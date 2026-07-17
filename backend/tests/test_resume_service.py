@@ -7,6 +7,7 @@ import pytest
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.models.candidate_profile import CandidateProfile
+from app.models.job import Job
 from app.services.resume import (
     CandidateProfileRequiredError,
     ResumeFileTooLargeError,
@@ -56,7 +57,9 @@ def test_upload_streams_file_and_creates_uploaded_resume(
     monkeypatch.setattr(settings, "upload_dir", str(tmp_path))
     session.refresh.side_effect = lambda resume: setattr(resume, "created_at", datetime.now(UTC))
 
-    upload_file = FakeUploadFile("C:\\Users\\Alan\\Resume.PDF", "application/pdf", b"pdf-content")
+    upload_file = FakeUploadFile(
+        "C:\\Users\\Alan\\Resume.PDF", "application/pdf", b"%PDF-1.4\ncontent"
+    )
     resume = asyncio.run(
         upload_resume(
             session,
@@ -66,12 +69,18 @@ def test_upload_streams_file_and_creates_uploaded_resume(
     )
 
     assert resume.original_filename == "Resume.PDF"
-    assert resume.file_size_bytes == len(b"pdf-content")
+    assert resume.file_size_bytes == len(b"%PDF-1.4\ncontent")
     assert resume.parse_status == "uploaded"
+    assert resume.checksum
     assert resume.extracted_text is None
     assert (tmp_path / f"{resume.id}.pdf") != tmp_path / "Resume.PDF"
     assert (tmp_path / resume.stored_path.split("\\")[-1]).exists()
-    session.add.assert_called_once_with(resume)
+    added = [call.args[0] for call in session.add.call_args_list]
+    assert resume in added
+    assert any(
+        isinstance(item, Job) and item.job_type == "resume_parse" and item.status == "pending"
+        for item in added
+    )
     session.commit.assert_called_once()
     assert upload_file.closed is True
 
@@ -111,7 +120,7 @@ def test_upload_database_failure_rolls_back_and_removes_file(
     session.commit.side_effect = SQLAlchemyError("database error")
     monkeypatch.setattr(settings, "upload_dir", str(tmp_path))
 
-    upload_file = FakeUploadFile("resume.pdf", "application/pdf", b"content")
+    upload_file = FakeUploadFile("resume.pdf", "application/pdf", b"%PDF-1.4\ncontent")
     with pytest.raises(SQLAlchemyError):
         asyncio.run(
             upload_resume(
@@ -135,7 +144,7 @@ def test_upload_storage_failure_closes_file(tmp_path, monkeypatch: pytest.Monkey
     upload_dir = tmp_path / "not-a-directory"
     upload_dir.write_text("file", encoding="utf-8")
     monkeypatch.setattr(settings, "upload_dir", str(upload_dir))
-    upload_file = FakeUploadFile("resume.pdf", "application/pdf", b"content")
+    upload_file = FakeUploadFile("resume.pdf", "application/pdf", b"%PDF-1.4\ncontent")
 
     with pytest.raises(ResumeStorageError):
         asyncio.run(upload_resume(session, profile.user_id, upload_file))

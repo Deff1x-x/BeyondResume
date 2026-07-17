@@ -1,15 +1,20 @@
 from contextlib import suppress
+from hashlib import sha256
+from io import BytesIO
 from pathlib import Path
+from zipfile import BadZipFile, ZipFile
 from uuid import UUID, uuid4
 
 from fastapi import UploadFile
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.models.candidate_profile import CandidateProfile
 from app.models.resume import Resume
+from app.models.job import Job
+from app.models.job import JobStatus, JobType
 
 MAX_RESUME_BYTES = 8 * 1024 * 1024
 CHUNK_SIZE = 64 * 1024
@@ -47,9 +52,22 @@ class ResumeStorageError(Exception):
     pass
 
 
+class InvalidResumeContentError(Exception):
+    pass
+
+
 def get_candidate_profile(session: Session, user_id: UUID) -> CandidateProfile | None:
     return session.execute(
         select(CandidateProfile).where(CandidateProfile.user_id == user_id)
+    ).scalar_one_or_none()
+
+
+def get_current_resume(session: Session, user_id: UUID) -> Resume | None:
+    profile = get_candidate_profile(session, user_id)
+    if profile is None:
+        return None
+    return session.execute(
+        select(Resume).where(Resume.candidate_id == profile.id, Resume.is_current.is_(True))
     ).scalar_one_or_none()
 
 
@@ -76,6 +94,19 @@ def _remove_file(path: Path) -> None:
         path.unlink()
 
 
+def _validate_content(extension: str, content: bytes) -> None:
+    if extension == ".pdf" and not content.startswith(b"%PDF-"):
+        raise InvalidResumeContentError
+    if extension == ".docx":
+        try:
+            with ZipFile(BytesIO(content)) as archive:
+                names = set(archive.namelist())
+        except BadZipFile as error:
+            raise InvalidResumeContentError from error
+        if not {"[Content_Types].xml", "word/document.xml"} <= names:
+            raise InvalidResumeContentError
+
+
 async def upload_resume(session: Session, user_id: UUID, upload_file: UploadFile) -> Resume:
     operation_error: BaseException | None = None
     try:
@@ -99,17 +130,21 @@ async def _upload_resume(session: Session, user_id: UUID, upload_file: UploadFil
     original_filename = _basename(upload_file.filename)
     extension = _extension_for(original_filename, upload_file.content_type)
     upload_dir = Path(settings.upload_dir)
+    content = bytearray()
+    while chunk := await upload_file.read(CHUNK_SIZE):
+        content.extend(chunk)
+        if len(content) > MAX_RESUME_BYTES:
+            raise ResumeFileTooLargeError
+    if not content:
+        raise EmptyResumeFileError
+    _validate_content(extension, bytes(content))
     destination = upload_dir / f"{uuid4()}{extension}"
+    checksum = sha256(content)
 
     try:
         upload_dir.mkdir(parents=True, exist_ok=True)
-        size = 0
         with destination.open("xb") as destination_file:
-            while chunk := await upload_file.read(CHUNK_SIZE):
-                size += len(chunk)
-                if size > MAX_RESUME_BYTES:
-                    raise ResumeFileTooLargeError
-                destination_file.write(chunk)
+            destination_file.write(content)
     except ResumeFileTooLargeError:
         _remove_file(destination)
         raise
@@ -117,21 +152,27 @@ async def _upload_resume(session: Session, user_id: UUID, upload_file: UploadFil
         _remove_file(destination)
         raise ResumeStorageError from error
 
-    if size == 0:
-        _remove_file(destination)
-        raise EmptyResumeFileError
-
     resume = Resume(
+        id=uuid4(),
         candidate_id=profile.id,
         original_filename=original_filename,
         stored_path=str(destination),
         mime_type=upload_file.content_type,
-        file_size_bytes=size,
+        file_size_bytes=len(content),
+        checksum=checksum.hexdigest(),
         extracted_text=None,
         parse_status="uploaded",
     )
-    session.add(resume)
     try:
+        session.execute(
+            update(Resume)
+            .where(Resume.candidate_id == profile.id, Resume.is_current.is_(True))
+            .values(is_current=False)
+        )
+        session.add(resume)
+        session.add(
+            Job(resume_id=resume.id, job_type=JobType.RESUME_PARSE, status=JobStatus.PENDING)
+        )
         session.commit()
     except SQLAlchemyError:
         session.rollback()
@@ -139,3 +180,11 @@ async def _upload_resume(session: Session, user_id: UUID, upload_file: UploadFil
         raise
     session.refresh(resume)
     return resume
+
+
+def get_download_path(resume: Resume) -> Path:
+    root = Path(settings.upload_dir).resolve()
+    path = Path(resume.stored_path).resolve()
+    if root not in path.parents or not path.is_file():
+        raise ResumeStorageError
+    return path

@@ -20,6 +20,8 @@ def test_resume_metadata_matches_contract() -> None:
         "extracted_text",
         "parse_status",
         "created_at",
+        "checksum",
+        "is_current",
     }
     assert "updated_at" not in resumes.columns
     assert {foreign_key.target_fullname for foreign_key in resumes.c.candidate_id.foreign_keys} == {

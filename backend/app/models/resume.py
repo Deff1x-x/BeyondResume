@@ -40,6 +40,8 @@ class Resume(Base):
     stored_path: Mapped[str] = mapped_column(Text, nullable=False)
     mime_type: Mapped[str] = mapped_column(String(100), nullable=False)
     file_size_bytes: Mapped[int] = mapped_column(Integer, nullable=False)
+    checksum: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    is_current: Mapped[bool] = mapped_column(nullable=False, server_default="true")
     extracted_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     parse_status: Mapped[str] = mapped_column(String(20), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
@@ -47,3 +49,23 @@ class Resume(Base):
     )
 
     candidate_profile: Mapped["CandidateProfile"] = relationship(back_populates="resumes")
+
+    @property
+    def candidate_profile_id(self) -> uuid.UUID:
+        return self.candidate_id
+
+    @property
+    def storage_path(self) -> str:
+        return self.stored_path
+
+    @property
+    def file_size(self) -> int:
+        return self.file_size_bytes
+
+    @property
+    def status(self) -> str:
+        return self.parse_status
+
+    @property
+    def uploaded_at(self) -> datetime:
+        return self.created_at

@@ -1,6 +1,7 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, UploadFile
+from fastapi.responses import FileResponse
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
@@ -8,7 +9,7 @@ from app.api.dependencies import require_candidate
 from app.api.errors import api_error
 from app.db.session import get_db
 from app.models.user import User
-from app.schemas.resume import ResumeUploadResponse
+from app.schemas.resume import ResumeResponse, ResumeUploadResponse
 from app.services.resume import (
     CandidateProfileRequiredError,
     EmptyResumeFileError,
@@ -18,6 +19,8 @@ from app.services.resume import (
     ResumeStorageError,
     UnsupportedResumeTypeError,
     upload_resume,
+    get_current_resume,
+    get_download_path,
 )
 
 router = APIRouter(prefix="/candidate", tags=["candidate"])
@@ -77,3 +80,29 @@ async def create_resume(
     except SQLAlchemyError:
         raise api_error(500, "DATABASE_ERROR", "Database operation failed") from None
     return ResumeUploadResponse.model_validate(resume)
+
+
+@router.get("/resume", response_model=ResumeResponse)
+def get_resume(
+    current_user: Annotated[User, Depends(require_candidate)],
+    session: Annotated[Session, Depends(get_db)],
+) -> ResumeResponse:
+    resume = get_current_resume(session, current_user.id)
+    if resume is None:
+        raise api_error(404, "RESUME_NOT_FOUND", "Current resume not found")
+    return ResumeResponse.model_validate(resume)
+
+
+@router.get("/resume/download")
+def download_resume(
+    current_user: Annotated[User, Depends(require_candidate)],
+    session: Annotated[Session, Depends(get_db)],
+) -> FileResponse:
+    resume = get_current_resume(session, current_user.id)
+    if resume is None:
+        raise api_error(404, "RESUME_NOT_FOUND", "Current resume not found")
+    try:
+        path = get_download_path(resume)
+    except ResumeStorageError:
+        raise api_error(404, "RESUME_FILE_NOT_FOUND", "Resume file not found") from None
+    return FileResponse(path, media_type=resume.mime_type, filename=resume.original_filename)

@@ -140,7 +140,7 @@ def test_resume_upload_missing_file_and_openapi(client: TestClient) -> None:
 
     assert missing.status_code == 422
     assert missing.json()["error"]["code"] == "VALIDATION_ERROR"
-    assert set(operations) == {"post"}
+    assert set(operations) == {"get", "post"}
     assert "multipart/form-data" in str(operations)
 
 

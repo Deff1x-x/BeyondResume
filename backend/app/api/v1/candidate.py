@@ -10,7 +10,7 @@ from app.db.session import get_db
 from app.models.user import User
 from app.schemas.candidate import CandidateProfilePatchRequest, CandidateProfileResponse
 from app.services.candidate import (
-    MissingCandidateProfileFullNameError,
+    CandidateProfileNotFoundError,
     get_candidate_profile,
     patch_candidate_profile,
 )
@@ -39,13 +39,8 @@ def patch_profile(
         profile = patch_candidate_profile(
             session, current_user.id, patch.model_dump(exclude_unset=True)
         )
-    except MissingCandidateProfileFullNameError:
-        raise api_error(
-            422,
-            "VALIDATION_ERROR",
-            "Validation error",
-            details=[{"field": "full_name", "issue": "missing"}],
-        ) from None
+    except CandidateProfileNotFoundError:
+        raise api_error(404, "CANDIDATE_PROFILE_NOT_FOUND", "Candidate profile not found") from None
     except SQLAlchemyError:
         raise api_error(500, "DATABASE_ERROR", "Database operation failed") from None
     return CandidateProfileResponse.model_validate(profile)
