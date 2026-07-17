@@ -12,7 +12,7 @@ def api_error(
     status_code: int,
     code: str,
     message: str,
-    details: Sequence[dict[str, str]] | None = None,
+    details: Sequence[dict[str, object]] | None = None,
     headers: dict[str, str] | None = None,
 ) -> HTTPException:
     return HTTPException(

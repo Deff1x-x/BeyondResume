@@ -1073,6 +1073,34 @@ Candidate only. The request DTO accepts only optional fields full_name, headline
 
 PATCH updates only explicitly supplied fields. Explicit null clears headline, country, timezone, work_format or bio; omitted fields remain unchanged. An empty PATCH returns an existing profile unchanged. If no profile exists, PATCH creates it, but full_name is required; its absence returns 422 VALIDATION_ERROR with details for full_name. If desired_role is omitted at creation, the candidate_profiles database default junior_python_backend_developer is used. Creation and updates return 200 with the same DTO as GET. PUT, POST and DELETE candidate profile endpoints are not part of the contract.
 
+POST /api/v1/candidate/resume
+
+Candidate only. Request content type is multipart/form-data with exactly one file field named file. Only PDF (application/pdf with .pdf extension) and DOCX (application/vnd.openxmlformats-officedocument.wordprocessingml.document with .docx extension) are accepted. MIME type and case-insensitive extension must match. Maximum size is 8 MiB (8_388_608 bytes); an empty file is invalid. The operation saves the original file locally and creates a resumes record with parse_status uploaded. It does not parse the file, create jobs, or invoke AI.
+
+Response 201:
+
+{
+  "id": "uuid",
+  "original_filename": "resume.pdf",
+  "mime_type": "application/pdf",
+  "file_size_bytes": 245812,
+  "parse_status": "uploaded",
+  "created_at": "2026-07-17T10:00:00Z"
+}
+
+The response must not include candidate_id, stored_path, extracted_text, user_id, filesystem paths or relationship objects. CandidateProfile must already exist for the current user; otherwise return 409:
+
+{
+  "error": {
+    "code": "CANDIDATE_PROFILE_REQUIRED",
+    "message": "Create a candidate profile before uploading a resume",
+    "details": [],
+    "request_id": "uuid"
+  }
+}
+
+Unsupported MIME, extension, or MIME/extension mismatch returns 415 UNSUPPORTED_RESUME_TYPE with details [{"field":"file","issue":"unsupported_type"}]. A file larger than 8_388_608 bytes returns 413 RESUME_FILE_TOO_LARGE with details [{"field":"file","issue":"file_too_large","max_bytes":8388608}]. An empty file returns 422 VALIDATION_ERROR with details [{"field":"file","issue":"empty_file"}].
+
 POST /api/v1/candidate/analyze
 
 Request:

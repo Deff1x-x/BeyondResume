@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://ebh:ebh@postgres:5432/ebh"
     jwt_secret: str = ""
     jwt_access_ttl_minutes: int = 15
+    upload_dir: str = "/app/data/uploads"
 
 
 settings = Settings()

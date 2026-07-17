@@ -1,0 +1,159 @@
+import asyncio
+from datetime import UTC, datetime
+from unittest.mock import Mock
+from uuid import uuid4
+
+import pytest
+from sqlalchemy.exc import SQLAlchemyError
+
+from app.models.candidate_profile import CandidateProfile
+from app.services.resume import (
+    CandidateProfileRequiredError,
+    ResumeFileTooLargeError,
+    upload_resume,
+)
+
+
+class FakeUploadFile:
+    def __init__(self, filename: str, content_type: str, content: bytes) -> None:
+        self.filename = filename
+        self.content_type = content_type
+        self._content = content
+        self._offset = 0
+        self.closed = False
+
+    async def read(self, size: int) -> bytes:
+        chunk = self._content[self._offset : self._offset + size]
+        self._offset += len(chunk)
+        return chunk
+
+    async def close(self) -> None:
+        self.closed = True
+
+
+def make_profile() -> CandidateProfile:
+    return CandidateProfile(id=uuid4(), user_id=uuid4(), full_name="Alan Yerkin")
+
+
+def make_session(profile: CandidateProfile | None) -> Mock:
+    session = Mock()
+    session.execute.return_value.scalar_one_or_none.return_value = profile
+    return session
+
+
+def test_upload_streams_file_and_creates_uploaded_resume(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.core.config import settings
+
+    profile = make_profile()
+    session = make_session(profile)
+    monkeypatch.setattr(settings, "upload_dir", str(tmp_path))
+    session.refresh.side_effect = lambda resume: setattr(resume, "created_at", datetime.now(UTC))
+
+    upload_file = FakeUploadFile("C:\\Users\\Alan\\Resume.PDF", "application/pdf", b"pdf-content")
+    resume = asyncio.run(
+        upload_resume(
+            session,
+            profile.user_id,
+            upload_file,
+        )
+    )
+
+    assert resume.original_filename == "Resume.PDF"
+    assert resume.file_size_bytes == len(b"pdf-content")
+    assert resume.parse_status == "uploaded"
+    assert resume.extracted_text is None
+    assert (tmp_path / f"{resume.id}.pdf") != tmp_path / "Resume.PDF"
+    assert (tmp_path / resume.stored_path.split("\\")[-1]).exists()
+    session.add.assert_called_once_with(resume)
+    session.commit.assert_called_once()
+    assert upload_file.closed is True
+
+
+def test_upload_rejects_oversized_file_and_cleans_partial_file(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.core.config import settings
+    from app.services.resume import MAX_RESUME_BYTES
+
+    profile = make_profile()
+    session = make_session(profile)
+    monkeypatch.setattr(settings, "upload_dir", str(tmp_path))
+
+    upload_file = FakeUploadFile("resume.pdf", "application/pdf", b"x" * (MAX_RESUME_BYTES + 1))
+    with pytest.raises(ResumeFileTooLargeError):
+        asyncio.run(
+            upload_resume(
+                session,
+                profile.user_id,
+                upload_file,
+            )
+        )
+
+    assert list(tmp_path.iterdir()) == []
+    session.add.assert_not_called()
+    assert upload_file.closed is True
+
+
+def test_upload_database_failure_rolls_back_and_removes_file(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.core.config import settings
+
+    profile = make_profile()
+    session = make_session(profile)
+    session.commit.side_effect = SQLAlchemyError("database error")
+    monkeypatch.setattr(settings, "upload_dir", str(tmp_path))
+
+    upload_file = FakeUploadFile("resume.pdf", "application/pdf", b"content")
+    with pytest.raises(SQLAlchemyError):
+        asyncio.run(
+            upload_resume(
+                session,
+                profile.user_id,
+                upload_file,
+            )
+        )
+
+    session.rollback.assert_called_once()
+    assert list(tmp_path.iterdir()) == []
+    assert upload_file.closed is True
+
+
+def test_upload_storage_failure_closes_file(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.core.config import settings
+    from app.services.resume import ResumeStorageError
+
+    profile = make_profile()
+    session = make_session(profile)
+    upload_dir = tmp_path / "not-a-directory"
+    upload_dir.write_text("file", encoding="utf-8")
+    monkeypatch.setattr(settings, "upload_dir", str(upload_dir))
+    upload_file = FakeUploadFile("resume.pdf", "application/pdf", b"content")
+
+    with pytest.raises(ResumeStorageError):
+        asyncio.run(upload_resume(session, profile.user_id, upload_file))
+
+    session.add.assert_not_called()
+    assert upload_file.closed is True
+
+
+def test_upload_requires_existing_candidate_profile(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.core.config import settings
+
+    session = make_session(None)
+    monkeypatch.setattr(settings, "upload_dir", str(tmp_path))
+
+    with pytest.raises(CandidateProfileRequiredError):
+        asyncio.run(
+            upload_resume(
+                session,
+                uuid4(),
+                FakeUploadFile("resume.pdf", "application/pdf", b"content"),
+            )
+        )
+
+    session.add.assert_not_called()

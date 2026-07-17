@@ -8,6 +8,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base, TimestampMixin
 
 if TYPE_CHECKING:
+    from app.models.resume import Resume
     from app.models.user import User
 
 
@@ -35,3 +36,4 @@ class CandidateProfile(TimestampMixin, Base):
     bio: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     user: Mapped["User"] = relationship(back_populates="candidate_profile")
+    resumes: Mapped[list["Resume"]] = relationship(back_populates="candidate_profile")
