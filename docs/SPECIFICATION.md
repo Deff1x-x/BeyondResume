@@ -371,9 +371,31 @@ Candidate регистрируется по email и паролю.
 7. при неуспехе Resume = `failed`;
 8. ошибка должна быть понятна пользователю и пригодна для повторной попытки.
 
+#### Plain-text parsing: граница текущего MVP
+
+Текущий MVP реализует только безопасное асинхронное извлечение plain text из загруженного Resume.
+
+`POST /candidate/resumes/{resume_id}/parse` запускает обработку Resume только через Job типа
+`resume_parse`: endpoint создаёт pending Job либо возвращает существующий активный Job в
+соответствии с idempotency-логикой. Endpoint не выполняет parsing синхронно и не возвращает
+извлечённый текст.
+
+Worker берёт pending Job, переводит его в `running`, извлекает plain text существующим parser
+service и сохраняет текст только во внутреннем поле `Resume.extracted_text`. При успехе одной
+транзакцией выполняются `Job: running → completed` и `Resume: uploaded → parsed`; при ошибке —
+`Job: running → failed` и `Resume: uploaded → failed`.
+
+Для этого MVP Resume имеет только переходы `uploaded → parsed` и `uploaded → failed`. Статус
+`parsing` не используется. `GET /jobs/{job_id}` — единственный публичный способ polling
+состояния обработки; отдельный endpoint результата parsing не нужен. Полный
+`Resume.extracted_text` не публикуется через публичный API и предназначен для будущих внутренних
+этапов обработки.
+
 ### 9.4 Evidence collection
 
-После parsing система извлекает потенциальные claims:
+Structured extraction и Evidence collection не входят в текущий plain-text parsing worker и
+реализуются отдельными последующими модулями. После их реализации система сможет извлекать
+потенциальные claims:
 
 - skills;
 - projects;
@@ -2014,6 +2036,11 @@ app/
 - admin видит technical error code;
 - duplicate jobs предотвращаются idempotency key.
 
+Для `resume_parse` текущего MVP Job относится к Resume и использует lifecycle
+`pending → running → completed|failed`. Повторный запуск возвращает существующий активный Job
+либо создаёт новую попытку только после failed Job в соответствии с правилами retry. Результат
+plain-text parsing хранится внутренне и не является публичным Job result.
+
 ## 61. API conventions
 
 Base path: `/api/v1`.
@@ -2064,9 +2091,14 @@ Error schema:
 - `GET /candidate/resumes/{id}`
 - `POST /candidate/resumes/{id}/parse`
 
+`POST /candidate/resumes/{id}/parse` запускает только plain-text parsing Job и не возвращает
+извлечённый текст. Отдельного endpoint для parsing result нет.
+
 ### Jobs
 
 - `GET /jobs/{id}`
+
+`GET /jobs/{id}` является единственным публичным polling endpoint для Resume processing.
 
 ### Evidence
 
@@ -2502,9 +2534,14 @@ Billing payment integration не обязана быть рабочей в Hacka
 - jobs table;
 - BackgroundTasks trigger;
 - pending → running → completed/failed;
+- safe PDF/DOCX plain-text extraction into internal `Resume.extracted_text`;
+- `Resume: uploaded → parsed|failed` without a `parsing` status;
 - `GET /api/v1/jobs/{job_id}`;
 - upload response returns job reference;
 - tests for idempotency and failures.
+
+Stage 6B не включает structured extraction, contacts, education, projects, skills, Evidence,
+Skill Passport, AI analysis или matching. Эти функции относятся к последующим отдельным модулям.
 
 ### Stage 7 — GitHub Evidence
 
@@ -2841,15 +2878,12 @@ Protected attributes не запрашиваются для scoring.
 1. Job `pending` → `running`.
 2. Из файла извлекается текст.
 3. Пустой или слишком короткий текст считается ошибкой качества.
-4. Сохраняется checksum.
-5. Сохраняется parsed text или безопасная производная.
-6. Запускается structured extraction adapter.
-7. Извлекаются skills, projects, education, experience, contacts.
-8. Результат проходит schema validation.
-9. Создаются candidate evidence records.
-10. Job становится `completed`.
-11. Profile analysis помечается `stale`.
-12. Запускается rebuild Skill Passport.
+4. Plain text сохраняется только во внутреннем `Resume.extracted_text`; он не возвращается
+   публичным API.
+5. Одной транзакцией Job становится `completed`, а Resume переходит `uploaded` → `parsed`.
+6. Structured extraction, contacts, education, projects, skills, Evidence, Skill Passport, AI
+   analysis и matching выполняются отдельными последующими модулями и не являются частью этого
+   worker.
 
 ### 91.3 Parsing failures
 
@@ -2860,8 +2894,6 @@ Protected attributes не запрашиваются для scoring.
 - `corrupted_file`;
 - `empty_text`;
 - `extractor_timeout`;
-- `ai_provider_error`;
-- `invalid_structured_output`;
 - `internal_error`.
 
 Пользователь видит действие: повторить, загрузить другой файл или продолжить без resume.

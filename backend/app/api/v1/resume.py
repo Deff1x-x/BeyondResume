@@ -1,6 +1,7 @@
 from typing import Annotated, Literal, cast
+from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
@@ -8,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.api.dependencies import require_candidate
 from app.api.errors import api_error
 from app.db.session import get_db
+from app.models.job import JobStatus
 from app.models.user import User
 from app.schemas.resume import JobPollingResponse, ResumeResponse, ResumeUploadResponse
 from app.services.resume import (
@@ -20,9 +22,15 @@ from app.services.resume import (
     UnsupportedResumeTypeError,
     upload_resume,
     get_current_resume,
+    get_candidate_resume,
     get_download_path,
 )
-from app.services.resume_jobs import ResumeTransitionError, retry_failed_resume
+from app.services.resume_jobs import (
+    ResumeTransitionError,
+    request_resume_parse,
+    retry_failed_resume,
+)
+from app.services.resume_parsing import run_resume_parse_job_task
 
 router = APIRouter(prefix="/candidate", tags=["candidate"])
 
@@ -107,6 +115,42 @@ def download_resume(
     except ResumeStorageError:
         raise api_error(404, "RESUME_FILE_NOT_FOUND", "Resume file not found") from None
     return FileResponse(path, media_type=resume.mime_type, filename=resume.original_filename)
+
+
+@router.post("/resumes/{resume_id}/parse", response_model=JobPollingResponse)
+def request_resume_parsing(
+    resume_id: UUID,
+    background_tasks: BackgroundTasks,
+    current_user: Annotated[User, Depends(require_candidate)],
+    session: Annotated[Session, Depends(get_db)],
+) -> JobPollingResponse:
+    resume = get_candidate_resume(session, current_user.id, resume_id)
+    if resume is None:
+        raise api_error(404, "RESUME_NOT_FOUND", "Resume not found")
+    try:
+        job = request_resume_parse(session, resume)
+    except ResumeTransitionError:
+        raise api_error(
+            409, "RESUME_PARSE_NOT_ALLOWED", "Resume parsing is not available"
+        ) from None
+    except SQLAlchemyError:
+        session.rollback()
+        raise api_error(500, "DATABASE_ERROR", "Database operation failed") from None
+
+    if job.status == JobStatus.PENDING:
+        background_tasks.add_task(run_resume_parse_job_task, job.id)
+    return JobPollingResponse(
+        id=job.id,
+        status=job.status,
+        created_at=job.created_at,
+        started_at=job.started_at,
+        completed_at=job.completed_at,
+        failed_at=job.failed_at,
+        error_code=job.error_code,
+        error_message=job.error_message,
+        resume_status=cast(Literal["uploaded", "parsed", "failed"], resume.parse_status),
+        retry_available=False,
+    )
 
 
 @router.post("/resume/retry", response_model=JobPollingResponse, status_code=201)

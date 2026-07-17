@@ -15,6 +15,7 @@ from app.services.resume_jobs import (
     complete_job,
     fail_job,
     is_retry_available,
+    request_resume_parse,
     retry_failed_resume,
 )
 
@@ -261,3 +262,39 @@ def test_non_failed_job_cannot_make_retry_available(job_status: JobStatus) -> No
     job = make_job(resume, job_status)
 
     assert is_retry_available(Mock(), job, resume) is False
+
+
+def test_parse_request_returns_existing_active_job_idempotently() -> None:
+    resume = make_resume()
+    active = make_job(resume, JobStatus.PENDING)
+    session = Mock()
+    session.execute.return_value = SimpleNamespace(scalar_one_or_none=lambda: active)
+
+    assert request_resume_parse(session, resume) is active
+    session.add.assert_not_called()
+    session.commit.assert_not_called()
+
+
+def test_parse_request_creates_pending_job_for_uploaded_resume() -> None:
+    resume = make_resume()
+    session = Mock()
+    session.execute.return_value = SimpleNamespace(scalar_one_or_none=lambda: None)
+
+    job = request_resume_parse(session, resume)
+
+    assert job.job_type == JobType.RESUME_PARSE
+    assert job.status == JobStatus.PENDING
+    assert job.resume_id == resume.id
+    session.add.assert_called_once_with(job)
+    session.commit.assert_called_once()
+
+
+def test_parse_request_reuses_retry_lifecycle_for_failed_resume() -> None:
+    resume = make_resume("failed")
+    session = Mock()
+    session.execute.return_value = SimpleNamespace(scalar_one_or_none=lambda: None)
+
+    job = request_resume_parse(session, resume)
+
+    assert job.status == JobStatus.PENDING
+    assert resume.parse_status == "uploaded"

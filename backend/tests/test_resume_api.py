@@ -310,3 +310,84 @@ def test_resume_retry_rejects_employer(client: TestClient) -> None:
     response = client.post("/api/v1/candidate/resume/retry")
 
     assert response.status_code == 403
+
+
+def test_parse_request_creates_orchestrated_job_without_text(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.api.v1 import resume as resume_api
+
+    candidate = make_user()
+    authorize_candidate(candidate)
+    resume = make_resume()
+    job = Job(
+        id=uuid4(),
+        resume_id=resume.id,
+        job_type=JobType.RESUME_PARSE,
+        status=JobStatus.PENDING,
+        created_at=datetime.now(UTC),
+    )
+    monkeypatch.setattr(resume_api, "get_candidate_resume", lambda *_args: resume)
+    monkeypatch.setattr(resume_api, "request_resume_parse", lambda *_args: job)
+    worker_calls: list[object] = []
+
+    async def run_worker(*args: object) -> None:
+        worker_calls.append(args)
+
+    monkeypatch.setattr(resume_api, "run_resume_parse_job_task", run_worker)
+
+    response = client.post(f"/api/v1/candidate/resumes/{resume.id}/parse")
+
+    assert response.status_code == 200
+    assert response.json()["id"] == str(job.id)
+    assert response.json()["status"] == "pending"
+    assert "extracted_text" not in response.json()
+    assert worker_calls == [(job.id,)]
+
+
+def test_parse_request_is_idempotent_for_active_job(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.api.v1 import resume as resume_api
+
+    authorize_candidate(make_user())
+    resume = make_resume()
+    active = Job(
+        id=uuid4(),
+        resume_id=resume.id,
+        job_type=JobType.RESUME_PARSE,
+        status=JobStatus.RUNNING,
+        created_at=datetime.now(UTC),
+        started_at=datetime.now(UTC),
+    )
+    monkeypatch.setattr(resume_api, "get_candidate_resume", lambda *_args: resume)
+    monkeypatch.setattr(resume_api, "request_resume_parse", lambda *_args: active)
+
+    response = client.post(f"/api/v1/candidate/resumes/{resume.id}/parse")
+
+    assert response.status_code == 200
+    assert response.json()["id"] == str(active.id)
+    assert response.json()["status"] == "running"
+
+
+def test_parse_request_returns_not_found_for_other_candidate(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.api.v1 import resume as resume_api
+
+    authorize_candidate(make_user())
+    monkeypatch.setattr(resume_api, "get_candidate_resume", lambda *_args: None)
+
+    response = client.post(f"/api/v1/candidate/resumes/{uuid4()}/parse")
+
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "RESUME_NOT_FOUND"
+
+
+def test_parse_endpoint_openapi_does_not_expose_extracted_text(client: TestClient) -> None:
+    operation = client.get("/openapi.json").json()["paths"][
+        "/api/v1/candidate/resumes/{resume_id}/parse"
+    ]
+
+    assert set(operation) == {"post"}
+    assert "extracted_text" not in str(operation)

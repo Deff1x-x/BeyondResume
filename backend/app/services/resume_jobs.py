@@ -138,6 +138,44 @@ def retry_failed_resume(session: Session, resume: Resume) -> Job:
     return job
 
 
+def request_resume_parse(session: Session, resume: Resume) -> Job:
+    """Return an active parse Job or create the next allowed parse attempt."""
+    active = session.execute(
+        select(Job).where(
+            Job.resume_id == resume.id,
+            Job.job_type == JobType.RESUME_PARSE,
+            Job.status.in_([JobStatus.PENDING, JobStatus.RUNNING]),
+        )
+    ).scalar_one_or_none()
+    if active is not None:
+        return active
+    if resume.parse_status == "failed":
+        return retry_failed_resume(session, resume)
+    if resume.parse_status != "uploaded":
+        raise ResumeTransitionError("Resume parsing is not available for this status")
+
+    job = Job(resume_id=resume.id, job_type=JobType.RESUME_PARSE, status=JobStatus.PENDING)
+    session.add(job)
+    try:
+        session.commit()
+    except IntegrityError:
+        session.rollback()
+        active = session.execute(
+            select(Job).where(
+                Job.resume_id == resume.id,
+                Job.job_type == JobType.RESUME_PARSE,
+                Job.status.in_([JobStatus.PENDING, JobStatus.RUNNING]),
+            )
+        ).scalar_one_or_none()
+        if active is not None:
+            return active
+        raise
+    except SQLAlchemyError:
+        session.rollback()
+        raise
+    return job
+
+
 def is_retry_available(session: Session, job: Job, resume: Resume) -> bool:
     """Return whether this failed parse attempt may create a new pending job."""
     if (

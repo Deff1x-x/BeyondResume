@@ -71,6 +71,14 @@ def get_current_resume(session: Session, user_id: UUID) -> Resume | None:
     ).scalar_one_or_none()
 
 
+def get_candidate_resume(session: Session, user_id: UUID, resume_id: UUID) -> Resume | None:
+    return session.execute(
+        select(Resume)
+        .join(CandidateProfile, Resume.candidate_id == CandidateProfile.id)
+        .where(Resume.id == resume_id, CandidateProfile.user_id == user_id)
+    ).scalar_one_or_none()
+
+
 def _basename(filename: str | None) -> str:
     if filename is None:
         raise MissingResumeFilenameError
