@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     jwt_secret: str = ""
     jwt_access_ttl_minutes: int = 15
     upload_dir: str = "/app/data/uploads"
+    resume_parse_timeout_seconds: int = 20
 
 
 settings = Settings()
