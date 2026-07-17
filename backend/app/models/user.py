@@ -16,7 +16,11 @@ class User(TimestampMixin, Base):
     __tablename__ = "users"
     __table_args__ = (
         CheckConstraint("role IN ('candidate', 'employer')", name="ck_users_role"),
-        CheckConstraint("status IN ('active', 'blocked', 'deleted')", name="ck_users_status"),
+        CheckConstraint(
+            "status IN ('pending_verification', 'active', 'suspended', "
+            "'deletion_requested', 'deleted')",
+            name="ck_users_status",
+        ),
         Index("ux_users_email", "email", unique=True),
         Index("ix_users_role", "role"),
     )

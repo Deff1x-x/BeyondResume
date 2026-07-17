@@ -1,6 +1,8 @@
 from unittest.mock import Mock
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
+import jwt
 import pytest
 from fastapi import HTTPException
 from fastapi.security import HTTPAuthorizationCredentials
@@ -38,12 +40,28 @@ def test_current_active_user_loads_user_from_database(monkeypatch: pytest.Monkey
     assert current_user is user
 
 
-@pytest.mark.parametrize("user", [None, make_user(status="blocked")])
+@pytest.mark.parametrize("user", [None, make_user(status="suspended")])
 def test_unknown_or_inactive_user_is_rejected(
     user: User | None, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     token = create_access_token(uuid4())
     monkeypatch.setattr(dependencies, "get_user_by_id", lambda *_args: user)
+
+    with pytest.raises(HTTPException) as error:
+        dependencies.get_current_active_user(
+            HTTPAuthorizationCredentials(scheme="Bearer", credentials=token), Mock()
+        )
+
+    assert error.value.status_code == 401
+    assert error.value.headers == {"WWW-Authenticate": "Bearer"}
+
+
+def test_expired_token_is_rejected_as_unauthorized() -> None:
+    token = jwt.encode(
+        {"sub": str(uuid4()), "exp": datetime.now(UTC) - timedelta(seconds=1)},
+        settings.jwt_secret,
+        algorithm="HS256",
+    )
 
     with pytest.raises(HTTPException) as error:
         dependencies.get_current_active_user(

@@ -32,6 +32,9 @@ class CandidateProfile(TimestampMixin, Base):
     desired_role: Mapped[str] = mapped_column(
         String(80), nullable=False, server_default=text("'junior_python_backend_developer'")
     )
+    onboarding_status: Mapped[str] = mapped_column(
+        String(30), nullable=False, server_default=text("'profile_required'")
+    )
     work_format: Mapped[str | None] = mapped_column(String(20), nullable=True)
     bio: Mapped[str | None] = mapped_column(Text, nullable=True)
 

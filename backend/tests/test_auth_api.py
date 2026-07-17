@@ -36,18 +36,32 @@ def test_register_contract_for_candidate_and_employer(
 ) -> None:
     from app.api.v1 import auth
 
-    monkeypatch.setattr(auth, "register_user", lambda *_args: make_user("candidate"))
+    monkeypatch.setattr(auth, "register_user", lambda *_args, **_kwargs: make_user("candidate"))
     candidate = client.post(
         "/api/v1/auth/register",
-        json={"email": "candidate@example.com", "password": "StrongPass123", "role": "candidate"},
+        json={
+            "email": "candidate@example.com",
+            "password": "StrongPass123",
+            "password_confirmation": "StrongPass123",
+            "role": "candidate",
+            "terms_accepted": True,
+            "privacy_accepted": True,
+        },
     )
-    monkeypatch.setattr(auth, "register_user", lambda *_args: make_user("employer"))
+    monkeypatch.setattr(auth, "register_user", lambda *_args, **_kwargs: make_user("employer"))
     employer = client.post(
         "/api/v1/auth/register",
-        json={"email": "employer@example.com", "password": "StrongPass123", "role": "employer"},
+        json={
+            "email": "employer@example.com",
+            "password": "StrongPass123",
+            "password_confirmation": "StrongPass123",
+            "role": "employer",
+            "terms_accepted": True,
+            "privacy_accepted": True,
+        },
     )
     assert candidate.status_code == employer.status_code == 201
-    assert set(candidate.json()) == set(employer.json()) == {"id", "email", "role"}
+    assert set(candidate.json()) == set(employer.json()) == {"access_token", "token_type"}
 
 
 def test_register_rejects_unsupported_role_and_duplicate_email(
@@ -58,20 +72,115 @@ def test_register_rejects_unsupported_role_and_duplicate_email(
 
     invalid_role = client.post(
         "/api/v1/auth/register",
-        json={"email": "user@example.com", "password": "StrongPass123", "role": "admin"},
+        json={
+            "email": "user@example.com",
+            "password": "StrongPass123",
+            "password_confirmation": "StrongPass123",
+            "role": "admin",
+            "terms_accepted": True,
+            "privacy_accepted": True,
+        },
     )
 
-    def duplicate(*_args: object) -> User:
+    def duplicate(*_args: object, **_kwargs: object) -> User:
         raise DuplicateEmailError
 
     monkeypatch.setattr(auth, "register_user", duplicate)
     duplicate_response = client.post(
         "/api/v1/auth/register",
-        json={"email": "user@example.com", "password": "StrongPass123", "role": "candidate"},
+        json={
+            "email": "user@example.com",
+            "password": "StrongPass123",
+            "password_confirmation": "StrongPass123",
+            "role": "candidate",
+            "terms_accepted": True,
+            "privacy_accepted": True,
+        },
     )
     assert invalid_role.status_code == 422
     assert duplicate_response.status_code == 409
-    assert duplicate_response.json()["error"]["code"] == "DUPLICATE_EMAIL"
+    assert duplicate_response.json()["error"]["code"] == "EMAIL_ALREADY_EXISTS"
+
+
+def test_register_returns_verification_requirement_outside_demo_mode(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.api.v1 import auth
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings, "demo_mode", False)
+    monkeypatch.setattr(
+        auth,
+        "register_user",
+        lambda *_args, **_kwargs: User(
+            id=uuid4(),
+            email="candidate@example.com",
+            password_hash="$argon2id$not-public",
+            role="candidate",
+            status="pending_verification",
+        ),
+    )
+
+    response = client.post(
+        "/api/v1/auth/register",
+        json={
+            "email": "candidate@example.com",
+            "password": "StrongPass123",
+            "password_confirmation": "StrongPass123",
+            "role": "candidate",
+            "terms_accepted": True,
+            "privacy_accepted": True,
+        },
+    )
+
+    assert response.status_code == 201
+    assert response.json() == {"verification_required": True}
+
+
+@pytest.mark.parametrize(
+    "payload, error_code",
+    [
+        (
+            {
+                "email": "user@example.com",
+                "password": "short",
+                "password_confirmation": "short",
+                "role": "candidate",
+                "terms_accepted": True,
+                "privacy_accepted": True,
+            },
+            "PASSWORD_POLICY_FAILED",
+        ),
+        (
+            {
+                "email": "user@example.com",
+                "password": "StrongPass123",
+                "password_confirmation": "DifferentPass123",
+                "role": "candidate",
+                "terms_accepted": True,
+                "privacy_accepted": True,
+            },
+            "PASSWORD_POLICY_FAILED",
+        ),
+        (
+            {
+                "email": "user@example.com",
+                "password": "StrongPass123",
+                "password_confirmation": "StrongPass123",
+                "role": "candidate",
+                "terms_accepted": False,
+                "privacy_accepted": True,
+            },
+            "CONSENT_REQUIRED",
+        ),
+    ],
+)
+def test_register_enforces_password_policy_and_consent(
+    client: TestClient, payload: dict[str, object], error_code: str
+) -> None:
+    response = client.post("/api/v1/auth/register", json=payload)
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == error_code
 
 
 def test_login_contract_and_identical_invalid_credentials_error(
@@ -119,3 +228,4 @@ def test_openapi_contains_stage_three_routes(client: TestClient) -> None:
         "/api/v1/me",
     }.issubset(schema["paths"])
     assert "password_hash" not in str(schema)
+    assert "event_type" not in str(schema)
