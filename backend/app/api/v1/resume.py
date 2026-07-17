@@ -1,4 +1,4 @@
-from typing import Annotated
+from typing import Annotated, Literal, cast
 
 from fastapi import APIRouter, Depends, File, UploadFile
 from fastapi.responses import FileResponse
@@ -9,7 +9,7 @@ from app.api.dependencies import require_candidate
 from app.api.errors import api_error
 from app.db.session import get_db
 from app.models.user import User
-from app.schemas.resume import ResumeResponse, ResumeUploadResponse
+from app.schemas.resume import JobPollingResponse, ResumeResponse, ResumeUploadResponse
 from app.services.resume import (
     CandidateProfileRequiredError,
     EmptyResumeFileError,
@@ -22,6 +22,7 @@ from app.services.resume import (
     get_current_resume,
     get_download_path,
 )
+from app.services.resume_jobs import ResumeTransitionError, retry_failed_resume
 
 router = APIRouter(prefix="/candidate", tags=["candidate"])
 
@@ -106,3 +107,33 @@ def download_resume(
     except ResumeStorageError:
         raise api_error(404, "RESUME_FILE_NOT_FOUND", "Resume file not found") from None
     return FileResponse(path, media_type=resume.mime_type, filename=resume.original_filename)
+
+
+@router.post("/resume/retry", response_model=JobPollingResponse, status_code=201)
+def retry_resume_processing(
+    current_user: Annotated[User, Depends(require_candidate)],
+    session: Annotated[Session, Depends(get_db)],
+) -> JobPollingResponse:
+    resume = get_current_resume(session, current_user.id)
+    if resume is None:
+        raise api_error(404, "RESUME_NOT_FOUND", "Current resume not found")
+    try:
+        job = retry_failed_resume(session, resume)
+    except ResumeTransitionError:
+        raise api_error(409, "RESUME_RETRY_NOT_ALLOWED", "Resume retry is not available") from None
+    except SQLAlchemyError:
+        session.rollback()
+        raise api_error(500, "DATABASE_ERROR", "Database operation failed") from None
+
+    return JobPollingResponse(
+        id=job.id,
+        status=job.status,
+        created_at=job.created_at,
+        started_at=job.started_at,
+        completed_at=job.completed_at,
+        failed_at=job.failed_at,
+        error_code=job.error_code,
+        error_message=job.error_message,
+        resume_status=cast(Literal["uploaded", "parsed", "failed"], resume.parse_status),
+        retry_available=False,
+    )

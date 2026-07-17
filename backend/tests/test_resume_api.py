@@ -1,4 +1,6 @@
 from datetime import UTC, datetime
+from types import SimpleNamespace
+from unittest.mock import Mock
 from uuid import uuid4
 
 import pytest
@@ -7,6 +9,7 @@ from fastapi.testclient import TestClient
 from app.api.dependencies import require_candidate
 from app.api.errors import api_error
 from app.db.session import get_db
+from app.models.job import Job, JobStatus, JobType
 from app.main import app
 from app.models.resume import Resume
 from app.models.user import User
@@ -160,5 +163,150 @@ def test_resume_upload_rejects_employer(client: TestClient) -> None:
     response = client.post(
         "/api/v1/candidate/resume", files={"file": ("resume.pdf", b"content", "application/pdf")}
     )
+
+    assert response.status_code == 403
+
+
+def test_job_polling_returns_only_safe_lifecycle_fields(client: TestClient) -> None:
+    candidate = make_user()
+    authorize_candidate(candidate)
+    resume = make_resume()
+    resume.parse_status = "failed"
+    job = Job(
+        id=uuid4(),
+        resume_id=resume.id,
+        job_type=JobType.RESUME_PARSE,
+        status=JobStatus.FAILED,
+        created_at=datetime.now(UTC),
+        error_code="RESUME_FILE_MISSING",
+        error_message="Resume file is unavailable",
+    )
+    session = Mock()
+    session.execute.side_effect = [
+        SimpleNamespace(one_or_none=lambda: (job, resume)),
+        SimpleNamespace(scalar_one_or_none=lambda: None),
+    ]
+    app.dependency_overrides[get_db] = lambda: session
+
+    response = client.get(f"/api/v1/jobs/{job.id}")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "failed"
+    assert body["resume_status"] == "failed"
+    assert body["retry_available"] is True
+    assert "storage_path" not in body
+    assert "checksum" not in body
+    assert "extracted_text" not in body
+    assert "resume_id" not in body
+
+
+def test_job_polling_returns_typed_not_found_for_other_candidate(client: TestClient) -> None:
+    authorize_candidate(make_user())
+    session = type(
+        "Session",
+        (),
+        {"execute": lambda *_args: type("Result", (), {"one_or_none": lambda _: None})()},
+    )()
+    app.dependency_overrides[get_db] = lambda: session
+
+    response = client.get(f"/api/v1/jobs/{uuid4()}")
+
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "JOB_NOT_FOUND"
+
+
+def test_job_polling_requires_authentication(client: TestClient) -> None:
+    response = client.get(f"/api/v1/jobs/{uuid4()}")
+
+    assert response.status_code == 401
+
+
+def test_job_polling_rejects_employer(client: TestClient) -> None:
+    app.dependency_overrides[require_candidate] = lambda: (_ for _ in ()).throw(
+        api_error(403, "FORBIDDEN", "Candidate role required")
+    )
+
+    response = client.get(f"/api/v1/jobs/{uuid4()}")
+
+    assert response.status_code == 403
+
+
+def test_resume_retry_returns_new_pending_job(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.api.v1 import resume as resume_api
+
+    candidate = make_user()
+    authorize_candidate(candidate)
+    failed_resume = make_resume()
+    failed_resume.parse_status = "failed"
+    job = Job(
+        id=uuid4(),
+        resume_id=failed_resume.id,
+        job_type=JobType.RESUME_PARSE,
+        status=JobStatus.PENDING,
+        created_at=datetime.now(UTC),
+    )
+    monkeypatch.setattr(resume_api, "get_current_resume", lambda *_args: failed_resume)
+
+    def retry(*_args: object) -> Job:
+        failed_resume.parse_status = "uploaded"
+        return job
+
+    monkeypatch.setattr(resume_api, "retry_failed_resume", retry)
+
+    response = client.post("/api/v1/candidate/resume/retry")
+
+    assert response.status_code == 201
+    assert response.json()["status"] == "pending"
+    assert response.json()["resume_status"] == "uploaded"
+
+
+def test_resume_retry_rejects_non_failed_current_resume(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.api.v1 import resume as resume_api
+    from app.services.resume_jobs import ResumeTransitionError
+
+    authorize_candidate(make_user())
+    monkeypatch.setattr(resume_api, "get_current_resume", lambda *_args: make_resume())
+
+    def retry(*_args: object) -> Job:
+        raise ResumeTransitionError
+
+    monkeypatch.setattr(resume_api, "retry_failed_resume", retry)
+    response = client.post("/api/v1/candidate/resume/retry")
+
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "RESUME_RETRY_NOT_ALLOWED"
+
+
+def test_resume_retry_returns_not_found_without_current_resume(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.api.v1 import resume as resume_api
+
+    authorize_candidate(make_user())
+    monkeypatch.setattr(resume_api, "get_current_resume", lambda *_args: None)
+
+    response = client.post("/api/v1/candidate/resume/retry")
+
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "RESUME_NOT_FOUND"
+
+
+def test_resume_retry_requires_authentication(client: TestClient) -> None:
+    response = client.post("/api/v1/candidate/resume/retry")
+
+    assert response.status_code == 401
+
+
+def test_resume_retry_rejects_employer(client: TestClient) -> None:
+    app.dependency_overrides[require_candidate] = lambda: (_ for _ in ()).throw(
+        api_error(403, "FORBIDDEN", "Candidate role required")
+    )
+
+    response = client.post("/api/v1/candidate/resume/retry")
 
     assert response.status_code == 403

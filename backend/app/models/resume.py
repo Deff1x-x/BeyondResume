@@ -44,6 +44,10 @@ class Resume(Base):
     is_current: Mapped[bool] = mapped_column(nullable=False, server_default="true")
     extracted_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     parse_status: Mapped[str] = mapped_column(String(20), nullable=False)
+    parsed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    failed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    parse_error_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    parse_error_message: Mapped[str | None] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )

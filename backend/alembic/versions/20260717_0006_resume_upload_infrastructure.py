@@ -28,9 +28,17 @@ def upgrade() -> None:
         "export_generation",
         "webhook_delivery",
         name="job_type",
+        create_type=False,
     )
     job_status = postgresql.ENUM(
-        "pending", "running", "completed", "failed", "cancelled", "expired", name="job_status"
+        "pending",
+        "running",
+        "completed",
+        "failed",
+        "cancelled",
+        "expired",
+        name="job_status",
+        create_type=False,
     )
     job_type.create(op.get_bind(), checkfirst=True)
     job_status.create(op.get_bind(), checkfirst=True)
