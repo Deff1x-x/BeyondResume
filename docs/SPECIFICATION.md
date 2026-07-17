@@ -1039,6 +1039,40 @@ Response 201:
   "role": "candidate"
 }
 
+GET /api/v1/candidate/profile
+
+Candidate only. Response 200:
+
+{
+  "id": "uuid",
+  "full_name": "Alan Yerkin",
+  "headline": "Junior Python Backend Developer",
+  "country": "Kazakhstan",
+  "timezone": "Asia/Almaty",
+  "desired_role": "junior_python_backend_developer",
+  "work_format": "remote",
+  "bio": "Short professional biography"
+}
+
+Response fields: id, full_name, headline, country, timezone, desired_role, work_format and bio. headline, country, timezone, work_format and bio may be null. The response must not include user_id, timestamps, user data, relationships or fields from other tables.
+
+If the profile is absent, return 404 with:
+
+{
+  "error": {
+    "code": "CANDIDATE_PROFILE_NOT_FOUND",
+    "message": "Candidate profile not found",
+    "details": [],
+    "request_id": "uuid"
+  }
+}
+
+PATCH /api/v1/candidate/profile
+
+Candidate only. The request DTO accepts only optional fields full_name, headline, country, timezone, desired_role, work_format and bio. full_name has length 1..150 and desired_role has length 1..80; both are trimmed and cannot be null or whitespace-only. headline, country and timezone have maximum lengths 160, 80 and 60 respectively. work_format is remote, hybrid, onsite, any or null. bio is string or null. Extra fields are forbidden.
+
+PATCH updates only explicitly supplied fields. Explicit null clears headline, country, timezone, work_format or bio; omitted fields remain unchanged. An empty PATCH returns an existing profile unchanged. If no profile exists, PATCH creates it, but full_name is required; its absence returns 422 VALIDATION_ERROR with details for full_name. If desired_role is omitted at creation, the candidate_profiles database default junior_python_backend_developer is used. Creation and updates return 200 with the same DTO as GET. PUT, POST and DELETE candidate profile endpoints are not part of the contract.
+
 POST /api/v1/candidate/analyze
 
 Request:

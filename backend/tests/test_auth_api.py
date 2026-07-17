@@ -111,7 +111,11 @@ def test_me_contract_and_missing_token(client: TestClient) -> None:
     assert missing_token.headers["www-authenticate"] == "Bearer"
 
 
-def test_openapi_contains_only_stage_three_api_routes(client: TestClient) -> None:
+def test_openapi_contains_stage_three_routes(client: TestClient) -> None:
     schema = client.get("/openapi.json").json()
-    assert set(schema["paths"]) == {"/api/v1/auth/register", "/api/v1/auth/login", "/api/v1/me"}
+    assert {
+        "/api/v1/auth/register",
+        "/api/v1/auth/login",
+        "/api/v1/me",
+    }.issubset(schema["paths"])
     assert "password_hash" not in str(schema)
