@@ -25,9 +25,7 @@ class User(TimestampMixin, Base):
     email: Mapped[str] = mapped_column(CITEXT, nullable=False)
     password_hash: Mapped[str] = mapped_column(Text, nullable=False)
     role: Mapped[str] = mapped_column(String(20), nullable=False)
-    status: Mapped[str] = mapped_column(
-        String(20), nullable=False, server_default=text("'active'")
-    )
+    status: Mapped[str] = mapped_column(String(20), nullable=False, server_default=text("'active'"))
 
     candidate_profile: Mapped["CandidateProfile | None"] = relationship(
         back_populates="user", uselist=False

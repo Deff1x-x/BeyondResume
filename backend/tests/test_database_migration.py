@@ -4,10 +4,7 @@ from pathlib import Path
 
 def test_database_foundation_migration_imports() -> None:
     migration_path = (
-        Path(__file__).parents[1]
-        / "alembic"
-        / "versions"
-        / "20260717_0001_database_foundation.py"
+        Path(__file__).parents[1] / "alembic" / "versions" / "20260717_0001_database_foundation.py"
     )
     spec = importlib.util.spec_from_file_location("database_foundation_migration", migration_path)
 
@@ -22,10 +19,7 @@ def test_database_foundation_migration_imports() -> None:
 
 def test_database_foundation_migration_has_no_duplicate_unique_objects() -> None:
     migration_path = (
-        Path(__file__).parents[1]
-        / "alembic"
-        / "versions"
-        / "20260717_0001_database_foundation.py"
+        Path(__file__).parents[1] / "alembic" / "versions" / "20260717_0001_database_foundation.py"
     )
     source = migration_path.read_text(encoding="utf-8")
 

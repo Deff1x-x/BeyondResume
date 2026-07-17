@@ -25,14 +25,18 @@ def test_candidate_profile_user_relationship_constraints() -> None:
     table = Base.metadata.tables["candidate_profiles"]
 
     assert table.c.user_id.unique is True
-    assert {foreign_key.target_fullname for foreign_key in table.c.user_id.foreign_keys} == {"users.id"}
+    assert {foreign_key.target_fullname for foreign_key in table.c.user_id.foreign_keys} == {
+        "users.id"
+    }
 
 
 def test_employer_profile_user_relationship_constraints() -> None:
     table = Base.metadata.tables["employer_profiles"]
 
     assert table.c.user_id.unique is True
-    assert {foreign_key.target_fullname for foreign_key in table.c.user_id.foreign_keys} == {"users.id"}
+    assert {foreign_key.target_fullname for foreign_key in table.c.user_id.foreign_keys} == {
+        "users.id"
+    }
 
 
 def test_metadata_has_no_duplicate_unique_objects() -> None:

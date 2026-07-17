@@ -26,12 +26,20 @@ def upgrade() -> None:
         sa.Column("email", postgresql.CITEXT(), nullable=False),
         sa.Column("password_hash", sa.Text(), nullable=False),
         sa.Column("role", sa.String(length=20), nullable=False),
-        sa.Column("status", sa.String(length=20), server_default=sa.text("'active'"), nullable=False),
         sa.Column(
-            "created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False
+            "status", sa.String(length=20), server_default=sa.text("'active'"), nullable=False
         ),
         sa.Column(
-            "updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
         ),
         sa.CheckConstraint("role IN ('candidate', 'employer')", name="ck_users_role"),
         sa.CheckConstraint("status IN ('active', 'blocked', 'deleted')", name="ck_users_status"),
@@ -57,16 +65,24 @@ def upgrade() -> None:
         sa.Column("work_format", sa.String(length=20), nullable=True),
         sa.Column("bio", sa.Text(), nullable=True),
         sa.Column(
-            "created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
         ),
         sa.Column(
-            "updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
         ),
         sa.CheckConstraint(
             "work_format IN ('remote', 'hybrid', 'onsite', 'any')",
             name="ck_candidate_profiles_work_format",
         ),
-        sa.ForeignKeyConstraint(["user_id"], ["users.id"], name="fk_candidate_profiles_user_id_users"),
+        sa.ForeignKeyConstraint(
+            ["user_id"], ["users.id"], name="fk_candidate_profiles_user_id_users"
+        ),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("user_id", name="uq_candidate_profiles_user_id"),
     )
@@ -79,12 +95,20 @@ def upgrade() -> None:
         sa.Column("website", sa.String(length=255), nullable=True),
         sa.Column("description", sa.Text(), nullable=True),
         sa.Column(
-            "created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
         ),
         sa.Column(
-            "updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
         ),
-        sa.ForeignKeyConstraint(["user_id"], ["users.id"], name="fk_employer_profiles_user_id_users"),
+        sa.ForeignKeyConstraint(
+            ["user_id"], ["users.id"], name="fk_employer_profiles_user_id_users"
+        ),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("user_id", name="uq_employer_profiles_user_id"),
     )
