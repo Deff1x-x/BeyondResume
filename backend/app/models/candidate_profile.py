@@ -1,7 +1,8 @@
 import uuid
+from enum import Enum
 from typing import TYPE_CHECKING
 
-from sqlalchemy import CheckConstraint, ForeignKey, String, Text, text
+from sqlalchemy import Boolean, Enum as SqlEnum, ForeignKey, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -12,31 +13,33 @@ if TYPE_CHECKING:
     from app.models.user import User
 
 
+class OnboardingStatus(str, Enum):
+    PROFILE_REQUIRED = "profile_required"
+
+
 class CandidateProfile(TimestampMixin, Base):
     __tablename__ = "candidate_profiles"
-    __table_args__ = (
-        CheckConstraint(
-            "work_format IN ('remote', 'hybrid', 'onsite', 'any')",
-            name="ck_candidate_profiles_work_format",
-        ),
-    )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, unique=True
     )
-    full_name: Mapped[str] = mapped_column(String(150), nullable=False)
-    headline: Mapped[str | None] = mapped_column(String(160), nullable=True)
-    country: Mapped[str | None] = mapped_column(String(80), nullable=True)
-    timezone: Mapped[str | None] = mapped_column(String(60), nullable=True)
-    desired_role: Mapped[str] = mapped_column(
-        String(80), nullable=False, server_default=text("'junior_python_backend_developer'")
+    display_name: Mapped[str | None] = mapped_column("full_name", String(150), nullable=True)
+    target_role: Mapped[str | None] = mapped_column("desired_role", String(80), nullable=True)
+    location: Mapped[str | None] = mapped_column("country", String(80), nullable=True)
+    remote_preference: Mapped[str | None] = mapped_column("work_format", String(50), nullable=True)
+    english_level: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    availability: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    summary: Mapped[str | None] = mapped_column("bio", Text, nullable=True)
+    data_processing_consent: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    onboarding_status: Mapped[OnboardingStatus] = mapped_column(
+        SqlEnum(OnboardingStatus, name="candidate_onboarding_status"), nullable=False
     )
-    onboarding_status: Mapped[str] = mapped_column(
-        String(30), nullable=False, server_default=text("'profile_required'")
-    )
-    work_format: Mapped[str | None] = mapped_column(String(20), nullable=True)
-    bio: Mapped[str | None] = mapped_column(Text, nullable=True)
+    salary_expectation: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    preferred_employment_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    relocation_readiness: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    portfolio_url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
+    linkedin_url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
 
     user: Mapped["User"] = relationship(back_populates="candidate_profile")
     resumes: Mapped[list["Resume"]] = relationship(back_populates="candidate_profile")

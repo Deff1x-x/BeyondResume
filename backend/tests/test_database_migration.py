@@ -61,3 +61,19 @@ def test_registration_workflow_migration_follows_account_status_migration() -> N
     assert "onboarding_status" in source
     assert "profile_required" in source
     assert "audit_events" in source
+
+
+def test_candidate_profile_onboarding_migration_follows_registration_workflow() -> None:
+    migration_path = (
+        Path(__file__).parents[1]
+        / "alembic"
+        / "versions"
+        / "20260717_0005_candidate_profile_onboarding.py"
+    )
+    source = migration_path.read_text(encoding="utf-8")
+
+    assert 'down_revision: Union[str, None] = "20260717_0004"' in source
+    assert "candidate_onboarding_status" in source
+    assert "english_level" in source
+    assert "data_processing_consent" in source
+    assert "op.drop_column" in source

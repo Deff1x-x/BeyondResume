@@ -32,7 +32,12 @@ class FakeUploadFile:
 
 
 def make_profile() -> CandidateProfile:
-    return CandidateProfile(id=uuid4(), user_id=uuid4(), full_name="Alan Yerkin")
+    return CandidateProfile(
+        id=uuid4(),
+        user_id=uuid4(),
+        display_name="Alan Yerkin",
+        onboarding_status="profile_required",
+    )
 
 
 def make_session(profile: CandidateProfile | None) -> Mock:

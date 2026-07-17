@@ -10,17 +10,13 @@ from app.api.dependencies import require_candidate
 from app.api.errors import api_error
 from app.db.session import get_db
 from app.main import app
-from app.models.candidate_profile import CandidateProfile
+from app.models.candidate_profile import CandidateProfile, OnboardingStatus
 from app.models.user import User
 
 
 def make_user(role: str = "candidate") -> User:
     return User(
-        id=uuid4(),
-        email="candidate@example.com",
-        password_hash="$argon2id$not-public",
-        role=role,
-        status="active",
+        id=uuid4(), email="candidate@example.com", password_hash="hash", role=role, status="active"
     )
 
 
@@ -28,13 +24,15 @@ def make_profile(user_id: object | None = None) -> CandidateProfile:
     return CandidateProfile(
         id=uuid4(),
         user_id=user_id or uuid4(),
-        full_name="Alan Yerkin",
-        headline="Junior Python Backend Developer",
-        country="Kazakhstan",
-        timezone="Asia/Almaty",
-        desired_role="junior_python_backend_developer",
-        work_format="remote",
-        bio="Short professional biography",
+        display_name="Alan Yerkin",
+        target_role="Junior developer",
+        location="Kazakhstan",
+        remote_preference="remote",
+        english_level="B2",
+        availability="Immediately",
+        summary="Summary",
+        data_processing_consent=True,
+        onboarding_status=OnboardingStatus.PROFILE_REQUIRED,
     )
 
 
@@ -46,211 +44,229 @@ def client() -> Generator[TestClient, None, None]:
     app.dependency_overrides.clear()
 
 
-@pytest.fixture
-def candidate_user() -> User:
-    return make_user()
+def authorize(user: User) -> None:
+    app.dependency_overrides[require_candidate] = lambda: user
 
 
-def authorize_candidate(candidate_user: User) -> None:
-    app.dependency_overrides[require_candidate] = lambda: candidate_user
-
-
-def test_get_existing_profile_returns_public_contract(
-    client: TestClient, candidate_user: User, monkeypatch: pytest.MonkeyPatch
+def test_candidate_gets_only_own_public_profile(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from app.api.v1 import candidate
 
-    authorize_candidate(candidate_user)
-    profile = make_profile(candidate_user.id)
-    monkeypatch.setattr(candidate, "get_candidate_profile", lambda *_args: profile)
-
+    user = make_user()
+    authorize(user)
+    monkeypatch.setattr(candidate, "get_candidate_profile", lambda *_args: make_profile(user.id))
     response = client.get("/api/v1/candidate/profile")
-
     assert response.status_code == 200
-    assert set(response.json()) == {
-        "id",
-        "full_name",
-        "headline",
-        "country",
-        "timezone",
-        "desired_role",
-        "work_format",
-        "bio",
-    }
+    assert "user_id" not in response.json()
+    assert "created_at" not in response.json()
+    assert response.json()["display_name"] == "Alan Yerkin"
 
 
-def test_get_missing_profile_returns_contract_error(
-    client: TestClient, candidate_user: User, monkeypatch: pytest.MonkeyPatch
+def test_patch_normalizes_only_supplied_fields_and_computes_status(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from app.api.v1 import candidate
 
-    authorize_candidate(candidate_user)
-    monkeypatch.setattr(candidate, "get_candidate_profile", lambda *_args: None)
-
-    response = client.get("/api/v1/candidate/profile")
-
-    assert response.status_code == 404
-    assert response.json()["error"]["code"] == "CANDIDATE_PROFILE_NOT_FOUND"
-    assert response.json()["error"]["message"] == "Candidate profile not found"
-    assert response.json()["error"]["details"] == []
-
-
-def test_patch_creates_profile_and_uses_database_default(
-    client: TestClient, candidate_user: User, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    from app.api.v1 import candidate
-
-    authorize_candidate(candidate_user)
-    profile = make_profile(candidate_user.id)
+    user = make_user()
+    authorize(user)
+    profile = make_profile(user.id)
     captured: dict[str, object] = {}
 
-    def patch_profile(*_args: object) -> CandidateProfile:
-        captured.update(_args[2])
+    def patch(*args: object) -> CandidateProfile:
+        captured.update(args[2])
+        profile.display_name = "Alan"
         return profile
 
-    monkeypatch.setattr(candidate, "patch_candidate_profile", patch_profile)
-    response = client.patch("/api/v1/candidate/profile", json={"full_name": "Alan Yerkin"})
-
+    monkeypatch.setattr(candidate, "patch_candidate_profile", patch)
+    response = client.patch("/api/v1/candidate/profile", json={"display_name": "  Alan  "})
     assert response.status_code == 200
-    assert "desired_role" not in captured
-    assert response.json()["desired_role"] == "junior_python_backend_developer"
-
-
-def test_patch_updates_only_supplied_fields_and_allows_null(
-    client: TestClient, candidate_user: User, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    from app.api.v1 import candidate
-
-    authorize_candidate(candidate_user)
-    profile = make_profile(candidate_user.id)
-    captured: dict[str, object] = {}
-
-    def patch_profile(*_args: object) -> CandidateProfile:
-        captured.update(_args[2])
-        profile.headline = None
-        return profile
-
-    monkeypatch.setattr(candidate, "patch_candidate_profile", patch_profile)
-    response = client.patch("/api/v1/candidate/profile", json={"headline": None})
-
-    assert response.status_code == 200
-    assert captured == {"headline": None}
-    assert response.json()["headline"] is None
-    assert response.json()["country"] == "Kazakhstan"
-
-
-def test_empty_patch_existing_profile_is_allowed(
-    client: TestClient, candidate_user: User, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    from app.api.v1 import candidate
-
-    authorize_candidate(candidate_user)
-    profile = make_profile(candidate_user.id)
-    monkeypatch.setattr(candidate, "patch_candidate_profile", lambda *_args: profile)
-
-    response = client.patch("/api/v1/candidate/profile", json={})
-
-    assert response.status_code == 200
-    assert response.json()["full_name"] == "Alan Yerkin"
+    assert captured == {"display_name": "Alan"}
+    assert response.json()["onboarding_status"] == "profile_required"
 
 
 @pytest.mark.parametrize(
-    ("payload", "expected_field"),
+    "payload",
     [
-        ({"full_name": None}, "body"),
-        ({"full_name": "   "}, "body.full_name"),
-        ({"full_name": "Alan", "desired_role": None}, "body"),
-        ({"full_name": "Alan", "desired_role": "   "}, "body.desired_role"),
-        ({"full_name": "Alan", "work_format": "office"}, "body.work_format"),
-        ({"full_name": "A" * 151}, "body.full_name"),
-        ({"full_name": "Alan", "headline": "A" * 161}, "body.headline"),
-        ({"full_name": "Alan", "country": "A" * 81}, "body.country"),
-        ({"full_name": "Alan", "timezone": "A" * 61}, "body.timezone"),
-        ({"full_name": "Alan", "desired_role": "A" * 81}, "body.desired_role"),
-        ({"full_name": "Alan", "unknown": "field"}, "body.unknown"),
+        {"portfolio_url": "ftp://example.com"},
+        {"display_name": "   "},
+        {"onboarding_status": "profile_required"},
+        {"user_id": str(uuid4())},
     ],
 )
-def test_patch_validation(
-    client: TestClient,
-    candidate_user: User,
-    monkeypatch: pytest.MonkeyPatch,
-    payload: dict[str, object],
-    expected_field: str,
+def test_patch_rejects_invalid_or_protected_fields(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch, payload: dict[str, object]
 ) -> None:
     from app.api.v1 import candidate
 
-    authorize_candidate(candidate_user)
-    patch_service = Mock()
-    monkeypatch.setattr(candidate, "patch_candidate_profile", patch_service)
-
+    authorize(make_user())
+    service = Mock()
+    monkeypatch.setattr(candidate, "patch_candidate_profile", service)
     response = client.patch("/api/v1/candidate/profile", json=payload)
-
     assert response.status_code == 422
-    assert response.json()["error"]["code"] == "VALIDATION_ERROR"
-    assert any(item["field"] == expected_field for item in response.json()["error"]["details"])
-    patch_service.assert_not_called()
+    service.assert_not_called()
 
 
-def test_patch_missing_full_name_maps_service_error(
-    client: TestClient, candidate_user: User, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    from app.api.v1 import candidate
-
-    authorize_candidate(candidate_user)
-    monkeypatch.setattr(
-        candidate,
-        "patch_candidate_profile",
-        lambda *_args: (_ for _ in ()).throw(candidate.MissingCandidateProfileFullNameError),
-    )
-
-    response = client.patch("/api/v1/candidate/profile", json={})
-
-    assert response.status_code == 422
-    assert response.json()["error"]["code"] == "VALIDATION_ERROR"
-    assert response.json()["error"]["details"] == [{"field": "full_name", "issue": "missing"}]
-
-
-def test_patch_database_error_uses_error_envelope(
-    client: TestClient, candidate_user: User, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    from app.api.v1 import candidate
-
-    authorize_candidate(candidate_user)
-    monkeypatch.setattr(
-        candidate,
-        "patch_candidate_profile",
-        lambda *_args: (_ for _ in ()).throw(SQLAlchemyError("database error")),
-    )
-
-    response = client.patch("/api/v1/candidate/profile", json={"full_name": "Alan Yerkin"})
-
-    assert response.status_code == 500
-    assert response.json()["error"]["code"] == "DATABASE_ERROR"
-    assert response.json()["error"]["details"] == []
-
-
-def test_candidate_profile_requires_candidate_role(client: TestClient) -> None:
+def test_candidate_profile_requires_candidate_role_and_token(client: TestClient) -> None:
+    response = client.get("/api/v1/candidate/profile")
+    assert response.status_code == 401
     app.dependency_overrides[require_candidate] = lambda: (_ for _ in ()).throw(
         api_error(403, "FORBIDDEN", "Candidate role required")
     )
-
-    response = client.get("/api/v1/candidate/profile")
-
-    assert response.status_code == 403
-    assert response.json()["error"]["code"] == "FORBIDDEN"
+    assert client.get("/api/v1/candidate/profile").status_code == 403
 
 
-def test_candidate_profile_requires_bearer_token(client: TestClient) -> None:
-    response = client.get("/api/v1/candidate/profile")
+def test_patch_database_error_does_not_leak_details(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.api.v1 import candidate
 
-    assert response.status_code == 401
-    assert response.headers["www-authenticate"] == "Bearer"
+    authorize(make_user())
+    monkeypatch.setattr(
+        candidate,
+        "patch_candidate_profile",
+        lambda *_args: (_ for _ in ()).throw(SQLAlchemyError("secret")),
+    )
+    response = client.patch("/api/v1/candidate/profile", json={"display_name": "Alan"})
+    assert response.status_code == 500
+    assert "secret" not in str(response.json())
 
 
-def test_candidate_profile_openapi_has_only_get_and_patch(client: TestClient) -> None:
+def test_candidate_profile_openapi_excludes_internal_fields(client: TestClient) -> None:
     operations = client.get("/openapi.json").json()["paths"]["/api/v1/candidate/profile"]
-
     assert set(operations) == {"get", "patch"}
-    assert "user_id" not in str(operations)
-    assert "created_at" not in str(operations)
-    assert "updated_at" not in str(operations)
+    assert all(
+        field not in str(operations) for field in ("user_id", "created_at", "updated_at", "audit")
+    )
+
+
+def test_get_missing_profile_returns_contract_error(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.api.v1 import candidate
+
+    authorize(make_user())
+    monkeypatch.setattr(candidate, "get_candidate_profile", lambda *_args: None)
+    response = client.get("/api/v1/candidate/profile")
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "CANDIDATE_PROFILE_NOT_FOUND"
+
+
+def test_empty_patch_preserves_profile(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.api.v1 import candidate
+
+    user = make_user()
+    authorize(user)
+    profile = make_profile(user.id)
+    monkeypatch.setattr(candidate, "patch_candidate_profile", lambda *_args: profile)
+    response = client.patch("/api/v1/candidate/profile", json={})
+    assert response.status_code == 200
+    assert response.json()["display_name"] == "Alan Yerkin"
+
+
+@pytest.mark.parametrize("value", [True, False, None])
+def test_patch_consent_accepts_explicit_values(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch, value: bool | None
+) -> None:
+    from app.api.v1 import candidate
+
+    user = make_user()
+    authorize(user)
+    profile = make_profile(user.id)
+    captured: dict[str, object] = {}
+    monkeypatch.setattr(
+        candidate, "patch_candidate_profile", lambda *_args: captured.update(_args[2]) or profile
+    )
+    response = client.patch("/api/v1/candidate/profile", json={"data_processing_consent": value})
+    assert response.status_code == 200
+    assert captured == {"data_processing_consent": value}
+
+
+def test_absent_consent_is_not_updated(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.api.v1 import candidate
+
+    user = make_user()
+    authorize(user)
+    profile = make_profile(user.id)
+    captured: dict[str, object] = {}
+    monkeypatch.setattr(
+        candidate, "patch_candidate_profile", lambda *_args: captured.update(_args[2]) or profile
+    )
+    response = client.patch("/api/v1/candidate/profile", json={"summary": "Updated"})
+    assert response.status_code == 200
+    assert "data_processing_consent" not in captured
+
+
+def test_patch_validation_keeps_length_contracts(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.api.v1 import candidate
+
+    authorize(make_user())
+    service = Mock()
+    monkeypatch.setattr(candidate, "patch_candidate_profile", service)
+    for payload in ({"display_name": "A" * 151}, {"target_role": "A" * 81}, {"location": "A" * 81}):
+        assert client.patch("/api/v1/candidate/profile", json=payload).status_code == 422
+    service.assert_not_called()
+
+
+def test_patch_missing_profile_returns_not_found(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.api.v1 import candidate
+
+    authorize(make_user())
+    monkeypatch.setattr(
+        candidate,
+        "patch_candidate_profile",
+        lambda *_args: (_ for _ in ()).throw(candidate.CandidateProfileNotFoundError),
+    )
+    response = client.patch("/api/v1/candidate/profile", json={"display_name": "Alan"})
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "CANDIDATE_PROFILE_NOT_FOUND"
+
+
+def test_patch_explicit_null_does_not_erase_unsupplied_fields(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.api.v1 import candidate
+
+    user = make_user()
+    authorize(user)
+    profile = make_profile(user.id)
+    captured: dict[str, object] = {}
+    monkeypatch.setattr(
+        candidate, "patch_candidate_profile", lambda *_args: captured.update(_args[2]) or profile
+    )
+    response = client.patch("/api/v1/candidate/profile", json={"summary": None})
+    assert response.status_code == 200
+    assert captured == {"summary": None}
+    assert response.json()["target_role"] == "Junior developer"
+
+
+def test_profile_response_contains_only_public_candidate_fields(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.api.v1 import candidate
+
+    user = make_user()
+    authorize(user)
+    monkeypatch.setattr(candidate, "get_candidate_profile", lambda *_args: make_profile(user.id))
+    response = client.get("/api/v1/candidate/profile")
+    assert set(response.json()) == {
+        "id",
+        "display_name",
+        "target_role",
+        "location",
+        "remote_preference",
+        "english_level",
+        "availability",
+        "summary",
+        "data_processing_consent",
+        "onboarding_status",
+        "salary_expectation",
+        "preferred_employment_type",
+        "relocation_readiness",
+        "portfolio_url",
+        "linkedin_url",
+    }

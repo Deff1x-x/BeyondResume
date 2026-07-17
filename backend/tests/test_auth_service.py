@@ -43,7 +43,7 @@ def test_candidate_registration_creates_profile_and_audit_event_atomically(
     assert registered.status == "active"
     assert registered.password_hash != "StrongPass123"
     assert profile.user_id == user.id
-    assert profile.full_name == ""
+    assert profile.display_name is None
     assert profile.onboarding_status == "profile_required"
     assert audit_event.user_id == user.id
     assert audit_event.event_type == "user_registered"

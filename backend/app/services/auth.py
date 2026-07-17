@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.core.security import hash_password, verify_password
 from app.models.audit_event import AuditEvent
-from app.models.candidate_profile import CandidateProfile
+from app.models.candidate_profile import CandidateProfile, OnboardingStatus
 from app.models.user import User
 
 
@@ -35,7 +35,10 @@ def get_user_by_id(session: Session, user_id: UUID) -> User | None:
 
 
 def create_empty_candidate_profile(user_id: UUID) -> CandidateProfile:
-    return CandidateProfile(user_id=user_id, full_name="", onboarding_status="profile_required")
+    return CandidateProfile(
+        user_id=user_id,
+        onboarding_status=OnboardingStatus.PROFILE_REQUIRED,
+    )
 
 
 def create_user_registered_audit_event(user_id: UUID) -> AuditEvent:

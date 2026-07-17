@@ -4,10 +4,10 @@ from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from app.models.candidate_profile import CandidateProfile
+from app.models.candidate_profile import CandidateProfile, OnboardingStatus
 
 
-class MissingCandidateProfileFullNameError(Exception):
+class CandidateProfileNotFoundError(Exception):
     pass
 
 
@@ -17,19 +17,20 @@ def get_candidate_profile(session: Session, user_id: UUID) -> CandidateProfile |
     ).scalar_one_or_none()
 
 
+def calculate_onboarding_status(_: CandidateProfile) -> OnboardingStatus:
+    return OnboardingStatus.PROFILE_REQUIRED
+
+
 def patch_candidate_profile(
     session: Session, user_id: UUID, patch_data: dict[str, object]
 ) -> CandidateProfile:
     profile = get_candidate_profile(session, user_id)
     if profile is None:
-        full_name = patch_data.get("full_name")
-        if not isinstance(full_name, str):
-            raise MissingCandidateProfileFullNameError
-        profile = CandidateProfile(user_id=user_id, **patch_data)
-        session.add(profile)
-    else:
-        for field_name, value in patch_data.items():
-            setattr(profile, field_name, value)
+        raise CandidateProfileNotFoundError
+
+    for field_name, value in patch_data.items():
+        setattr(profile, field_name, value)
+    profile.onboarding_status = calculate_onboarding_status(profile)
 
     try:
         session.commit()
