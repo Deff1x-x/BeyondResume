@@ -1,5 +1,8 @@
 from collections.abc import Iterable
 from typing import Protocol
+from uuid import UUID
+
+from sqlalchemy.orm import Session
 
 
 class SourceAdapter(Protocol):
@@ -14,7 +17,7 @@ class SourceAdapter(Protocol):
 
     def generate_evidence(self, *args: object, **kwargs: object) -> object: ...
 
-    def run_scan(self, *args: object, **kwargs: object) -> object: ...
+    def run_scan(self, session: Session, candidate_id: UUID) -> object: ...
 
 
 class DuplicateSourceAdapterError(ValueError):
@@ -32,15 +35,20 @@ class SourceAdapterRegistry:
             self.register(adapter)
 
     def register(self, adapter: SourceAdapter) -> None:
-        source_type = adapter.source_type
-        if not source_type:
-            raise ValueError("Source adapter type must not be empty")
+        source_type = validate_source_type(adapter.source_type)
         if source_type in self._adapters:
             raise DuplicateSourceAdapterError(source_type)
         self._adapters[source_type] = adapter
 
     def get(self, source_type: str) -> SourceAdapter:
+        source_type = validate_source_type(source_type)
         try:
             return self._adapters[source_type]
         except KeyError as error:
             raise SourceAdapterNotFoundError(source_type) from error
+
+
+def validate_source_type(source_type: str) -> str:
+    if not isinstance(source_type, str) or not source_type:
+        raise ValueError("Source adapter type must be a non-empty string")
+    return source_type

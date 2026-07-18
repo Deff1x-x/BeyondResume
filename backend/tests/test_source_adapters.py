@@ -52,7 +52,7 @@ def test_registry_rejects_duplicate_source_type() -> None:
 def test_registry_rejects_empty_source_type_and_missing_adapter() -> None:
     registry = SourceAdapterRegistry()
 
-    with pytest.raises(ValueError, match="must not be empty"):
+    with pytest.raises(ValueError, match="non-empty string"):
         registry.register(FakeSourceAdapter(""))
     with pytest.raises(SourceAdapterNotFoundError):
         registry.get("missing_source")

@@ -3229,6 +3229,32 @@ GitHub adapter регистрируется под `github_repository`, полу
 требует новой facade implementation и её явной регистрации; существующие adapters, включая GitHub,
 не изменяются.
 
+### 92.8 Source Scan Dispatcher
+
+Source Scan Dispatcher является application-level facade над готовым Source Adapter Registry. Он
+не является registry, provider factory, dependency injection container, scheduler, background
+worker, transaction manager или API layer.
+
+Dispatcher получает explicit registry, non-empty string `source_type`, внешний Session и
+candidate identity. Он валидирует `source_type` по тем же правилам, что registration и lookup
+registry, выполняет ровно один `registry.get(source_type)`, вызывает ровно один
+`adapter.run_scan(session, candidate_id)` и возвращает именно result adapter без преобразования,
+копирования или source-specific projection. Дополнительные source-specific dependencies уже
+принадлежат adapter instance; dispatcher не принимает provider напрямую.
+
+Dispatcher не содержит `if`/`elif`/`match` по source type, не импортирует source-specific adapter
+или provider, не создаёт provider/registry/Session, не изменяет registry, не регистрирует и не
+кэширует adapter, не выбирает fallback adapter, не повторяет scan и не выполняет automatic
+discovery. Один вызов dispatcher выполняет один lookup и один вызов найденного adapter.
+
+Ошибки validation, registry lookup и любые typed domain/service/provider errors из adapter
+пробрасываются без преобразования в HTTP или общий ScanFailedError. При lookup error adapter не
+вызывается; при adapter error dispatcher не выполняет retry и не вызывает другой adapter.
+
+Dispatcher не владеет транзакцией и не вызывает `commit`, `rollback`, `flush`, `close` или `begin`.
+Внешний API/job/application boundary в будущем владеет Session lifecycle, commit, rollback и retry
+policy. Вложенный adapter может выполнять flush только по собственному принятому contract.
+
 ## 93. Skill Passport rebuild
 
 Rebuild запускается при:
