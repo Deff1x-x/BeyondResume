@@ -15,6 +15,7 @@ from app.utils.github_skill_rules import (
 
 RULES = (
     GitHubDeterministicSkillRule(
+        rule_id="gh_rule.package.react.v1",
         signal_type=DEPENDENCY_MANIFEST_SIGNAL_TYPE,
         manifest_kind="package_json",
         ecosystem="npm",
@@ -22,6 +23,7 @@ RULES = (
         target_skill_name="React",
     ),
     GitHubDeterministicSkillRule(
+        rule_id="gh_rule.python.requests.v1",
         signal_type=DEPENDENCY_MANIFEST_SIGNAL_TYPE,
         manifest_kind="requirements_txt",
         ecosystem="python",
