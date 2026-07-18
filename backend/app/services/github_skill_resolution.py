@@ -25,16 +25,10 @@ def resolve_github_skill_candidates(
     session: Session,
     candidates: Iterable[GitHubSkillCandidate],
 ) -> tuple[ResolvedGitHubSkillCandidate, ...]:
-    """Resolve unique target skill names only through the approved ontology resolver."""
-    candidates_by_target: dict[str, GitHubSkillCandidate] = {}
-    for candidate in candidates:
-        existing = candidates_by_target.get(candidate.target_skill_name)
-        if existing is None or _candidate_key(candidate) < _candidate_key(existing):
-            candidates_by_target[candidate.target_skill_name] = candidate
-
+    """Resolve every source candidate only through the approved ontology resolver."""
     resolved: list[ResolvedGitHubSkillCandidate] = []
-    for target_skill_name, candidate in sorted(candidates_by_target.items()):
-        skill = resolve_skill(session, target_skill_name)
+    for candidate in candidates:
+        skill = resolve_skill(session, candidate.target_skill_name)
         if skill is not None:
             resolved.append(
                 ResolvedGitHubSkillCandidate(
@@ -43,15 +37,20 @@ def resolve_github_skill_candidates(
                     rule_id=candidate.rule_id,
                 )
             )
-    return tuple(resolved)
+    return tuple(sorted(resolved, key=_resolved_candidate_key))
 
 
-def _candidate_key(candidate: GitHubSkillCandidate) -> tuple[str, str, str, str, str, str]:
+def _resolved_candidate_key(
+    resolved: ResolvedGitHubSkillCandidate,
+) -> tuple[str, str, str, str, str, str, str, str]:
+    candidate = resolved.candidate
     return (
+        candidate.target_skill_name,
+        candidate.signal_type,
         candidate.target_skill_name,
         candidate.source_manifest,
         candidate.manifest_kind,
         candidate.ecosystem,
         candidate.source_dependency,
-        candidate.signal_type,
+        candidate.rule_id,
     )
