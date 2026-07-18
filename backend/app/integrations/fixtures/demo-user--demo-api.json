@@ -1,0 +1,18 @@
+{
+  "canonical_url": "https://github.com/demo-user/demo-api",
+  "repository_name": "demo-api",
+  "owner": "demo-user",
+  "description": "Small public demo API repository.",
+  "default_branch": "main",
+  "is_public": true,
+  "is_archived": false,
+  "languages": ["Python", "SQL"],
+  "file_tree": [
+    "README.md",
+    "pyproject.toml",
+    "app/main.py",
+    "app/db.py"
+  ],
+  "readme_text": "# Demo API\n\nA small deterministic fixture for the BeyondResume GitHub integration.",
+  "manifest_paths": ["pyproject.toml"]
+}
