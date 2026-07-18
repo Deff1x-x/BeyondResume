@@ -13,7 +13,6 @@ from sqlalchemy.exc import IntegrityError
 from app.integrations.github import (
     MAX_FILE_TREE_PATHS,
     MAX_LANGUAGES,
-    MAX_MANIFEST_PATHS,
     MAX_README_CHARS,
     GitHubRepositorySnapshot as ProviderGitHubRepositorySnapshot,
 )
@@ -122,7 +121,10 @@ def test_canonicalization_is_stable_and_uses_utf8_json() -> None:
         "owner",
         "readme_text",
         "repository_name",
+        "schema_version",
         "tree_paths",
+        "normalized_manifests",
+        "manifest_warnings",
     }
     with pytest.raises(TypeError):
         first.payload["owner"] = "other-owner"  # type: ignore[index]
@@ -133,7 +135,7 @@ def test_canonicalization_is_stable_and_uses_utf8_json() -> None:
     [
         replace(make_provider_snapshot(), languages=("Python",) * (MAX_LANGUAGES + 1)),
         replace(make_provider_snapshot(), file_tree=("path",) * (MAX_FILE_TREE_PATHS + 1)),
-        replace(make_provider_snapshot(), manifest_paths=("path",) * (MAX_MANIFEST_PATHS + 1)),
+        replace(make_provider_snapshot(), manifest_paths=("path",) * (MAX_FILE_TREE_PATHS + 1)),
         replace(make_provider_snapshot(), readme_text="x" * (MAX_README_CHARS + 1)),
     ],
 )

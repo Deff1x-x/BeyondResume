@@ -3,6 +3,13 @@ import json
 from pathlib import Path
 from typing import Final, Protocol
 
+from app.utils.github_manifests import (
+    GitHubManifestValidationError,
+    GitHubManifestWarning,
+    GitHubNormalizedManifest,
+    normalize_fixture_manifests,
+)
+
 from app.utils.github_url import GitHubRepositoryURL, is_valid_github_repository_identity
 
 
@@ -10,6 +17,7 @@ MAX_LANGUAGES: Final = 20
 MAX_FILE_TREE_PATHS: Final = 500
 MAX_MANIFEST_PATHS: Final = 50
 MAX_README_CHARS: Final = 10_000
+GITHUB_SNAPSHOT_SCHEMA_VERSION: Final = 2
 
 
 class GitHubProviderError(Exception):
@@ -42,6 +50,9 @@ class GitHubRepositorySnapshot:
     readme_text: str | None
     manifest_paths: tuple[str, ...]
     is_demo: bool
+    schema_version: int = GITHUB_SNAPSHOT_SCHEMA_VERSION
+    normalized_manifests: tuple[GitHubNormalizedManifest, ...] = ()
+    manifest_warnings: tuple[GitHubManifestWarning, ...] = ()
 
 
 class GitHubProvider(Protocol):
@@ -109,6 +120,7 @@ def _snapshot_from_fixture(
         "file_tree",
         "readme_text",
         "manifest_paths",
+        "manifest_contents",
     }
     required_fields = {
         "canonical_url",
@@ -148,10 +160,12 @@ def _snapshot_from_fixture(
 
     languages = _string_tuple(fixture, "languages", MAX_LANGUAGES)
     file_tree = _path_tuple(fixture, "file_tree", MAX_FILE_TREE_PATHS)
-    manifest_paths = _path_tuple(fixture, "manifest_paths", MAX_MANIFEST_PATHS)
+    # §17.6 limits manifest processing, not the historical discovered-path field.
+    manifest_paths = _path_tuple(fixture, "manifest_paths", MAX_FILE_TREE_PATHS)
     if not set(manifest_paths).issubset(file_tree):
         raise GitHubFixtureError("GitHub repository fixture manifest paths must exist in file tree")
 
+    manifests, warnings = _normalized_manifests(fixture, manifest_paths)
     return GitHubRepositorySnapshot(
         canonical_url=canonical_url,
         repository_name=repository_name,
@@ -164,8 +178,23 @@ def _snapshot_from_fixture(
         file_tree=file_tree,
         readme_text=readme_text,
         manifest_paths=manifest_paths,
+        normalized_manifests=manifests,
+        manifest_warnings=warnings,
         is_demo=True,
+        schema_version=GITHUB_SNAPSHOT_SCHEMA_VERSION,
     )
+
+
+def _normalized_manifests(
+    fixture: dict[str, object], manifest_paths: tuple[str, ...]
+) -> tuple[tuple[GitHubNormalizedManifest, ...], tuple[GitHubManifestWarning, ...]]:
+    contents = fixture.get("manifest_contents", {})
+    if not isinstance(contents, dict) or not all(isinstance(path, str) for path in contents):
+        raise GitHubFixtureError("GitHub repository fixture manifest contents are invalid")
+    try:
+        return normalize_fixture_manifests(manifest_paths, contents)
+    except GitHubManifestValidationError as error:
+        raise GitHubFixtureError("GitHub repository fixture manifests are invalid") from error
 
 
 def _required_string(fixture: dict[str, object], field: str) -> str:

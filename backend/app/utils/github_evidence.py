@@ -8,6 +8,10 @@ from app.integrations.github import (
     MAX_README_CHARS,
 )
 from app.utils.github_url import GitHubRepositoryUrlError, parse_github_repository_url
+from app.utils.github_snapshot import (
+    GitHubSnapshotValidationError,
+    read_github_repository_snapshot_payload,
+)
 
 
 class GitHubPersistedSnapshotValidationError(ValueError):
@@ -43,13 +47,24 @@ _PAYLOAD_FIELDS = frozenset(
         "tree_paths",
     }
 )
+_V2_PAYLOAD_FIELDS = _PAYLOAD_FIELDS | {
+    "schema_version",
+    "normalized_manifests",
+    "manifest_warnings",
+}
 
 
 def validate_persisted_github_repository_payload(
     payload: Mapping[str, object],
 ) -> PersistedGitHubRepositoryPayload:
-    if set(payload) != _PAYLOAD_FIELDS:
+    if set(payload) not in {_PAYLOAD_FIELDS, _V2_PAYLOAD_FIELDS}:
         raise GitHubPersistedSnapshotValidationError("GitHub snapshot payload fields are invalid")
+    try:
+        read_github_repository_snapshot_payload(payload)
+    except GitHubSnapshotValidationError as error:
+        raise GitHubPersistedSnapshotValidationError(
+            "GitHub snapshot payload is invalid"
+        ) from error
 
     canonical_url = _string(payload, "canonical_url")
     try:
