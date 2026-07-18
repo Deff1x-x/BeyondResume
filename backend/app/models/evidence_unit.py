@@ -3,7 +3,15 @@ from decimal import Decimal
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Numeric, String, Text
+from sqlalchemy import (
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Numeric,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -23,6 +31,16 @@ class EvidenceUnit(TimestampMixin, Base):
             "OR verification_status IS NULL",
             name="ck_evidence_units_verification_status",
         ),
+        CheckConstraint(
+            "ownership_status IN ('unverified', 'verified') OR ownership_status IS NULL",
+            name="ck_evidence_units_ownership_status",
+        ),
+        UniqueConstraint(
+            "candidate_id",
+            "source_type",
+            "source_reference",
+            name="uq_evidence_units_candidate_source",
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -39,7 +57,7 @@ class EvidenceUnit(TimestampMixin, Base):
     verification_status: Mapped[str | None] = mapped_column(String(50), nullable=True)
     ownership_status: Mapped[str | None] = mapped_column(String(50), nullable=True)
     strength_score: Mapped[Decimal | None] = mapped_column(Numeric(3, 2), nullable=True)
-    quality_flags: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    quality_flags: Mapped[dict[str, bool] | None] = mapped_column(JSONB, nullable=True)
     raw_payload_reference: Mapped[str | None] = mapped_column(String(2048), nullable=True)
 
     candidate_profile: Mapped["CandidateProfile"] = relationship(back_populates="evidence_units")

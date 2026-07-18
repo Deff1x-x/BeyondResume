@@ -720,6 +720,12 @@ Recruiter видит таблицу:
 - `created_at`;
 - `updated_at`.
 
+`ownership_status` принимает только следующие нормативные значения:
+
+- `unverified` — источник связан с профилем кандидата, но система не получила независимого
+  подтверждения владения;
+- `verified` — владение источником подтверждено отдельным механизмом, явно определённым в SPEC.
+
 ### 12.2 Источники evidence
 
 | Source | Базовая сила | Комментарий |
@@ -2978,6 +2984,77 @@ created_at сохраняется. Bounds: languages до 20, tree_paths до 50
 
 Stage 7.4B не создаёт EvidenceUnit. Stage 7.5 использует актуальный persisted snapshot для
 EvidenceUnit generation; прямого FK между snapshot и EvidenceUnit нет.
+
+### 92.4 GitHub Evidence Generation
+
+Для каждого подключённого `GitHubRepository` существует ровно один актуальный repository-level
+`EvidenceUnit`. Отдельные EvidenceUnit для languages, README, manifest files, default branch,
+tree paths или отдельных файлов не создаются.
+
+Этот EvidenceUnit строится только из актуального persisted `GitHubRepositorySnapshot`. Его
+`source_type` всегда равен `github_repository`, а `source_reference` — canonical GitHub URL из
+snapshot без checksum, snapshot ID, query, branch, commit или timestamp. Дедупликационный ключ —
+`(candidate_id, source_type, source_reference)`; для него существует не более одной актуальной
+записи.
+
+Поля проецируются детерминированно:
+
+- `title`: `GitHub repository: {owner}/{repository_name}`;
+- `description`: trimmed `snapshot.description`, если он непустой; иначе
+  `Public GitHub repository {owner}/{repository_name}.`;
+- `observed_at` и `freshness_at`: `GitHubRepositorySnapshot.updated_at`;
+- `issued_at`: `NULL`;
+- `verification_status`: `source_reachable`, поскольку публичный источник был непосредственно
+  получен системой;
+- `ownership_status`: `unverified`. В Stage 7 public repository connection без GitHub OAuth не
+  подтверждает ownership и никогда не устанавливает `verified`;
+- `strength_score`: `1.00` — базовая сила `Relevant public code repository` из §12.2. Отсутствие
+  README/description/manifests, archived status и малый tree не изменяют score;
+- `raw_payload_reference`: `github_repository_snapshot:{snapshot.id}` с каноническим строковым
+  представлением ID. Payload повторно внутри EvidenceUnit не хранится.
+
+`quality_flags` — JSON object ровно со следующими boolean-полями, без дополнительных ключей:
+
+```json
+{
+  "archived": false,
+  "missing_description": false,
+  "missing_readme": false,
+  "missing_languages": false,
+  "empty_file_tree": false,
+  "missing_manifests": false
+}
+```
+
+`archived` равен `snapshot.is_archived == true`; `missing_description` и `missing_readme` равны
+отсутствию либо пустому значению после trim соответствующего текста; `missing_languages`,
+`empty_file_tree` и `missing_manifests` равны пустоте соответствующих коллекций. Эти flags не
+изменяют strength score на Stage 7.
+
+Generation service повторно проверяет identity repository и snapshot: canonical URL, owner и
+repository_name. Он не вызывает provider, сеть или fetch, не создаёт snapshot, не делает commit
+или rollback. После построения полей он ищет EvidenceUnit по дедупликационному ключу. При
+отсутствии записи он создаёт её, делает flush и возвращает `created=True, changed=True`. Если все
+управляемые Stage 7.5 поля совпадают, он возвращает существующую запись без mutation и flush с
+`created=False, changed=False`. При любом отличии управляемого поля он обновляет эту же запись in
+place, делает flush и возвращает `created=False, changed=True`.
+
+Управляемые Stage 7.5 поля: `source_type`, `source_reference`, `title`, `description`,
+`observed_at`, `issued_at`, `freshness_at`, `verification_status`, `ownership_status`,
+`strength_score`, `quality_flags` и `raw_payload_reference`. Другие поля service не изменяет.
+
+При неизменившемся snapshot Stage 7.4B не меняет `snapshot.updated_at`, поэтому EvidenceUnit не
+изменяется, не flush-ится и его timestamps не обновляются. При изменившемся snapshot Stage 7.5
+обновляет тот же EvidenceUnit in place; новый EvidenceUnit не создаётся. Stage 7.5 не удаляет,
+не soft-delete-ит и не помечает evidence устаревшим; disconnect/removal repository определяется
+отдельным этапом.
+
+Service владеет только flush. Внешний transaction boundary владеет commit, rollback и retry.
+UNIQUE constraint защищает от конкурентного создания одинакового EvidenceUnit; `IntegrityError`
+не преобразуется в успешную идемпотентность и пробрасывается наружу без rollback внутри service.
+Типизированные внутренние ошибки используются для отсутствующих CandidateProfile,
+GitHubRepository или GitHubRepositorySnapshot, malformed stored repository URL, identity mismatch
+и persisted snapshot payload, не соответствующего ожидаемой canonical schema.
 
 ## 93. Skill Passport rebuild
 
