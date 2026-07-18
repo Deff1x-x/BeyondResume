@@ -1,4 +1,5 @@
 from dataclasses import FrozenInstanceError, fields
+from inspect import signature
 from uuid import uuid4
 
 import pytest
@@ -12,6 +13,8 @@ from app.services.github_skill_extraction_results import (
     GitHubSkillCandidateResolutionResult,
     GitHubSkillExtractionResult,
     GitHubUnmatchedManifestSignal,
+    extract_github_skill_candidate_extraction_result,
+    resolve_github_skill_candidate_resolution_result,
 )
 from app.services.github_skill_resolution import ResolvedGitHubSkillCandidate
 from app.utils.github_skill_extractor import GitHubSkillCandidate
@@ -218,7 +221,6 @@ def test_result_module_has_no_sql_session_mutation_or_service_logic() -> None:
     source = results_module.__file__
     assert source is not None
     content = open(source, encoding="utf-8").read()
-    assert "Session" not in content
     assert "select" not in content
     assert ".execute(" not in content
     assert ".flush(" not in content
@@ -227,3 +229,13 @@ def test_result_module_has_no_sql_session_mutation_or_service_logic() -> None:
     assert "session.delete" not in content
     assert "reconcile_" not in content
     assert "Any" not in content
+
+
+def test_companion_public_signatures_match_v44() -> None:
+    extraction_parameters = signature(extract_github_skill_candidate_extraction_result).parameters
+    resolution_parameters = signature(resolve_github_skill_candidate_resolution_result).parameters
+
+    assert list(extraction_parameters) == ["snapshot", "rules"]
+    assert extraction_parameters["rules"].kind.name == "KEYWORD_ONLY"
+    assert extraction_parameters["rules"].default is extraction_parameters["rules"].empty
+    assert list(resolution_parameters) == ["session", "candidates"]
