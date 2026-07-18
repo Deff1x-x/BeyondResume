@@ -2944,6 +2944,15 @@ Stage 7.3 и требуют отдельного определения/этап
 
 Provider verification при подключении не выполняется. Metadata получается позднее на этапе scan.
 
+### 92.2 Внутренние подэтапы scan pipeline
+
+Полный scan сохраняет repository snapshot и checksum, а также создаёт EvidenceUnit согласно §92.
+
+Stage 7.4A является внутренним read-only шагом полного pipeline: он получает и проверяет snapshot,
+но не считается завершённым пользовательским scan. Его валидированный результат передаётся в
+отдельный Stage 7.4B для persistence snapshot и checksum. EvidenceUnit generation выполняется
+отдельным Stage 7.5.
+
 ## 93. Skill Passport rebuild
 
 Rebuild запускается при:
