@@ -9,6 +9,7 @@ from app.db.base import Base, TimestampMixin
 
 if TYPE_CHECKING:
     from app.models.candidate_profile import CandidateProfile
+    from app.models.github_repository_snapshot import GitHubRepositorySnapshot
 
 
 class GitHubRepository(TimestampMixin, Base):
@@ -22,3 +23,6 @@ class GitHubRepository(TimestampMixin, Base):
     repository_url: Mapped[str] = mapped_column(String(2048), nullable=False)
 
     candidate_profile: Mapped["CandidateProfile"] = relationship(back_populates="github_repository")
+    snapshot: Mapped["GitHubRepositorySnapshot | None"] = relationship(
+        back_populates="repository", uselist=False
+    )

@@ -2953,6 +2953,32 @@ Stage 7.4A является внутренним read-only шагом полно
 отдельный Stage 7.4B для persistence snapshot и checksum. EvidenceUnit generation выполняется
 отдельным Stage 7.5.
 
+### 92.3 GitHub repository snapshot persistence
+
+Для каждого GitHubRepository хранится не более одного актуального snapshot; история snapshots на
+текущем этапе не ведётся. Snapshot хранится в отдельной таблице GitHubRepositorySnapshot и
+принадлежит ровно одному GitHubRepository. `repository_id` уникален, `candidate_id` не дублируется.
+
+Persisted snapshot содержит только normalized provider data: canonical_url, owner, repository_name,
+description, default_branch, is_public, is_archived, languages, tree_paths, readme_text,
+manifest_paths и provider/demo indicator. Raw GitHub API payload не сохраняется. Payload хранится
+в JSONB; отдельные поля таблицы: id, repository_id, checksum, payload, created_at, updated_at.
+
+Перед checksum snapshot сериализуется в canonical JSON с фиксированным набором полей, сортировкой
+ключей, UTF-8 без незначащих пробелов и ASCII-экранирования. Порядок коллекций сохраняется;
+optional values сериализуются как null; дополнительные поля запрещены. Checksum — SHA-256 от UTF-8
+bytes canonical JSON в lowercase hexadecimal длиной 64. Одинаковый checksum означает
+семантически неизменившийся persisted snapshot.
+
+Первый scan создаёт snapshot, payload и checksum. При повторном scan с тем же checksum возвращается
+существующий snapshot без изменения payload/checksum, flush и ручного изменения timestamps. При
+другом checksum payload и checksum заменяются; updated_at обновляется обычным ORM/DB механизмом,
+created_at сохраняется. Bounds: languages до 20, tree_paths до 500, manifest_paths до 50, README до
+10 000 символов; persistence повторно их валидирует.
+
+Stage 7.4B не создаёт EvidenceUnit. Stage 7.5 использует актуальный persisted snapshot для
+EvidenceUnit generation; прямого FK между snapshot и EvidenceUnit нет.
+
 ## 93. Skill Passport rebuild
 
 Rebuild запускается при:
