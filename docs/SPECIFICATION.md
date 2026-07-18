@@ -1301,6 +1301,12 @@ forbidden; parsers never execute code, archive decompression is not used, binary
 rejected, invalid UTF-8 warns and UTF-8 BOM is removed. Secrets, tokens and private registry
 credentials never enter normalized payload.
 
+If a dependency name exceeds 255 Unicode code points after normalization, the dependency record is
+invalid and processing of that manifest fails with the typed fatal validation error `invalid
+normalized dependency record`. The provider result is invalid, no snapshot is formed, no partial
+warning is used and no warning code is added. This is a normalized-model invariant, not a recoverable
+parser warning.
+
 #### Provider, serialization and compatibility
 
 Provider snapshot DTO gains integer `schema_version` and immutable tuple collections
