@@ -18,6 +18,7 @@ class ResolvedGitHubSkillCandidate:
 
     skill: Skill
     candidate: GitHubSkillCandidate
+    rule_id: str
 
 
 def resolve_github_skill_candidates(
@@ -35,7 +36,13 @@ def resolve_github_skill_candidates(
     for target_skill_name, candidate in sorted(candidates_by_target.items()):
         skill = resolve_skill(session, target_skill_name)
         if skill is not None:
-            resolved.append(ResolvedGitHubSkillCandidate(skill=skill, candidate=candidate))
+            resolved.append(
+                ResolvedGitHubSkillCandidate(
+                    skill=skill,
+                    candidate=candidate,
+                    rule_id=candidate.rule_id,
+                )
+            )
     return tuple(resolved)
 
 
