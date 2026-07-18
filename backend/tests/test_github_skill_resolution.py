@@ -14,6 +14,7 @@ def candidate(target: str, path: str = "package.json") -> GitHubSkillCandidate:
         manifest_kind="package_json",
         ecosystem="npm",
         signal_type="dependency_manifest",
+        rule_id="gh_rule.package.react.v1",
     )
 
 

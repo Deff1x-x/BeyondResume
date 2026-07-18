@@ -23,6 +23,7 @@ class GitHubSkillCandidate:
     manifest_kind: str
     ecosystem: str
     signal_type: str
+    rule_id: str
 
 
 def extract_github_skill_candidates(
@@ -50,6 +51,7 @@ def extract_github_skill_candidates(
                 manifest_kind=manifest.kind,
                 ecosystem=manifest.ecosystem,
                 signal_type=DEPENDENCY_MANIFEST_SIGNAL_TYPE,
+                rule_id=rule.rule_id,
             )
             existing = candidates_by_skill.get(candidate.target_skill_name)
             if existing is None or _candidate_key(candidate) < _candidate_key(existing):

@@ -1,4 +1,6 @@
-from dataclasses import replace
+from dataclasses import FrozenInstanceError, replace
+
+import pytest
 
 from app.integrations.github import GitHubRepositorySnapshot
 from app.utils.github_manifests import (
@@ -6,7 +8,10 @@ from app.utils.github_manifests import (
     GitHubNormalizedDependency,
     GitHubNormalizedManifest,
 )
-from app.utils.github_skill_extractor import extract_github_skill_candidates
+from app.utils.github_skill_extractor import (
+    GitHubSkillCandidate,
+    extract_github_skill_candidates,
+)
 from app.utils.github_skill_rules import (
     DEPENDENCY_MANIFEST_SIGNAL_TYPE,
     GitHubDeterministicSkillRule,
@@ -73,6 +78,26 @@ def test_one_dependency_creates_one_rule_backed_candidate() -> None:
     assert len(candidates) == 1
     assert candidates[0].target_skill_name == "React"
     assert candidates[0].source_dependency == "react"
+    assert candidates[0].rule_id == "gh_rule.package.react.v1"
+
+
+def test_candidate_requires_rule_id_and_is_immutable() -> None:
+    with pytest.raises(TypeError):
+        GitHubSkillCandidate(
+            target_skill_name="React",
+            source_dependency="react",
+            source_manifest="package.json",
+            manifest_kind="package_json",
+            ecosystem="npm",
+            signal_type=DEPENDENCY_MANIFEST_SIGNAL_TYPE,
+        )
+
+    candidate = extract_github_skill_candidates(
+        make_snapshot((manifest("package.json", "package_json", "npm", "react"),)),
+        rules=RULES,
+    )[0]
+    with pytest.raises(FrozenInstanceError):
+        candidate.rule_id = "gh_rule.package.changed.v1"  # type: ignore[misc]
 
 
 def test_duplicate_dependencies_and_manifests_deduplicate_to_one_candidate() -> None:
@@ -87,6 +112,44 @@ def test_duplicate_dependencies_and_manifests_deduplicate_to_one_candidate() -> 
 
     assert len(candidates) == 1
     assert candidates[0].source_manifest == "a/package.json"
+
+
+def test_same_target_rules_preserve_their_matched_rule_ids_without_affecting_deduplication() -> (
+    None
+):
+    react = RULES[0]
+    preact = GitHubDeterministicSkillRule(
+        rule_id="gh_rule.package.preact.v1",
+        signal_type=DEPENDENCY_MANIFEST_SIGNAL_TYPE,
+        manifest_kind="package_json",
+        ecosystem="npm",
+        normalized_match_value="preact",
+        target_skill_name="React",
+    )
+
+    react_candidate = extract_github_skill_candidates(
+        make_snapshot((manifest("package.json", "package_json", "npm", "react"),)),
+        rules=(react, preact),
+    )
+    preact_candidate = extract_github_skill_candidates(
+        make_snapshot((manifest("package.json", "package_json", "npm", "preact"),)),
+        rules=(react, preact),
+    )
+    deduplicated = extract_github_skill_candidates(
+        make_snapshot(
+            (
+                manifest("z/package.json", "package_json", "npm", "react"),
+                manifest("a/package.json", "package_json", "npm", "preact"),
+            )
+        ),
+        rules=(react, preact),
+    )
+
+    assert react_candidate[0].rule_id == react.rule_id
+    assert preact_candidate[0].rule_id == preact.rule_id
+    assert len(deduplicated) == 1
+    assert deduplicated[0].source_manifest == "a/package.json"
+    assert deduplicated[0].rule_id == preact.rule_id
 
 
 def test_unknown_dependency_and_empty_registry_produce_no_candidates() -> None:
