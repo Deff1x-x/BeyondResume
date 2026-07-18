@@ -9,6 +9,8 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base, TimestampMixin
 
 if TYPE_CHECKING:
+    from app.models.evidence_unit import EvidenceUnit
+    from app.models.github_repository import GitHubRepository
     from app.models.resume import Resume
     from app.models.user import User
 
@@ -43,3 +45,7 @@ class CandidateProfile(TimestampMixin, Base):
 
     user: Mapped["User"] = relationship(back_populates="candidate_profile")
     resumes: Mapped[list["Resume"]] = relationship(back_populates="candidate_profile")
+    github_repository: Mapped["GitHubRepository | None"] = relationship(
+        back_populates="candidate_profile", uselist=False
+    )
+    evidence_units: Mapped[list["EvidenceUnit"]] = relationship(back_populates="candidate_profile")
