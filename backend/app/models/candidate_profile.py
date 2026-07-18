@@ -10,6 +10,7 @@ from app.db.base import Base, TimestampMixin
 
 if TYPE_CHECKING:
     from app.models.evidence_unit import EvidenceUnit
+    from app.models.evidence_skill_link import EvidenceSkillLink
     from app.models.github_repository import GitHubRepository
     from app.models.resume import Resume
     from app.models.user import User
@@ -49,3 +50,6 @@ class CandidateProfile(TimestampMixin, Base):
         back_populates="candidate_profile", uselist=False
     )
     evidence_units: Mapped[list["EvidenceUnit"]] = relationship(back_populates="candidate_profile")
+    evidence_skill_links: Mapped[list["EvidenceSkillLink"]] = relationship(
+        back_populates="candidate_profile"
+    )

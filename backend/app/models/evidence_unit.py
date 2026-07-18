@@ -19,6 +19,7 @@ from app.db.base import Base, TimestampMixin
 
 if TYPE_CHECKING:
     from app.models.candidate_profile import CandidateProfile
+    from app.models.evidence_skill_link import EvidenceSkillLink
 
 
 class EvidenceUnit(TimestampMixin, Base):
@@ -61,3 +62,4 @@ class EvidenceUnit(TimestampMixin, Base):
     raw_payload_reference: Mapped[str | None] = mapped_column(String(2048), nullable=True)
 
     candidate_profile: Mapped["CandidateProfile"] = relationship(back_populates="evidence_units")
+    skill_links: Mapped[list["EvidenceSkillLink"]] = relationship(back_populates="evidence_unit")
