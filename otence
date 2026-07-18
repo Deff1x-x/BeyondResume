@@ -1,0 +1,12 @@
+ .../versions/20260718_0011_skill_ontology.py       | 114 [32m++++++[m
+ backend/app/models/__init__.py                     |   6 [32m+[m
+ backend/app/models/candidate_profile.py            |   4 [32m+[m
+ backend/app/models/evidence_skill_link.py          |  58 [32m+++[m
+ backend/app/models/evidence_unit.py                |   2 [32m+[m
+ backend/app/models/skill.py                        |  28 [32m++[m
+ backend/app/models/skill_alias.py                  |  31 [32m++[m
+ backend/app/services/evidence_skill_links.py       | 127 [32m++++++[m
+ backend/app/services/skill_ontology.py             |  81 [32m++++[m
+ backend/app/utils/skill_name.py                    |  18 [32m+[m
+ backend/tests/test_skill_ontology.py               | 450 [32m+++++++++++++++++++++[m
+ 11 files changed, 919 insertions(+)

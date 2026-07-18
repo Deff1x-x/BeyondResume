@@ -1,4 +1,4 @@
-# BeyondResume
+    # BeyondResume
 
 ## Purpose
 
@@ -15,6 +15,7 @@ docs/       Project specification
 ```
 
 ## Start
+
 
 ```bash
 docker compose up
