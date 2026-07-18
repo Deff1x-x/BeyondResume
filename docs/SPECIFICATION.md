@@ -3094,6 +3094,141 @@ generation не вызываются; при persistence error evidence generati
 generation orchestration service не выполняет rollback, а вызывающий boundary откатывает всю
 транзакцию. Logging, metrics, tracing и audit events на Stage 7.6 не добавляются.
 
+### 92.6 Universal Evidence Pipeline Architecture
+
+Любой Evidence Source проходит единый жизненный цикл: source connection определяет кандидата и
+каноническую identity источника; scan получает данные источника; данные нормализуются; актуальный
+normalized snapshot сохраняется; из него детерминированно формируются EvidenceUnit. Source
+connection, scan и EvidenceUnit не заменяют друг друга и не должны смешивать ответственность.
+
+Универсальный pipeline обязателен для каждого нового source:
+
+```text
+fetch → normalize → persist snapshot → generate EvidenceUnit
+```
+
+Каждая следующая стадия выполняется только после успешного завершения предыдущей. Стадии работают
+для одного кандидата и одного подключённого source. Отдельная source specification определяет
+его connection identity, допустимые данные, evidence projection и source-specific errors, но не
+может менять порядок или общие transaction semantics pipeline.
+
+#### Source Adapter contract
+
+Source Adapter получает только каноническую identity уже подключённого источника и возвращает
+типизированный source fetch result. Adapter отвечает исключительно за получение данных source и
+проверку того, что полученные данные относятся к запрошенной identity. Он не получает SQLAlchemy
+Session, не изменяет БД, не создаёт snapshot, EvidenceUnit, job или provider другого source, не
+делает commit/rollback и не выполняет Evidence projection. Сеть, если она разрешена для
+конкретного source, используется только внутри его adapter; adapter не использует пользовательский
+URL как произвольный HTTP endpoint.
+
+#### Normalized Snapshot contract
+
+Normalizer преобразует typed fetch result в immutable normalized snapshot. Normalized snapshot
+обязан содержать канонический `source_type`, канонический `source_reference` и полный фиксированный
+набор нормализованных source-specific полей, достаточных для его Evidence projection. Optional
+values представляются явно как `null`; дополнительные поля запрещены. Порядок коллекций должен
+быть определён source specification. Snapshot не содержит DB IDs, timestamps, session, provider,
+AI conclusions либо необработанный provider/API payload.
+
+Каждый source обязан нормативно определить свой exact schema normalized snapshot: допустимые
+source-specific поля, их типы, bounds, identity checks и canonical representation. Общий контракт
+не требует одинаковых metadata-полей у разных источников и не добавляет поля в уже существующие
+source snapshots.
+
+#### Snapshot persistence contract
+
+Для каждого подключённого source хранится не более одного актуального persisted snapshot; история
+snapshot в universal pipeline не ведётся. Persisted snapshot принадлежит ровно одному source и
+содержит normalized payload, checksum и обычные timestamps. Raw provider/API payload не
+сохраняется, если отдельная source specification явно не определяет иное.
+
+Перед вычислением checksum normalized snapshot сериализуется в canonical JSON: source-defined
+фиксированный набор полей, сортировка ключей, UTF-8, отсутствие незначащих пробелов,
+неэкранированный Unicode, явные `null`, запрещённые дополнительные поля и source-defined порядок
+коллекций. Checksum algorithm и его textual representation должны быть явно определены в source
+specification. Равные checksums означают семантически неизменившийся persisted snapshot.
+
+Первое сохранение создаёт snapshot. При равном checksum возвращается существующий snapshot без
+mutation, flush и ручного изменения timestamps. При отличающемся checksum payload и checksum
+обновляются in place, `created_at` сохраняется, а `updated_at` изменяется обычным ORM/DB
+механизмом. Persistence повторно валидирует schema и bounds normalized snapshot независимо от
+adapter/normalizer.
+
+#### Universal orchestration contract
+
+Orchestrator получает через аргументы внешний Session, candidate identity и Source Adapter; он не
+создаёт Session, adapter, provider factory, global provider или environment-based selection. Он
+выполняет pipeline в обязательном порядке, передаёт нормализованный результат persistence service
+и после успешного persistence запускает Evidence generation. Orchestrator не выполняет source
+normalization, canonical serialization, checksum calculation или Evidence projection самостоятельно.
+
+Все стадии выполняются в одном внешнем transaction boundary. Orchestrator и вложенные services не
+делают commit, rollback или retry; commit/rollback принадлежат вызывающему application/API/job
+layer. Ошибки adapter, validation, identity, persistence и Evidence generation пробрасываются без
+преобразования в HTTP или общий error. При ошибке стадия после неё не запускается; внешний boundary
+откатывает всю транзакцию, поэтому partial success не сохраняется.
+
+Универсальный orchestration result является immutable и содержит source, persisted snapshot,
+созданные/обновлённые EvidenceUnit и flags `snapshot_created`, `snapshot_changed`,
+`evidence_created`, `evidence_changed`. Для source, формирующего несколько EvidenceUnit, result
+содержит immutable collection EvidenceUnit и flags описывают операцию целиком; конкретная source
+specification обязана определить её evidence granularity и deduplication.
+
+#### Adding a new Evidence Source
+
+До реализации нового source его specification MUST определить:
+
+1. source connection и canonical identity;
+2. Source Adapter и typed fetch result;
+3. normalized snapshot schema, canonical serialization, checksum algorithm, bounds и identity
+   validation;
+4. persistence model/relationship и idempotent update semantics;
+5. deterministic EvidenceUnit projection: `source_type`, `source_reference`, temporal fields,
+   verification/ownership statuses, strength, quality flags, raw payload reference, deduplication,
+   update и stale policy;
+6. orchestration interface, error propagation и transaction boundary;
+7. unit/integration tests для adapter isolation, normalization, persistence, evidence generation,
+   idempotency, errors и orchestration ordering.
+
+Добавление нового source реализуется как новая source-specific implementation этих contracts и не
+требует изменения уже существующих implementations других sources. Общие pipeline contracts могут
+быть расширены только backward-compatible нормативным изменением; source-specific rules не должны
+изменять семантику другого source. Это Open/Closed правило обязательно.
+
+GitHub Stage 7 является первой reference implementation universal pipeline: Stage 7.4A выполняет
+fetch и source-specific normalization/identity validation, Stage 7.4B — snapshot persistence,
+Stage 7.5 — deterministic EvidenceUnit generation, Stage 7.6 — orchestration. Его GitHub-specific
+models, contracts, bounds, checksum, evidence rules и service interfaces сохраняют прежнюю
+семантику и не изменяются данным разделом.
+
+### 92.7 Source Adapter Registry
+
+Application composition создаёт Source Adapter Registry как явный локальный объект и передаёт его
+потребителям явно. Registry не является global mutable state, не читает environment variables, не
+создаёт adapters/providers и не управляет их lifecycle. Adapter и его provider dependencies
+создаются внешним composition layer; registry хранит и возвращает тот же зарегистрированный
+instance.
+
+Каждый зарегистрированный Source Adapter имеет один стабильный canonical `source_type`, совпадающий
+с `source_type` его EvidenceUnit. Registry регистрирует adapter по exact `source_type`, запрещает
+пустой source type и дублирование. Existing registration не заменяется и не удаляется неявно.
+Lookup по отсутствующему source type возвращает типизированную internal registry error; lookup не
+создаёт adapter по требованию.
+
+Registry-level Source Adapter является application facade над source-specific pipeline и обязан
+предоставлять entrypoints `fetch`, `normalize`, `persist_snapshot`, `generate_evidence` и
+`run_scan`. Его stage entrypoints делегируют source-specific implementations и не дублируют их
+business logic. `run_scan` выполняет полный source-specific orchestration. Низкоуровневый Source
+Adapter из §92.6, который непосредственно получает внешние данные, по-прежнему не получает Session
+и не изменяет БД; registry facade может принимать внешний Session только для делегирования уже
+принятым application services.
+
+GitHub adapter регистрируется под `github_repository`, получает GitHubProvider через constructor и
+делегирует Stage 7.4A–7.6 без изменения их interfaces или semantics. Добавление другого source
+требует новой facade implementation и её явной регистрации; существующие adapters, включая GitHub,
+не изменяются.
+
 ## 93. Skill Passport rebuild
 
 Rebuild запускается при:
