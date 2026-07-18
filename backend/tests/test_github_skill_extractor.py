@@ -100,23 +100,16 @@ def test_candidate_requires_rule_id_and_is_immutable() -> None:
         candidate.rule_id = "gh_rule.package.changed.v1"  # type: ignore[misc]
 
 
-def test_duplicate_dependencies_and_manifests_deduplicate_to_one_candidate() -> None:
-    snapshot = make_snapshot(
-        (
-            manifest("z/package.json", "package_json", "npm", "react", "react"),
-            manifest("a/package.json", "package_json", "npm", "react"),
-        )
-    )
+def test_exact_duplicate_source_signal_is_deduplicated() -> None:
+    snapshot = make_snapshot((manifest("package.json", "package_json", "npm", "react", "react"),))
 
     candidates = extract_github_skill_candidates(snapshot, rules=RULES)
 
     assert len(candidates) == 1
-    assert candidates[0].source_manifest == "a/package.json"
+    assert candidates[0].source_manifest == "package.json"
 
 
-def test_same_target_rules_preserve_their_matched_rule_ids_without_affecting_deduplication() -> (
-    None
-):
+def test_same_target_rules_preserve_distinct_source_signals_and_rule_ids() -> None:
     react = RULES[0]
     preact = GitHubDeterministicSkillRule(
         rule_id="gh_rule.package.preact.v1",
@@ -127,15 +120,7 @@ def test_same_target_rules_preserve_their_matched_rule_ids_without_affecting_ded
         target_skill_name="React",
     )
 
-    react_candidate = extract_github_skill_candidates(
-        make_snapshot((manifest("package.json", "package_json", "npm", "react"),)),
-        rules=(react, preact),
-    )
-    preact_candidate = extract_github_skill_candidates(
-        make_snapshot((manifest("package.json", "package_json", "npm", "preact"),)),
-        rules=(react, preact),
-    )
-    deduplicated = extract_github_skill_candidates(
+    candidates = extract_github_skill_candidates(
         make_snapshot(
             (
                 manifest("z/package.json", "package_json", "npm", "react"),
@@ -145,11 +130,28 @@ def test_same_target_rules_preserve_their_matched_rule_ids_without_affecting_ded
         rules=(react, preact),
     )
 
-    assert react_candidate[0].rule_id == react.rule_id
-    assert preact_candidate[0].rule_id == preact.rule_id
-    assert len(deduplicated) == 1
-    assert deduplicated[0].source_manifest == "a/package.json"
-    assert deduplicated[0].rule_id == preact.rule_id
+    assert len(candidates) == 2
+    assert [(candidate.source_dependency, candidate.rule_id) for candidate in candidates] == [
+        ("preact", preact.rule_id),
+        ("react", react.rule_id),
+    ]
+
+
+def test_same_dependency_in_distinct_manifests_preserves_two_source_signals() -> None:
+    candidates = extract_github_skill_candidates(
+        make_snapshot(
+            (
+                manifest("a/package.json", "package_json", "npm", "react"),
+                manifest("z/package.json", "package_json", "npm", "react"),
+            )
+        ),
+        rules=RULES,
+    )
+
+    assert [candidate.source_manifest for candidate in candidates] == [
+        "a/package.json",
+        "z/package.json",
+    ]
 
 
 def test_unknown_dependency_and_empty_registry_produce_no_candidates() -> None:
@@ -170,6 +172,33 @@ def test_result_order_and_result_are_independent_of_input_order() -> None:
 
     assert first == second
     assert [candidate.target_skill_name for candidate in first] == ["React", "Requests"]
+
+
+def test_result_is_independent_of_registry_order() -> None:
+    react = RULES[0]
+    preact = GitHubDeterministicSkillRule(
+        rule_id="gh_rule.package.preact.v1",
+        signal_type=DEPENDENCY_MANIFEST_SIGNAL_TYPE,
+        manifest_kind="package_json",
+        ecosystem="npm",
+        normalized_match_value="preact",
+        target_skill_name="React",
+    )
+    snapshot = make_snapshot(
+        (
+            manifest("z/package.json", "package_json", "npm", "react"),
+            manifest("a/package.json", "package_json", "npm", "preact"),
+        )
+    )
+
+    first = extract_github_skill_candidates(snapshot, rules=(react, preact))
+    second = extract_github_skill_candidates(snapshot, rules=(preact, react))
+
+    assert first == second
+    assert [candidate.source_manifest for candidate in first] == [
+        "a/package.json",
+        "z/package.json",
+    ]
 
 
 def test_extractor_uses_only_normalized_manifests() -> None:

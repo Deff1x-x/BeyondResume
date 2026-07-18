@@ -32,7 +32,7 @@ def extract_github_skill_candidates(
     rules: tuple[GitHubDeterministicSkillRule, ...] = GITHUB_DETERMINISTIC_SKILL_RULES,
 ) -> tuple[GitHubSkillCandidate, ...]:
     """Extract exact rule matches using only ``snapshot.normalized_manifests``."""
-    candidates_by_skill: dict[str, GitHubSkillCandidate] = {}
+    candidates_by_signal: dict[tuple[str, str, str, str, str, str, str], GitHubSkillCandidate] = {}
     for manifest in snapshot.normalized_manifests:
         for dependency in manifest.dependencies:
             rule = match_github_skill_rule(
@@ -53,18 +53,17 @@ def extract_github_skill_candidates(
                 signal_type=DEPENDENCY_MANIFEST_SIGNAL_TYPE,
                 rule_id=rule.rule_id,
             )
-            existing = candidates_by_skill.get(candidate.target_skill_name)
-            if existing is None or _candidate_key(candidate) < _candidate_key(existing):
-                candidates_by_skill[candidate.target_skill_name] = candidate
-    return tuple(sorted(candidates_by_skill.values(), key=_candidate_key))
+            candidates_by_signal.setdefault(_candidate_key(candidate), candidate)
+    return tuple(sorted(candidates_by_signal.values(), key=_candidate_key))
 
 
-def _candidate_key(candidate: GitHubSkillCandidate) -> tuple[str, str, str, str, str, str]:
+def _candidate_key(candidate: GitHubSkillCandidate) -> tuple[str, str, str, str, str, str, str]:
     return (
+        candidate.signal_type,
         candidate.target_skill_name,
         candidate.source_manifest,
         candidate.manifest_kind,
         candidate.ecosystem,
         candidate.source_dependency,
-        candidate.signal_type,
+        candidate.rule_id,
     )
