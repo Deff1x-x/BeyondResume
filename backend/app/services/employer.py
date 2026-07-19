@@ -1,15 +1,19 @@
 """Employer company (EmployerProfile) and vacancy services."""
 
+from dataclasses import dataclass
 from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
+from app.models.candidate_profile import CandidateProfile
 from app.models.employer_profile import EmployerProfile
 from app.models.skill import Skill
 from app.models.vacancy import Vacancy
 from app.models.vacancy_skill_requirement import VacancySkillRequirement
+from app.services.matching import MatchRequirement, MatchResult, match_passport_to_requirements
+from app.services.skill_passport import build_passport
 
 
 class EmployerCompanyNotFoundError(Exception):
@@ -189,3 +193,45 @@ def delete_vacancy_requirement(
     except SQLAlchemyError:
         session.rollback()
         raise
+
+
+@dataclass(frozen=True, slots=True)
+class VacancyCandidateMatch:
+    candidate_id: UUID
+    candidate_name: str
+    result: MatchResult
+
+
+def list_vacancy_matches(session: Session, vacancy_id: UUID) -> list[VacancyCandidateMatch]:
+    """Match every candidate passport against this vacancy's structured requirements."""
+    requirement_rows = list_vacancy_requirements(session, vacancy_id)
+    requirements = [
+        MatchRequirement(
+            skill_id=skill.id,
+            skill_name=skill.canonical_name,
+            requirement_type=requirement.requirement_type,
+        )
+        for requirement, skill in requirement_rows
+    ]
+
+    candidates = (
+        session.execute(select(CandidateProfile).order_by(CandidateProfile.display_name))
+        .scalars()
+        .all()
+    )
+
+    matches: list[VacancyCandidateMatch] = []
+    for candidate in candidates:
+        passport = build_passport(session, candidate.id)
+        result = match_passport_to_requirements(passport, requirements)
+        name = candidate.display_name.strip() if candidate.display_name else "Unnamed candidate"
+        matches.append(
+            VacancyCandidateMatch(
+                candidate_id=candidate.id,
+                candidate_name=name,
+                result=result,
+            )
+        )
+
+    matches.sort(key=lambda item: (-item.result.score, item.candidate_name.lower()))
+    return matches

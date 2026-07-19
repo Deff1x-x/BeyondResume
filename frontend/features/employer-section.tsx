@@ -4,7 +4,9 @@ import { useState, type FormEvent } from "react";
 
 import { ApiClientError } from "@/lib/api/error";
 import type {
+  MatchSkillGroup,
   Vacancy,
+  VacancyMatch,
   VacancyRequirement,
   VacancyRequirementType
 } from "@/lib/api/types/employer";
@@ -17,6 +19,7 @@ import {
   useEmployerSkillsQuery,
   useEmployerVacanciesQuery,
   useEmployerVacancyQuery,
+  useVacancyMatchesQuery,
   useVacancyRequirementsQuery
 } from "@/lib/employer/hooks";
 
@@ -251,6 +254,76 @@ function VacancyDetail({ vacancyId }: Readonly<{ vacancyId: string }>) {
         {vacancy.description?.trim() ? vacancy.description : "No description provided."}
       </p>
       <VacancyRequirements vacancyId={vacancyId} />
+      <VacancyMatches vacancyId={vacancyId} />
+    </div>
+  );
+}
+
+function skillGroupText(group: MatchSkillGroup, emptyLabel: string): string {
+  const matched =
+    group.matched.length > 0 ? `Matched: ${group.matched.join(", ")}` : "Matched: none";
+  const missing =
+    group.missing.length > 0 ? `Missing: ${group.missing.join(", ")}` : emptyLabel;
+  return `${matched}. ${missing}`;
+}
+
+function MatchCard({ match }: Readonly<{ match: VacancyMatch }>) {
+  return (
+    <li className="rounded-card border border-border bg-surface p-3">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <p className="text-sm font-medium text-ink">{match.candidate_name}</p>
+        <p className="text-sm font-medium text-ink">Score {match.score}</p>
+      </div>
+      <p className="mt-2 text-sm text-secondary">
+        Required — {skillGroupText(match.required, "Missing: none")}
+      </p>
+      <p className="mt-1 text-sm text-secondary">
+        Preferred — {skillGroupText(match.preferred, "Missing: none")}
+      </p>
+    </li>
+  );
+}
+
+function VacancyMatches({ vacancyId }: Readonly<{ vacancyId: string }>) {
+  const matchesQuery = useVacancyMatchesQuery(vacancyId, true);
+  const matches = matchesQuery.data?.matches ?? [];
+
+  return (
+    <div className="mt-4 space-y-3 border-t border-border pt-3">
+      <p className="text-sm font-medium text-ink">Matches</p>
+
+      {matchesQuery.isLoading ? (
+        <p className="text-sm text-secondary" role="status">
+          Loading matches…
+        </p>
+      ) : null}
+
+      {matchesQuery.isError ? (
+        <div>
+          <p className="text-sm text-danger" role="alert">
+            {errorMessage(matchesQuery.error)}
+          </p>
+          <button
+            type="button"
+            onClick={() => void matchesQuery.refetch()}
+            className="mt-2 min-h-control rounded-button border border-border bg-background px-3 text-sm font-medium text-ink"
+          >
+            Try again
+          </button>
+        </div>
+      ) : null}
+
+      {matchesQuery.isSuccess && matches.length === 0 ? (
+        <p className="text-sm text-secondary">No candidates available to match yet.</p>
+      ) : null}
+
+      {matches.length > 0 ? (
+        <ul className="space-y-2">
+          {matches.map((match) => (
+            <MatchCard key={match.candidate_id} match={match} />
+          ))}
+        </ul>
+      ) : null}
     </div>
   );
 }

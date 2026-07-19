@@ -66,3 +66,20 @@ class SkillOptionResponse(BaseModel):
     id: UUID
     name: str
     category: str
+
+
+class MatchSkillGroupResponse(BaseModel):
+    matched: list[str]
+    missing: list[str]
+
+
+class VacancyMatchResponse(BaseModel):
+    candidate_id: UUID
+    candidate_name: str
+    score: int
+    required: MatchSkillGroupResponse
+    preferred: MatchSkillGroupResponse
+
+
+class VacancyMatchesResponse(BaseModel):
+    matches: list[VacancyMatchResponse]

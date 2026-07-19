@@ -13,8 +13,11 @@ from app.models.user import User
 from app.schemas.employer import (
     EmployerCompanyCreateRequest,
     EmployerCompanyResponse,
+    MatchSkillGroupResponse,
     SkillOptionResponse,
     VacancyCreateRequest,
+    VacancyMatchResponse,
+    VacancyMatchesResponse,
     VacancyRequirementCreateRequest,
     VacancyRequirementResponse,
     VacancyRequirementType,
@@ -33,6 +36,7 @@ from app.services.employer import (
     get_vacancy,
     list_available_skills,
     list_vacancies,
+    list_vacancy_matches,
     list_vacancy_requirements,
 )
 
@@ -247,3 +251,34 @@ def remove_vacancy_requirement(
     except SQLAlchemyError:
         raise api_error(500, "DATABASE_ERROR", "Database operation failed") from None
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get(
+    "/vacancies/{vacancy_id}/matches",
+    response_model=VacancyMatchesResponse,
+)
+def get_vacancy_matches(
+    vacancy_id: UUID,
+    current_user: Annotated[User, Depends(require_employer)],
+    session: Annotated[Session, Depends(get_db)],
+) -> VacancyMatchesResponse:
+    _require_owned_vacancy(session, current_user.id, vacancy_id)
+    matches = list_vacancy_matches(session, vacancy_id)
+    return VacancyMatchesResponse(
+        matches=[
+            VacancyMatchResponse(
+                candidate_id=item.candidate_id,
+                candidate_name=item.candidate_name,
+                score=item.result.score,
+                required=MatchSkillGroupResponse(
+                    matched=list(item.result.required.matched),
+                    missing=list(item.result.required.missing),
+                ),
+                preferred=MatchSkillGroupResponse(
+                    matched=list(item.result.preferred.matched),
+                    missing=list(item.result.preferred.missing),
+                ),
+            )
+            for item in matches
+        ]
+    )

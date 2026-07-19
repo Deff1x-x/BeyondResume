@@ -5,6 +5,7 @@ import type {
   SkillOption,
   Vacancy,
   VacancyCreateRequest,
+  VacancyMatchesResponse,
   VacancyRequirement,
   VacancyRequirementCreateRequest
 } from "@/lib/api/types/employer";
@@ -62,4 +63,8 @@ export function deleteVacancyRequirement(
   return apiRequest<void>(`/employer/vacancies/${vacancyId}/requirements/${requirementId}`, {
     method: "DELETE"
   });
+}
+
+export function listVacancyMatches(vacancyId: string): Promise<VacancyMatchesResponse> {
+  return apiRequest<VacancyMatchesResponse>(`/employer/vacancies/${vacancyId}/matches`);
 }

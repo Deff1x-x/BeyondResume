@@ -48,3 +48,20 @@ export type SkillOption = {
   name: string;
   category: string;
 };
+
+export type MatchSkillGroup = {
+  matched: string[];
+  missing: string[];
+};
+
+export type VacancyMatch = {
+  candidate_id: string;
+  candidate_name: string;
+  score: number;
+  required: MatchSkillGroup;
+  preferred: MatchSkillGroup;
+};
+
+export type VacancyMatchesResponse = {
+  matches: VacancyMatch[];
+};

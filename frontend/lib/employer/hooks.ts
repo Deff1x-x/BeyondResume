@@ -11,6 +11,7 @@ import {
   getEmployerVacancy,
   listEmployerSkills,
   listEmployerVacancies,
+  listVacancyMatches,
   listVacancyRequirements
 } from "@/lib/api/employer";
 import type {
@@ -30,6 +31,10 @@ export function employerVacancyQueryKey(vacancyId: string) {
 
 export function vacancyRequirementsQueryKey(vacancyId: string) {
   return ["employer", "vacancy", vacancyId, "requirements"] as const;
+}
+
+export function vacancyMatchesQueryKey(vacancyId: string) {
+  return ["employer", "vacancy", vacancyId, "matches"] as const;
 }
 
 export function useEmployerCompanyQuery(enabled: boolean) {
@@ -125,6 +130,7 @@ export function useAddVacancyRequirement(vacancyId: string) {
       void queryClient.invalidateQueries({
         queryKey: vacancyRequirementsQueryKey(vacancyId)
       });
+      void queryClient.invalidateQueries({ queryKey: vacancyMatchesQueryKey(vacancyId) });
     }
   });
 }
@@ -138,6 +144,17 @@ export function useDeleteVacancyRequirement(vacancyId: string) {
       void queryClient.invalidateQueries({
         queryKey: vacancyRequirementsQueryKey(vacancyId)
       });
+      void queryClient.invalidateQueries({ queryKey: vacancyMatchesQueryKey(vacancyId) });
     }
+  });
+}
+
+export function useVacancyMatchesQuery(vacancyId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: vacancyMatchesQueryKey(vacancyId),
+    queryFn: () => listVacancyMatches(vacancyId),
+    enabled,
+    staleTime: 30_000,
+    gcTime: 300_000
   });
 }

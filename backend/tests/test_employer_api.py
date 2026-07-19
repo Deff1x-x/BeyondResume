@@ -331,3 +331,59 @@ def test_delete_requirement_not_found(
     )
     assert response.status_code == 404
     assert response.json()["error"]["code"] == "VACANCY_REQUIREMENT_NOT_FOUND"
+
+
+def test_vacancy_matches_endpoint(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.api.v1 import employer
+    from app.services.employer import VacancyCandidateMatch
+    from app.services.matching import MatchResult, SkillGroupBreakdown
+
+    user = make_user()
+    company = make_company(user.id)
+    vacancy = make_vacancy(company.id)
+    authorize_employer(user)
+    monkeypatch.setattr(employer, "get_employer_company", lambda *_args: company)
+    monkeypatch.setattr(employer, "get_vacancy", lambda *_args: vacancy)
+    monkeypatch.setattr(
+        employer,
+        "list_vacancy_matches",
+        lambda *_args: [
+            VacancyCandidateMatch(
+                candidate_id=uuid4(),
+                candidate_name="Ada Lovelace",
+                result=MatchResult(
+                    score=85,
+                    required=SkillGroupBreakdown(matched=("Python",), missing=("Docker",)),
+                    preferred=SkillGroupBreakdown(matched=("React",), missing=()),
+                ),
+            )
+        ],
+    )
+
+    response = client.get(f"/api/v1/employer/vacancies/{vacancy.id}/matches")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["matches"][0]["candidate_name"] == "Ada Lovelace"
+    assert body["matches"][0]["score"] == 85
+    assert body["matches"][0]["required"] == {
+        "matched": ["Python"],
+        "missing": ["Docker"],
+    }
+    assert body["matches"][0]["preferred"] == {"matched": ["React"], "missing": []}
+
+
+def test_vacancy_matches_requires_owned_vacancy(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.api.v1 import employer
+
+    user = make_user()
+    company = make_company(user.id)
+    authorize_employer(user)
+    monkeypatch.setattr(employer, "get_employer_company", lambda *_args: company)
+    monkeypatch.setattr(employer, "get_vacancy", lambda *_args: None)
+
+    response = client.get(f"/api/v1/employer/vacancies/{uuid4()}/matches")
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "VACANCY_NOT_FOUND"
