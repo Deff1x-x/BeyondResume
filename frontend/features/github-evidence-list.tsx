@@ -29,8 +29,12 @@ function evidenceTypeLabel(sourceType: string): string {
   return sourceType.replaceAll("_", " ");
 }
 
-function confidencePercent(confidence: number): string {
-  return `${Math.round(confidence * 100)}%`;
+function evidenceConfidencePercent(value: number): string {
+  return `${Math.round(value * 100)}%`;
+}
+
+function strengthScorePercent(value: number): string {
+  return `${Math.round(value * 100)}%`;
 }
 
 function EvidenceCard({ evidence }: Readonly<{ evidence: EvidenceResponse }>) {
@@ -102,7 +106,7 @@ function EvidenceCard({ evidence }: Readonly<{ evidence: EvidenceResponse }>) {
               >
                 {skill.name}
                 <span className="ml-2 text-secondary">
-                  {confidencePercent(skill.extraction_confidence)}
+                  {evidenceConfidencePercent(skill.evidence_confidence)}
                 </span>
               </li>
             ))}
@@ -138,7 +142,7 @@ function EvidenceCard({ evidence }: Readonly<{ evidence: EvidenceResponse }>) {
             <div>
               <dt className="text-secondary">Strength score</dt>
               <dd className="font-medium text-ink">
-                {confidencePercent(evidence.strength_score)}
+                {strengthScorePercent(evidence.strength_score)}
               </dd>
             </div>
           ) : null}
@@ -151,8 +155,8 @@ function EvidenceCard({ evidence }: Readonly<{ evidence: EvidenceResponse }>) {
                     {skill.name}
                     <span className="text-secondary">
                       {" "}
-                      · {skill.category} · {skill.extraction_method} ·{" "}
-                      {confidencePercent(skill.extraction_confidence)} confidence
+                      · {skill.category} · {skill.extraction_method} · Evidence
+                      confidence {evidenceConfidencePercent(skill.evidence_confidence)}
                     </span>
                   </p>
                 ))}

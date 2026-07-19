@@ -43,7 +43,7 @@ class EvidenceSkillResponse(BaseModel):
     name: str
     category: str
     extraction_method: str
-    extraction_confidence: float
+    evidence_confidence: float
 
 
 class EvidenceResponse(BaseModel):

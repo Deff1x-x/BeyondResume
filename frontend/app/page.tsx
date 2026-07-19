@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { CandidateProfileSection } from "@/features/candidate-profile-section";
 import { GitHubSection } from "@/features/github-section";
 import { ResumeSection } from "@/features/resume-section";
+import { SkillPassportSection } from "@/features/skill-passport-section";
 import { useCurrentUser, useLogout } from "@/lib/auth/hooks";
 
 export default function HomePage() {
@@ -89,6 +90,7 @@ export default function HomePage() {
         <CandidateProfileSection enabled={user.role === "candidate"} />
         <ResumeSection enabled={user.role === "candidate"} />
         <GitHubSection enabled={user.role === "candidate"} />
+        <SkillPassportSection enabled={user.role === "candidate"} />
       </div>
     </main>
   );

@@ -13,6 +13,7 @@ import {
 } from "@/lib/api/github";
 import type { GitHubRepositoryConnectRequest } from "@/lib/api/types/github";
 import { isTerminalJobStatus, jobQueryKey, useJobQuery } from "@/lib/jobs/hooks";
+import { skillPassportQueryKey } from "@/lib/skill-passport/hooks";
 
 export const githubRepositoriesQueryKey = ["github", "repositories"] as const;
 
@@ -93,6 +94,7 @@ export function useGitHubScanJobQuery(jobId: string | null, repositoryId: string
       void queryClient.invalidateQueries({
         queryKey: githubRepositoryQueryKey(repositoryId)
       });
+      void queryClient.invalidateQueries({ queryKey: skillPassportQueryKey });
     }
   }, [status, queryClient, repositoryId]);
 
@@ -107,6 +109,7 @@ export function useDeleteGitHubRepository() {
     onSuccess: (_data, repositoryId) => {
       queryClient.removeQueries({ queryKey: githubRepositoryQueryKey(repositoryId) });
       void queryClient.invalidateQueries({ queryKey: githubRepositoriesQueryKey });
+      void queryClient.invalidateQueries({ queryKey: skillPassportQueryKey });
     }
   });
 }

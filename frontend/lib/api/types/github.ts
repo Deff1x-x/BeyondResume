@@ -34,7 +34,7 @@ export type EvidenceSkill = {
   name: string;
   category: string;
   extraction_method: string;
-  extraction_confidence: number;
+  evidence_confidence: number;
 };
 
 export type EvidenceResponse = {

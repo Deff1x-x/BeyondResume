@@ -271,7 +271,7 @@ def _evidence_skills_by_unit(
                 name=name,
                 category=category,
                 extraction_method=method,
-                extraction_confidence=float(confidence),
+                evidence_confidence=float(confidence),
             )
         )
     return skills_by_unit
