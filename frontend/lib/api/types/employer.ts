@@ -65,3 +65,43 @@ export type VacancyMatch = {
 export type VacancyMatchesResponse = {
   matches: VacancyMatch[];
 };
+
+export type MatchDetailsCandidate = {
+  id: string;
+  name: string;
+  headline: string | null;
+  avatar: string | null;
+};
+
+export type MatchDetailsMatch = {
+  score: number;
+  required: MatchSkillGroup;
+  preferred: MatchSkillGroup;
+};
+
+export type MatchDetailsPassport = {
+  top_skills: string[];
+};
+
+export type MatchDetailsEvidence = {
+  source_type: string;
+  title: string | null;
+  skills: string[];
+};
+
+export type MatchDetailsRoadmapItem = {
+  id: string;
+  title: string;
+  reason: string;
+  priority: "high" | "medium" | "low";
+  missing_skills: string[];
+  related_skills: string[];
+};
+
+export type MatchDetailsResponse = {
+  candidate: MatchDetailsCandidate;
+  match: MatchDetailsMatch;
+  passport: MatchDetailsPassport;
+  evidence: MatchDetailsEvidence[];
+  roadmap: MatchDetailsRoadmapItem[];
+};

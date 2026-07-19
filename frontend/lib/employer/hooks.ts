@@ -9,6 +9,7 @@ import {
   deleteVacancyRequirement,
   getEmployerCompany,
   getEmployerVacancy,
+  getMatchDetails,
   listEmployerSkills,
   listEmployerVacancies,
   listVacancyMatches,
@@ -154,6 +155,29 @@ export function useVacancyMatchesQuery(vacancyId: string, enabled: boolean) {
     queryKey: vacancyMatchesQueryKey(vacancyId),
     queryFn: () => listVacancyMatches(vacancyId),
     enabled,
+    staleTime: 30_000,
+    gcTime: 300_000
+  });
+}
+
+export function matchDetailsQueryKey(candidateId: string, vacancyId: string) {
+  return ["employer", "matches", candidateId, vacancyId] as const;
+}
+
+export function useMatchDetailsQuery(
+  candidateId: string | null,
+  vacancyId: string | null,
+  enabled: boolean
+) {
+  return useQuery({
+    queryKey: matchDetailsQueryKey(candidateId ?? "", vacancyId ?? ""),
+    queryFn: () => {
+      if (candidateId === null || vacancyId === null) {
+        throw new Error("Candidate and vacancy IDs are required");
+      }
+      return getMatchDetails(candidateId, vacancyId);
+    },
+    enabled: enabled && candidateId !== null && vacancyId !== null,
     staleTime: 30_000,
     gcTime: 300_000
   });

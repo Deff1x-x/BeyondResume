@@ -2,6 +2,7 @@ import { apiRequest } from "@/lib/api/client";
 import type {
   EmployerCompany,
   EmployerCompanyCreateRequest,
+  MatchDetailsResponse,
   SkillOption,
   Vacancy,
   VacancyCreateRequest,
@@ -67,4 +68,14 @@ export function deleteVacancyRequirement(
 
 export function listVacancyMatches(vacancyId: string): Promise<VacancyMatchesResponse> {
   return apiRequest<VacancyMatchesResponse>(`/employer/vacancies/${vacancyId}/matches`);
+}
+
+export function getMatchDetails(
+  candidateId: string,
+  vacancyId: string
+): Promise<MatchDetailsResponse> {
+  const params = new URLSearchParams({ vacancy_id: vacancyId });
+  return apiRequest<MatchDetailsResponse>(
+    `/employer/matches/${candidateId}?${params.toString()}`
+  );
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState, type FormEvent } from "react";
 
 import { ApiClientError } from "@/lib/api/error";
@@ -267,19 +268,31 @@ function skillGroupText(group: MatchSkillGroup, emptyLabel: string): string {
   return `${matched}. ${missing}`;
 }
 
-function MatchCard({ match }: Readonly<{ match: VacancyMatch }>) {
+function MatchCard({
+  match,
+  vacancyId
+}: Readonly<{ match: VacancyMatch; vacancyId: string }>) {
+  const href = `/employer/matches/${match.candidate_id}?vacancy_id=${encodeURIComponent(vacancyId)}`;
+
   return (
-    <li className="rounded-card border border-border bg-surface p-3">
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <p className="text-sm font-medium text-ink">{match.candidate_name}</p>
-        <p className="text-sm font-medium text-ink">Score {match.score}</p>
-      </div>
-      <p className="mt-2 text-sm text-secondary">
-        Required — {skillGroupText(match.required, "Missing: none")}
-      </p>
-      <p className="mt-1 text-sm text-secondary">
-        Preferred — {skillGroupText(match.preferred, "Missing: none")}
-      </p>
+    <li>
+      <Link
+        href={href}
+        className="block rounded-card border border-border bg-surface p-3 transition-colors hover:border-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+        aria-label={`Open profile for ${match.candidate_name}, match score ${match.score}`}
+      >
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <p className="text-sm font-medium text-ink">{match.candidate_name}</p>
+          <p className="text-sm font-medium text-ink">Score {match.score}</p>
+        </div>
+        <p className="mt-2 text-sm text-secondary">
+          Required — {skillGroupText(match.required, "Missing: none")}
+        </p>
+        <p className="mt-1 text-sm text-secondary">
+          Preferred — {skillGroupText(match.preferred, "Missing: none")}
+        </p>
+        <p className="mt-3 text-sm font-medium text-primary">View profile →</p>
+      </Link>
     </li>
   );
 }
@@ -320,7 +333,7 @@ function VacancyMatches({ vacancyId }: Readonly<{ vacancyId: string }>) {
       {matches.length > 0 ? (
         <ul className="space-y-2">
           {matches.map((match) => (
-            <MatchCard key={match.candidate_id} match={match} />
+            <MatchCard key={match.candidate_id} match={match} vacancyId={vacancyId} />
           ))}
         </ul>
       ) : null}

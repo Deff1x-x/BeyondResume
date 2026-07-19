@@ -387,3 +387,111 @@ def test_vacancy_matches_requires_owned_vacancy(
     response = client.get(f"/api/v1/employer/vacancies/{uuid4()}/matches")
     assert response.status_code == 404
     assert response.json()["error"]["code"] == "VACANCY_NOT_FOUND"
+
+
+def test_match_details_endpoint(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.api.v1 import employer
+    from app.schemas.employer import (
+        MatchDetailsCandidateResponse,
+        MatchDetailsEvidenceResponse,
+        MatchDetailsMatchResponse,
+        MatchDetailsPassportResponse,
+        MatchDetailsResponse,
+        MatchDetailsRoadmapItemResponse,
+        MatchSkillGroupResponse,
+    )
+
+    user = make_user()
+    company = make_company(user.id)
+    vacancy = make_vacancy(company.id)
+    candidate_id = uuid4()
+    authorize_employer(user)
+    monkeypatch.setattr(employer, "get_employer_company", lambda *_args: company)
+    monkeypatch.setattr(employer, "get_vacancy", lambda *_args: vacancy)
+    monkeypatch.setattr(
+        employer,
+        "build_match_details",
+        lambda *_args, **_kwargs: MatchDetailsResponse(
+            candidate=MatchDetailsCandidateResponse(
+                id=candidate_id,
+                name="Ada Lovelace",
+                headline="Backend Engineer",
+                avatar=None,
+            ),
+            match=MatchDetailsMatchResponse(
+                score=91,
+                required=MatchSkillGroupResponse(matched=["Python"], missing=[]),
+                preferred=MatchSkillGroupResponse(matched=[], missing=["Docker"]),
+            ),
+            passport=MatchDetailsPassportResponse(top_skills=["Python", "FastAPI"]),
+            evidence=[
+                MatchDetailsEvidenceResponse(
+                    source_type="resume",
+                    title="Resume: ada.pdf",
+                    skills=["Python", "FastAPI"],
+                )
+            ],
+            roadmap=[
+                MatchDetailsRoadmapItemResponse(
+                    id="add-docker",
+                    title="Add Docker evidence",
+                    reason="Strengthen preferred stack",
+                    priority="medium",
+                    missing_skills=["Docker"],
+                    related_skills=["Python"],
+                )
+            ],
+        ),
+    )
+
+    response = client.get(
+        f"/api/v1/employer/matches/{candidate_id}",
+        params={"vacancy_id": str(vacancy.id)},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["candidate"]["name"] == "Ada Lovelace"
+    assert body["match"]["score"] == 91
+    assert body["passport"]["top_skills"] == ["Python", "FastAPI"]
+    assert body["evidence"][0]["source_type"] == "resume"
+    assert body["roadmap"][0]["id"] == "add-docker"
+
+
+def test_match_details_requires_vacancy_query(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.api.v1 import employer
+
+    user = make_user()
+    authorize_employer(user)
+    monkeypatch.setattr(employer, "get_employer_company", lambda *_args: make_company(user.id))
+
+    response = client.get(f"/api/v1/employer/matches/{uuid4()}")
+    assert response.status_code == 422
+
+
+def test_match_details_candidate_not_found(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.api.v1 import employer
+    from app.services.match_details import MatchDetailsCandidateNotFoundError
+
+    user = make_user()
+    company = make_company(user.id)
+    vacancy = make_vacancy(company.id)
+    authorize_employer(user)
+    monkeypatch.setattr(employer, "get_employer_company", lambda *_args: company)
+    monkeypatch.setattr(employer, "get_vacancy", lambda *_args: vacancy)
+
+    def missing(*_args: object, **_kwargs: object) -> None:
+        raise MatchDetailsCandidateNotFoundError
+
+    monkeypatch.setattr(employer, "build_match_details", missing)
+
+    response = client.get(
+        f"/api/v1/employer/matches/{uuid4()}",
+        params={"vacancy_id": str(vacancy.id)},
+    )
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "CANDIDATE_NOT_FOUND"

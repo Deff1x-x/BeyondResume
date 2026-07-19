@@ -83,3 +83,43 @@ class VacancyMatchResponse(BaseModel):
 
 class VacancyMatchesResponse(BaseModel):
     matches: list[VacancyMatchResponse]
+
+
+class MatchDetailsCandidateResponse(BaseModel):
+    id: UUID
+    name: str
+    headline: str | None
+    avatar: str | None
+
+
+class MatchDetailsMatchResponse(BaseModel):
+    score: int
+    required: MatchSkillGroupResponse
+    preferred: MatchSkillGroupResponse
+
+
+class MatchDetailsPassportResponse(BaseModel):
+    top_skills: list[str]
+
+
+class MatchDetailsEvidenceResponse(BaseModel):
+    source_type: str
+    title: str | None
+    skills: list[str]
+
+
+class MatchDetailsRoadmapItemResponse(BaseModel):
+    id: str
+    title: str
+    reason: str
+    priority: Literal["high", "medium", "low"]
+    missing_skills: list[str]
+    related_skills: list[str]
+
+
+class MatchDetailsResponse(BaseModel):
+    candidate: MatchDetailsCandidateResponse
+    match: MatchDetailsMatchResponse
+    passport: MatchDetailsPassportResponse
+    evidence: list[MatchDetailsEvidenceResponse]
+    roadmap: list[MatchDetailsRoadmapItemResponse]

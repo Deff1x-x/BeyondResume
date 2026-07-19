@@ -1,7 +1,7 @@
 from typing import Annotated, cast
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
@@ -13,6 +13,7 @@ from app.models.user import User
 from app.schemas.employer import (
     EmployerCompanyCreateRequest,
     EmployerCompanyResponse,
+    MatchDetailsResponse,
     MatchSkillGroupResponse,
     SkillOptionResponse,
     VacancyCreateRequest,
@@ -38,6 +39,10 @@ from app.services.employer import (
     list_vacancies,
     list_vacancy_matches,
     list_vacancy_requirements,
+)
+from app.services.match_details import (
+    MatchDetailsCandidateNotFoundError,
+    build_match_details,
 )
 
 router = APIRouter(prefix="/employer", tags=["employer"])
@@ -282,3 +287,25 @@ def get_vacancy_matches(
             for item in matches
         ]
     )
+
+
+@router.get(
+    "/matches/{candidate_id}",
+    response_model=MatchDetailsResponse,
+)
+def get_match_details(
+    candidate_id: UUID,
+    vacancy_id: Annotated[UUID, Query()],
+    current_user: Annotated[User, Depends(require_employer)],
+    session: Annotated[Session, Depends(get_db)],
+) -> MatchDetailsResponse:
+    """Explainable match view for one candidate against an owned vacancy."""
+    _require_owned_vacancy(session, current_user.id, vacancy_id)
+    try:
+        return build_match_details(
+            session, vacancy_id=vacancy_id, candidate_id=candidate_id
+        )
+    except MatchDetailsCandidateNotFoundError:
+        raise api_error(404, "CANDIDATE_NOT_FOUND", "Candidate not found") from None
+    except SQLAlchemyError:
+        raise api_error(500, "DATABASE_ERROR", "Database operation failed") from None
