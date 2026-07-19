@@ -1,5 +1,6 @@
 import { apiRequest } from "@/lib/api/client";
 import type {
+  EvidenceResponse,
   GitHubRepositoryConnectRequest,
   GitHubRepositoryDetailResponse,
   GitHubRepositoryResponse
@@ -24,6 +25,14 @@ export function getGitHubRepository(
 ): Promise<GitHubRepositoryDetailResponse> {
   return apiRequest<GitHubRepositoryDetailResponse>(
     `/candidate/github/repositories/${repositoryId}`
+  );
+}
+
+export function listGitHubRepositoryEvidence(
+  repositoryId: string
+): Promise<EvidenceResponse[]> {
+  return apiRequest<EvidenceResponse[]>(
+    `/candidate/github/repositories/${repositoryId}/evidence`
   );
 }
 

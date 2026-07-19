@@ -18,6 +18,8 @@ from app.models.job import Job, JobStatus
 from app.models.skill import Skill
 from app.models.user import User
 from app.schemas.github import (
+    EvidenceResponse,
+    EvidenceSkillResponse,
     GitHubRepositoryConnectRequest,
     GitHubRepositoryDetailResponse,
     GitHubRepositoryResponse,
@@ -243,6 +245,78 @@ def get_repository(
     profile = _require_profile(session, current_user)
     repository = _get_owned_repository(session, profile.id, repository_id)
     return _detail_response(session, profile.id, repository)
+
+
+def _evidence_skills_by_unit(
+    session: Session, evidence_unit_ids: list[UUID]
+) -> dict[UUID, list[EvidenceSkillResponse]]:
+    if not evidence_unit_ids:
+        return {}
+    rows = session.execute(
+        select(
+            EvidenceSkillLink.evidence_unit_id,
+            Skill.canonical_name,
+            Skill.category,
+            EvidenceSkillLink.extraction_method,
+            EvidenceSkillLink.extraction_confidence,
+        )
+        .join(Skill, Skill.id == EvidenceSkillLink.skill_id)
+        .where(EvidenceSkillLink.evidence_unit_id.in_(evidence_unit_ids))
+        .order_by(Skill.canonical_name)
+    ).all()
+    skills_by_unit: dict[UUID, list[EvidenceSkillResponse]] = {}
+    for evidence_unit_id, name, category, method, confidence in rows:
+        skills_by_unit.setdefault(evidence_unit_id, []).append(
+            EvidenceSkillResponse(
+                name=name,
+                category=category,
+                extraction_method=method,
+                extraction_confidence=float(confidence),
+            )
+        )
+    return skills_by_unit
+
+
+@router.get(
+    "/repositories/{repository_id}/evidence",
+    response_model=list[EvidenceResponse],
+)
+def list_repository_evidence(
+    repository_id: UUID,
+    current_user: Annotated[User, Depends(require_candidate)],
+    session: Annotated[Session, Depends(get_db)],
+) -> list[EvidenceResponse]:
+    profile = _require_profile(session, current_user)
+    repository = _get_owned_repository(session, profile.id, repository_id)
+    evidence_units = (
+        session.execute(
+            select(EvidenceUnit)
+            .where(
+                EvidenceUnit.candidate_id == profile.id,
+                EvidenceUnit.source_type == "github_repository",
+                EvidenceUnit.source_reference == repository.repository_url,
+            )
+            .order_by(EvidenceUnit.created_at)
+        )
+        .scalars()
+        .all()
+    )
+    skills_by_unit = _evidence_skills_by_unit(session, [unit.id for unit in evidence_units])
+    return [
+        EvidenceResponse(
+            id=unit.id,
+            source_type=unit.source_type,
+            source_reference=unit.source_reference,
+            title=unit.title,
+            description=unit.description,
+            observed_at=unit.observed_at,
+            verification_status=unit.verification_status,
+            ownership_status=unit.ownership_status,
+            strength_score=float(unit.strength_score) if unit.strength_score is not None else None,
+            skills=skills_by_unit.get(unit.id, []),
+        )
+        for unit in evidence_units
+    ]
 
 
 @router.post(

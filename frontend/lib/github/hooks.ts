@@ -8,7 +8,8 @@ import {
   connectGitHubRepository,
   deleteGitHubRepository,
   getGitHubRepository,
-  listGitHubRepositories
+  listGitHubRepositories,
+  listGitHubRepositoryEvidence
 } from "@/lib/api/github";
 import type { GitHubRepositoryConnectRequest } from "@/lib/api/types/github";
 import { isTerminalJobStatus, jobQueryKey, useJobQuery } from "@/lib/jobs/hooks";
@@ -33,6 +34,20 @@ export function useGitHubRepositoryQuery(repositoryId: string, enabled: boolean)
   return useQuery({
     queryKey: githubRepositoryQueryKey(repositoryId),
     queryFn: () => getGitHubRepository(repositoryId),
+    enabled,
+    staleTime: 60_000,
+    gcTime: 300_000
+  });
+}
+
+export function githubRepositoryEvidenceQueryKey(repositoryId: string) {
+  return [...githubRepositoryQueryKey(repositoryId), "evidence"] as const;
+}
+
+export function useGitHubRepositoryEvidenceQuery(repositoryId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: githubRepositoryEvidenceQueryKey(repositoryId),
+    queryFn: () => listGitHubRepositoryEvidence(repositoryId),
     enabled,
     staleTime: 60_000,
     gcTime: 300_000

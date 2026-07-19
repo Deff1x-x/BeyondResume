@@ -37,3 +37,23 @@ class GitHubRepositorySkillResponse(BaseModel):
 class GitHubRepositoryDetailResponse(GitHubRepositoryResponse):
     snapshot: GitHubRepositorySnapshotSummary | None
     skills: list[GitHubRepositorySkillResponse]
+
+
+class EvidenceSkillResponse(BaseModel):
+    name: str
+    category: str
+    extraction_method: str
+    extraction_confidence: float
+
+
+class EvidenceResponse(BaseModel):
+    id: UUID
+    source_type: str
+    source_reference: str | None
+    title: str | None
+    description: str | None
+    observed_at: datetime | None
+    verification_status: str | None
+    ownership_status: str | None
+    strength_score: float | None
+    skills: list[EvidenceSkillResponse]

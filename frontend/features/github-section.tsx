@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 
+import { GitHubEvidenceList } from "@/features/github-evidence-list";
 import { ApiClientError } from "@/lib/api/error";
 import type { GitHubRepositoryResponse } from "@/lib/api/types/github";
 import type { JobPollingResponse } from "@/lib/api/types/jobs";
@@ -151,6 +152,13 @@ function RepositoryDetails({ repositoryId }: Readonly<{ repositoryId: string }>)
             ))}
           </ul>
         )}
+      </div>
+
+      <div>
+        <p className="text-sm font-medium text-ink">Evidence</p>
+        <div className="mt-2">
+          <GitHubEvidenceList repositoryId={repositoryId} />
+        </div>
       </div>
     </div>
   );
