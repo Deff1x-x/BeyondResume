@@ -1,4 +1,5 @@
 from contextlib import suppress
+from dataclasses import dataclass
 from hashlib import sha256
 from io import BytesIO
 from pathlib import Path
@@ -54,6 +55,12 @@ class ResumeStorageError(Exception):
 
 class InvalidResumeContentError(Exception):
     pass
+
+
+@dataclass(frozen=True)
+class ResumeUploadResult:
+    resume: Resume
+    job: Job
 
 
 def get_candidate_profile(session: Session, user_id: UUID) -> CandidateProfile | None:
@@ -115,7 +122,9 @@ def _validate_content(extension: str, content: bytes) -> None:
             raise InvalidResumeContentError
 
 
-async def upload_resume(session: Session, user_id: UUID, upload_file: UploadFile) -> Resume:
+async def upload_resume(
+    session: Session, user_id: UUID, upload_file: UploadFile
+) -> ResumeUploadResult:
     operation_error: BaseException | None = None
     try:
         return await _upload_resume(session, user_id, upload_file)
@@ -130,7 +139,9 @@ async def upload_resume(session: Session, user_id: UUID, upload_file: UploadFile
                 raise
 
 
-async def _upload_resume(session: Session, user_id: UUID, upload_file: UploadFile) -> Resume:
+async def _upload_resume(
+    session: Session, user_id: UUID, upload_file: UploadFile
+) -> ResumeUploadResult:
     profile = get_candidate_profile(session, user_id)
     if profile is None:
         raise CandidateProfileRequiredError
@@ -178,16 +189,15 @@ async def _upload_resume(session: Session, user_id: UUID, upload_file: UploadFil
             .values(is_current=False)
         )
         session.add(resume)
-        session.add(
-            Job(resume_id=resume.id, job_type=JobType.RESUME_PARSE, status=JobStatus.PENDING)
-        )
+        job = Job(resume_id=resume.id, job_type=JobType.RESUME_PARSE, status=JobStatus.PENDING)
+        session.add(job)
         session.commit()
     except SQLAlchemyError:
         session.rollback()
         _remove_file(destination)
         raise
     session.refresh(resume)
-    return resume
+    return ResumeUploadResult(resume=resume, job=job)
 
 
 def get_download_path(resume: Resume) -> Path:

@@ -13,6 +13,7 @@ from app.models.job import Job, JobStatus, JobType
 from app.main import app
 from app.models.resume import Resume
 from app.models.user import User
+from app.services.resume import ResumeUploadResult
 
 
 def make_user(role: str = "candidate") -> User:
@@ -64,23 +65,30 @@ def test_resume_upload_success_contract(
     uploaded.original_filename = filename
     uploaded.mime_type = mime_type
 
-    async def upload(*_args: object) -> Resume:
-        return uploaded
-
-    monkeypatch.setattr(resume, "upload_resume", upload)
-    response = client.post(
-        "/api/v1/candidate/resume", files={"file": (filename, b"content", mime_type)}
+    job = Job(
+        id=uuid4(),
+        resume_id=uploaded.id,
+        job_type=JobType.RESUME_PARSE,
+        status=JobStatus.PENDING,
     )
 
-    assert response.status_code == 201
-    assert set(response.json()) == {
-        "id",
-        "original_filename",
-        "mime_type",
-        "file_size_bytes",
-        "parse_status",
-        "created_at",
-    }
+    async def upload(*_args: object) -> ResumeUploadResult:
+        return ResumeUploadResult(resume=uploaded, job=job)
+
+    monkeypatch.setattr(resume, "upload_resume", upload)
+    worker_calls: list[tuple[object, ...]] = []
+
+    async def run_worker(*args: object) -> None:
+        worker_calls.append(args)
+
+    monkeypatch.setattr(resume, "run_resume_parse_job_task", run_worker)
+    response = client.post(
+        "/api/v1/candidate/resumes", files={"file": (filename, b"content", mime_type)}
+    )
+
+    assert response.status_code == 202
+    assert response.json() == {"resume_id": str(uploaded.id), "job_id": str(job.id)}
+    assert worker_calls == [(job.id,)]
 
 
 def test_resume_upload_profile_required(
@@ -91,12 +99,12 @@ def test_resume_upload_profile_required(
 
     authorize_candidate(make_user())
 
-    async def upload(*_args: object) -> Resume:
+    async def upload(*_args: object) -> ResumeUploadResult:
         raise CandidateProfileRequiredError
 
     monkeypatch.setattr(resume, "upload_resume", upload)
     response = client.post(
-        "/api/v1/candidate/resume", files={"file": ("resume.pdf", b"content", "application/pdf")}
+        "/api/v1/candidate/resumes", files={"file": ("resume.pdf", b"content", "application/pdf")}
     )
 
     assert response.status_code == 409
@@ -124,12 +132,12 @@ def test_resume_upload_error_mapping(
     authorize_candidate(make_user())
     error_type = getattr(resume_service, error_name)
 
-    async def upload(*_args: object) -> Resume:
+    async def upload(*_args: object) -> ResumeUploadResult:
         raise error_type
 
     monkeypatch.setattr(resume, "upload_resume", upload)
     response = client.post(
-        "/api/v1/candidate/resume", files={"file": ("resume.pdf", b"content", "application/pdf")}
+        "/api/v1/candidate/resumes", files={"file": ("resume.pdf", b"content", "application/pdf")}
     )
 
     assert response.status_code == status_code
@@ -138,18 +146,45 @@ def test_resume_upload_error_mapping(
 
 def test_resume_upload_missing_file_and_openapi(client: TestClient) -> None:
     authorize_candidate(make_user())
-    missing = client.post("/api/v1/candidate/resume")
-    operations = client.get("/openapi.json").json()["paths"]["/api/v1/candidate/resume"]
+    missing = client.post("/api/v1/candidate/resumes")
+    openapi = client.get("/openapi.json").json()
+    paths = openapi["paths"]
+    operations = paths["/api/v1/candidate/resumes"]
 
     assert missing.status_code == 422
     assert missing.json()["error"]["code"] == "VALIDATION_ERROR"
     assert set(operations) == {"get", "post"}
     assert "multipart/form-data" in str(operations)
+    response_schema = operations["post"]["responses"]["202"]["content"]["application/json"][
+        "schema"
+    ]
+    assert response_schema["$ref"].endswith("/ResumeUploadAcceptedResponse")
+    schema = openapi["components"]["schemas"]["ResumeUploadAcceptedResponse"]
+    assert set(schema["properties"]) == {"resume_id", "job_id"}
+    assert set(schema["required"]) == {"resume_id", "job_id"}
+    assert {field["format"] for field in schema["properties"].values()} == {"uuid"}
+    assert "/api/v1/candidate/resume" not in paths
+
+
+def test_resume_member_read_uses_plural_path(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.api.v1 import resume as resume_api
+
+    candidate = make_user()
+    resume = make_resume()
+    authorize_candidate(candidate)
+    monkeypatch.setattr(resume_api, "get_candidate_resume", lambda *_args: resume)
+
+    response = client.get(f"/api/v1/candidate/resumes/{resume.id}")
+
+    assert response.status_code == 200
+    assert response.json()["id"] == str(resume.id)
 
 
 def test_resume_upload_requires_bearer_token(client: TestClient) -> None:
     response = client.post(
-        "/api/v1/candidate/resume", files={"file": ("resume.pdf", b"content", "application/pdf")}
+        "/api/v1/candidate/resumes", files={"file": ("resume.pdf", b"content", "application/pdf")}
     )
 
     assert response.status_code == 401
@@ -161,7 +196,7 @@ def test_resume_upload_rejects_employer(client: TestClient) -> None:
     )
 
     response = client.post(
-        "/api/v1/candidate/resume", files={"file": ("resume.pdf", b"content", "application/pdf")}
+        "/api/v1/candidate/resumes", files={"file": ("resume.pdf", b"content", "application/pdf")}
     )
 
     assert response.status_code == 403

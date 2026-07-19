@@ -11,7 +11,7 @@ from app.api.errors import api_error
 from app.db.session import get_db
 from app.models.job import JobStatus
 from app.models.user import User
-from app.schemas.resume import JobPollingResponse, ResumeResponse, ResumeUploadResponse
+from app.schemas.resume import JobPollingResponse, ResumeResponse, ResumeUploadAcceptedResponse
 from app.services.resume import (
     CandidateProfileRequiredError,
     EmptyResumeFileError,
@@ -35,14 +35,15 @@ from app.services.resume_parsing import run_resume_parse_job_task
 router = APIRouter(prefix="/candidate", tags=["candidate"])
 
 
-@router.post("/resume", response_model=ResumeUploadResponse, status_code=201)
+@router.post("/resumes", response_model=ResumeUploadAcceptedResponse, status_code=202)
 async def create_resume(
     file: Annotated[UploadFile, File()],
+    background_tasks: BackgroundTasks,
     current_user: Annotated[User, Depends(require_candidate)],
     session: Annotated[Session, Depends(get_db)],
-) -> ResumeUploadResponse:
+) -> ResumeUploadAcceptedResponse:
     try:
-        resume = await upload_resume(session, current_user.id, file)
+        upload_result = await upload_resume(session, current_user.id, file)
     except CandidateProfileRequiredError:
         raise api_error(
             409,
@@ -88,10 +89,14 @@ async def create_resume(
         raise api_error(500, "RESUME_STORAGE_ERROR", "Failed to store resume file") from None
     except SQLAlchemyError:
         raise api_error(500, "DATABASE_ERROR", "Database operation failed") from None
-    return ResumeUploadResponse.model_validate(resume)
+    background_tasks.add_task(run_resume_parse_job_task, upload_result.job.id)
+    return ResumeUploadAcceptedResponse(
+        resume_id=upload_result.resume.id,
+        job_id=upload_result.job.id,
+    )
 
 
-@router.get("/resume", response_model=ResumeResponse)
+@router.get("/resumes", response_model=ResumeResponse)
 def get_resume(
     current_user: Annotated[User, Depends(require_candidate)],
     session: Annotated[Session, Depends(get_db)],
@@ -99,6 +104,18 @@ def get_resume(
     resume = get_current_resume(session, current_user.id)
     if resume is None:
         raise api_error(404, "RESUME_NOT_FOUND", "Current resume not found")
+    return ResumeResponse.model_validate(resume)
+
+
+@router.get("/resumes/{resume_id}", response_model=ResumeResponse)
+def get_resume_by_id(
+    resume_id: UUID,
+    current_user: Annotated[User, Depends(require_candidate)],
+    session: Annotated[Session, Depends(get_db)],
+) -> ResumeResponse:
+    resume = get_candidate_resume(session, current_user.id, resume_id)
+    if resume is None:
+        raise api_error(404, "RESUME_NOT_FOUND", "Resume not found")
     return ResumeResponse.model_validate(resume)
 
 

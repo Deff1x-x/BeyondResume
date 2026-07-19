@@ -60,13 +60,15 @@ def test_upload_streams_file_and_creates_uploaded_resume(
     upload_file = FakeUploadFile(
         "C:\\Users\\Alan\\Resume.PDF", "application/pdf", b"%PDF-1.4\ncontent"
     )
-    resume = asyncio.run(
+    upload_result = asyncio.run(
         upload_resume(
             session,
             profile.user_id,
             upload_file,
         )
     )
+    resume = upload_result.resume
+    job = upload_result.job
 
     assert resume.original_filename == "Resume.PDF"
     assert resume.file_size_bytes == len(b"%PDF-1.4\ncontent")
@@ -81,6 +83,7 @@ def test_upload_streams_file_and_creates_uploaded_resume(
         isinstance(item, Job) and item.job_type == "resume_parse" and item.status == "pending"
         for item in added
     )
+    assert job.resume_id == resume.id
     session.commit.assert_called_once()
     assert upload_file.closed is True
 
@@ -131,6 +134,31 @@ def test_upload_database_failure_rolls_back_and_removes_file(
         )
 
     session.rollback.assert_called_once()
+    assert list(tmp_path.iterdir()) == []
+    assert upload_file.closed is True
+
+
+def test_upload_job_creation_failure_rolls_back_resume_and_removes_file(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.core.config import settings
+
+    profile = make_profile()
+    session = make_session(profile)
+    monkeypatch.setattr(settings, "upload_dir", str(tmp_path))
+
+    def add(entity: object) -> None:
+        if isinstance(entity, Job):
+            raise SQLAlchemyError("job creation error")
+
+    session.add.side_effect = add
+    upload_file = FakeUploadFile("resume.pdf", "application/pdf", b"%PDF-1.4\ncontent")
+
+    with pytest.raises(SQLAlchemyError):
+        asyncio.run(upload_resume(session, profile.user_id, upload_file))
+
+    session.rollback.assert_called_once()
+    session.commit.assert_not_called()
     assert list(tmp_path.iterdir()) == []
     assert upload_file.closed is True
 
