@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
+import { CandidateDashboardSection } from "@/features/candidate-dashboard-section";
 import { CandidateProfileSection } from "@/features/candidate-profile-section";
 import { EmployerSection } from "@/features/employer-section";
 import { GitHubSection } from "@/features/github-section";
@@ -95,6 +96,7 @@ export default function HomePage() {
           <EmployerSection enabled />
         ) : (
           <>
+            <CandidateDashboardSection enabled={user.role === "candidate"} />
             <CandidateProfileSection enabled={user.role === "candidate"} />
             <ResumeSection enabled={user.role === "candidate"} />
             <GitHubSection enabled={user.role === "candidate"} />

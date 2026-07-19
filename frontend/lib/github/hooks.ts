@@ -13,6 +13,7 @@ import {
 } from "@/lib/api/github";
 import type { GitHubRepositoryConnectRequest } from "@/lib/api/types/github";
 import { isTerminalJobStatus, jobQueryKey, useJobQuery } from "@/lib/jobs/hooks";
+import { candidateDashboardQueryKey } from "@/lib/dashboard/hooks";
 import { roadmapQueryKey } from "@/lib/roadmap/hooks";
 import { skillPassportQueryKey } from "@/lib/skill-passport/hooks";
 
@@ -97,6 +98,7 @@ export function useGitHubScanJobQuery(jobId: string | null, repositoryId: string
       });
       void queryClient.invalidateQueries({ queryKey: skillPassportQueryKey });
       void queryClient.invalidateQueries({ queryKey: roadmapQueryKey });
+      void queryClient.invalidateQueries({ queryKey: candidateDashboardQueryKey });
     }
   }, [status, queryClient, repositoryId]);
 
@@ -113,6 +115,7 @@ export function useDeleteGitHubRepository() {
       void queryClient.invalidateQueries({ queryKey: githubRepositoriesQueryKey });
       void queryClient.invalidateQueries({ queryKey: skillPassportQueryKey });
       void queryClient.invalidateQueries({ queryKey: roadmapQueryKey });
+      void queryClient.invalidateQueries({ queryKey: candidateDashboardQueryKey });
     }
   });
 }
