@@ -4,7 +4,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
 
-from app.models.job import JobStatus
+from app.models.job import JobStatus, JobType
 
 
 class ResumeUploadAcceptedResponse(BaseModel):
@@ -24,9 +24,14 @@ class ResumeResponse(BaseModel):
 
 
 class JobPollingResponse(BaseModel):
-    """Safe status projection for a resume-processing job."""
+    """Safe status projection for any background job.
+
+    resume_status is populated only for resume-bound jobs; other job types
+    (for example github_scan) return null.
+    """
 
     id: UUID
+    job_type: JobType
     status: JobStatus
     created_at: datetime
     started_at: datetime | None
@@ -34,5 +39,5 @@ class JobPollingResponse(BaseModel):
     failed_at: datetime | None
     error_code: str | None
     error_message: str | None
-    resume_status: Literal["uploaded", "parsed", "failed"]
+    resume_status: Literal["uploaded", "parsed", "failed"] | None
     retry_available: bool

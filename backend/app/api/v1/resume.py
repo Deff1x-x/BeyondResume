@@ -200,6 +200,7 @@ def request_resume_parsing(
         background_tasks.add_task(run_resume_parse_job_task, job.id)
     return JobPollingResponse(
         id=job.id,
+        job_type=job.job_type,
         status=job.status,
         created_at=job.created_at,
         started_at=job.started_at,
@@ -234,6 +235,7 @@ def retry_resume_processing(
         background_tasks.add_task(run_resume_parse_job_task, job.id)
     return JobPollingResponse(
         id=job.id,
+        job_type=job.job_type,
         status=job.status,
         created_at=job.created_at,
         started_at=job.started_at,

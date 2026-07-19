@@ -46,9 +46,26 @@ class Job(Base):
         CheckConstraint(
             "job_type != 'resume_parse' OR resume_id IS NOT NULL", name="ck_jobs_resume_context"
         ),
+        CheckConstraint(
+            "job_type != 'github_scan' OR ("
+            "candidate_id IS NOT NULL AND subject_type IS NOT NULL AND subject_id IS NOT NULL"
+            ")",
+            name="ck_jobs_github_scan_context",
+        ),
+        CheckConstraint(
+            "(subject_type IS NULL) = (subject_id IS NULL)",
+            name="ck_jobs_subject_pair",
+        ),
         Index(
             "ix_jobs_active_resume",
             "resume_id",
+            unique=True,
+            postgresql_where=text("status IN ('pending', 'running')"),
+        ),
+        Index(
+            "ix_jobs_active_subject",
+            "subject_type",
+            "subject_id",
             unique=True,
             postgresql_where=text("status IN ('pending', 'running')"),
         ),
@@ -58,6 +75,11 @@ class Job(Base):
     resume_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("resumes.id"), nullable=True
     )
+    candidate_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("candidate_profiles.id"), nullable=True
+    )
+    subject_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    subject_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     job_type: Mapped[JobType] = mapped_column(SqlEnum(JobType, name="job_type"), nullable=False)
     status: Mapped[JobStatus] = mapped_column(SqlEnum(JobStatus, name="job_status"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(

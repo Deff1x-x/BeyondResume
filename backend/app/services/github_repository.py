@@ -1,10 +1,13 @@
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.models.candidate_profile import CandidateProfile
+from app.models.evidence_skill_link import EvidenceSkillLink
+from app.models.evidence_unit import EvidenceUnit
 from app.models.github_repository import GitHubRepository
+from app.models.github_repository_snapshot import GitHubRepositorySnapshot
 from app.services.candidate import CandidateProfileNotFoundError
 from app.utils.github_url import parse_github_repository_url
 
@@ -38,3 +41,49 @@ def connect_github_repository(
     session.add(repository)
     session.flush()
     return repository
+
+
+def disconnect_github_repository(
+    session: Session, candidate_id: UUID, repository_id: UUID
+) -> bool:
+    """Delete the repository with its snapshot and GitHub-derived evidence.
+
+    Returns False when the repository does not exist or belongs to another candidate.
+    The caller owns the transaction boundary; this function only flushes.
+    """
+    repository = session.execute(
+        select(GitHubRepository).where(
+            GitHubRepository.id == repository_id,
+            GitHubRepository.candidate_id == candidate_id,
+        )
+    ).scalar_one_or_none()
+    if repository is None:
+        return False
+
+    evidence_units = (
+        session.execute(
+            select(EvidenceUnit).where(
+                EvidenceUnit.candidate_id == candidate_id,
+                EvidenceUnit.source_type == "github_repository",
+                EvidenceUnit.source_reference == repository.repository_url,
+            )
+        )
+        .scalars()
+        .all()
+    )
+    for evidence_unit in evidence_units:
+        session.execute(
+            delete(EvidenceSkillLink).where(
+                EvidenceSkillLink.evidence_unit_id == evidence_unit.id
+            )
+        )
+        session.delete(evidence_unit)
+
+    session.execute(
+        delete(GitHubRepositorySnapshot).where(
+            GitHubRepositorySnapshot.repository_id == repository.id
+        )
+    )
+    session.delete(repository)
+    session.flush()
+    return True

@@ -19,10 +19,6 @@ export function getCurrentResume(): Promise<ResumeResponse> {
   return apiRequest<ResumeResponse>("/candidate/resumes");
 }
 
-export function getResumeJob(jobId: string): Promise<JobPollingResponse> {
-  return apiRequest<JobPollingResponse>(`/jobs/${jobId}`);
-}
-
 export function retryResumeProcessing(): Promise<JobPollingResponse> {
   return apiRequest<JobPollingResponse>("/candidate/resume/retry", {
     method: "POST"

@@ -5,26 +5,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
   getCurrentResume,
-  getResumeJob,
   retryResumeProcessing,
   uploadResume
 } from "@/lib/api/resume";
-import type { JobStatus } from "@/lib/api/types/jobs";
+import { jobQueryKey, useJobQuery } from "@/lib/jobs/hooks";
 
 export const currentResumeQueryKey = ["candidate", "resume", "current"] as const;
-
-export function resumeJobQueryKey(jobId: string | null) {
-  return ["jobs", jobId] as const;
-}
-
-export function isTerminalJobStatus(status: JobStatus | undefined): boolean {
-  return (
-    status === "completed" ||
-    status === "failed" ||
-    status === "cancelled" ||
-    status === "expired"
-  );
-}
 
 export function useCurrentResumeQuery(enabled: boolean) {
   return useQuery({
@@ -48,30 +34,14 @@ export function useRetryResumeMutation() {
   return useMutation({
     mutationFn: retryResumeProcessing,
     onSuccess: (job) => {
-      queryClient.setQueryData(resumeJobQueryKey(job.id), job);
+      queryClient.setQueryData(jobQueryKey(job.id), job);
     }
   });
 }
 
 export function useResumeJobQuery(jobId: string | null) {
   const queryClient = useQueryClient();
-  const query = useQuery({
-    queryKey: resumeJobQueryKey(jobId),
-    queryFn: () => {
-      if (jobId === null) {
-        throw new Error("A job ID is required");
-      }
-
-      return getResumeJob(jobId);
-    },
-    enabled: jobId !== null,
-    staleTime: 0,
-    gcTime: 300_000,
-    refetchInterval: (currentQuery) =>
-      currentQuery.state.error || isTerminalJobStatus(currentQuery.state.data?.status)
-        ? false
-        : 2_000
-  });
+  const query = useJobQuery(jobId);
 
   useEffect(() => {
     if (query.data?.status === "completed") {

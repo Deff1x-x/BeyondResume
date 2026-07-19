@@ -279,7 +279,8 @@ def test_job_polling_returns_only_safe_lifecycle_fields(client: TestClient) -> N
     )
     session = Mock()
     session.execute.side_effect = [
-        SimpleNamespace(one_or_none=lambda: (job, resume)),
+        SimpleNamespace(scalar_one_or_none=lambda: job),
+        SimpleNamespace(scalar_one_or_none=lambda: resume),
         SimpleNamespace(scalar_one_or_none=lambda: None),
     ]
     app.dependency_overrides[get_db] = lambda: session
@@ -289,6 +290,7 @@ def test_job_polling_returns_only_safe_lifecycle_fields(client: TestClient) -> N
     assert response.status_code == 200
     body = response.json()
     assert body["status"] == "failed"
+    assert body["job_type"] == "resume_parse"
     assert body["resume_status"] == "failed"
     assert body["retry_available"] is True
     assert "storage_path" not in body
@@ -302,7 +304,7 @@ def test_job_polling_returns_typed_not_found_for_other_candidate(client: TestCli
     session = type(
         "Session",
         (),
-        {"execute": lambda *_args: type("Result", (), {"one_or_none": lambda _: None})()},
+        {"execute": lambda *_args: type("Result", (), {"scalar_one_or_none": lambda _: None})()},
     )()
     app.dependency_overrides[get_db] = lambda: session
 

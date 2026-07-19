@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { CandidateProfileSection } from "@/features/candidate-profile-section";
+import { GitHubSection } from "@/features/github-section";
 import { ResumeSection } from "@/features/resume-section";
 import { useCurrentUser, useLogout } from "@/lib/auth/hooks";
 
@@ -87,6 +88,7 @@ export default function HomePage() {
       <div className="mt-8 grid gap-6 lg:grid-cols-2">
         <CandidateProfileSection enabled={user.role === "candidate"} />
         <ResumeSection enabled={user.role === "candidate"} />
+        <GitHubSection enabled={user.role === "candidate"} />
       </div>
     </main>
   );

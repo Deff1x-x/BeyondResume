@@ -62,6 +62,15 @@ class GitHubProvider(Protocol):
     ) -> GitHubRepositorySnapshot: ...
 
 
+def get_github_provider() -> "GitHubProvider":
+    """Return the configured snapshot provider.
+
+    The demo provider is currently the only implementation; a live GitHub
+    provider plugs in here without changing workers or the HTTP API.
+    """
+    return DemoGitHubProvider()
+
+
 class DemoGitHubProvider:
     """Read deterministic repository snapshots from local JSON fixtures only."""
 

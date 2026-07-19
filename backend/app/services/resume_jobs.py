@@ -1,23 +1,17 @@
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import cast
-from uuid import UUID
 
-from sqlalchemy import select, update
-from sqlalchemy.engine import CursorResult
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.models.job import Job, JobStatus, JobType
 from app.models.resume import Resume
-
-
-class JobNotFoundError(Exception):
-    """The requested job does not exist."""
-
-
-class JobTransitionError(Exception):
-    """The requested job lifecycle transition is not allowed."""
+from app.services.jobs import (
+    JobNotFoundError as JobNotFoundError,
+    JobTransitionError as JobTransitionError,
+    claim_job as claim_job,
+)
 
 
 class ResumeTransitionError(Exception):
@@ -30,26 +24,6 @@ class ResumeRetryResult:
 
     job: Job
     should_schedule: bool
-
-
-def claim_job(session: Session, job_id: UUID) -> Job:
-    result = cast(
-        CursorResult[object],
-        session.execute(
-            update(Job)
-            .where(Job.id == job_id, Job.status == JobStatus.PENDING)
-            .values(status=JobStatus.RUNNING, started_at=datetime.now(UTC))
-        ),
-    )
-    if result.rowcount != 1:
-        session.rollback()
-        raise JobTransitionError("Only a pending job can be claimed")
-    job = session.execute(select(Job).where(Job.id == job_id)).scalar_one_or_none()
-    if job is None:
-        session.rollback()
-        raise JobNotFoundError
-    session.commit()
-    return job
 
 
 def complete_job(session: Session, job: Job) -> Job:

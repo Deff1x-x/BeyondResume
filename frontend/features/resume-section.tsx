@@ -5,8 +5,8 @@ import { useState, type ChangeEvent, type FormEvent } from "react";
 import { ApiClientError } from "@/lib/api/error";
 import type { JobPollingResponse } from "@/lib/api/types/jobs";
 import type { ResumeResponse } from "@/lib/api/types/resume";
+import { isTerminalJobStatus } from "@/lib/jobs/hooks";
 import {
-  isTerminalJobStatus,
   useCurrentResumeQuery,
   useResumeJobQuery,
   useRetryResumeMutation,
