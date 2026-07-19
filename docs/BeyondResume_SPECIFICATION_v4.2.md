@@ -362,23 +362,50 @@ Candidate регистрируется по email и паролю.
 
 После успешной загрузки:
 
-1. создаётся Resume;
-2. создаётся Job типа `resume_parse`;
-3. статус Resume = `uploaded`;
-4. файл сохраняется неизменённым;
-5. parsing выполняется асинхронно;
-6. при успехе Resume = `parsed`;
-7. при неуспехе Resume = `failed`;
-8. ошибка должна быть понятна пользователю и пригодна для повторной попытки.
+1. безопасно сохраняется файл Resume;
+2. создаётся Resume со статусом `uploaded`;
+3. создаётся один pending Job типа `resume_parse`, связанный с этим Resume;
+4. Resume и pending Job фиксируются одной database transaction;
+5. только после успешного commit FastAPI `BackgroundTasks` планирует canonical resume parsing worker с `job_id`;
+6. API возвращает HTTP `202 Accepted` и ровно два top-level JSON поля: `resume_id` и `job_id`;
+7. frontend немедленно начинает polling `GET /api/v1/jobs/{job_id}` и не делает отдельный parse request;
+8. файл сохраняется неизменённым, parsing выполняется асинхронно, при успехе Resume = `parsed`, а при неуспехе Resume = `failed`;
+9. ошибка должна быть понятна пользователю и пригодна для повторной попытки.
 
 #### Plain-text parsing: граница текущего MVP
 
 Текущий MVP реализует только безопасное асинхронное извлечение plain text из загруженного Resume.
 
-`POST /candidate/resumes/{resume_id}/parse` запускает обработку Resume только через Job типа
-`resume_parse`: endpoint создаёт pending Job либо возвращает существующий активный Job в
-соответствии с idempotency-логикой. Endpoint не выполняет parsing синхронно и не возвращает
+`POST /api/v1/candidate/resumes` — единственный normal entry point initial Resume parsing.
+Успешный upload atomically создаёт Resume и один pending Job типа `resume_parse`.
+`POST /api/v1/candidate/resumes/{resume_id}/parse` не входит в canonical initial upload/parsing
+flow, не является canonical entry point initial parsing, и frontend MUST NOT вызывать его после
+successful upload. Initial parsing создаётся и schedule-ится исключительно через
+`POST /api/v1/candidate/resumes`. Это уточнение само по себе не требует physical removal уже
+существующего compatibility route. Upload не выполняет parsing синхронно и не возвращает
 извлечённый текст.
+
+Успешный upload возвращает HTTP `202 Accepted` без envelope, data wrapper, message или status:
+
+```json
+{
+  "resume_id": "<UUID>",
+  "job_id": "<UUID>"
+}
+```
+
+Это ровно два top-level JSON поля с snake_case именами. Оба значения сериализуются JSON string,
+содержащими UUID. Envelope, data wrapper, message, status и дополнительные top-level fields
+отсутствуют. Ответ
+означает, что Resume и parsing Job успешно persisted, а асинхронный parsing accepted, но ещё не
+обязательно completed.
+
+До commit создание Resume и pending Job является одной atomic database operation: failure создания
+Resume не сохраняет Job, failure создания Job не сохраняет Resume этого upload, а background work
+не планируется. После successful commit допускается scheduling worker. Worker получает только
+`job_id`, не получает и не удерживает request-scoped SQLAlchemy Session и сам создаёт, владеет и
+закрывает lifecycle собственной `SessionLocal`. Если invocation scheduling не удаётся уже после
+commit, committed Resume и Job не откатываются этой причиной.
 
 Worker берёт pending Job, переводит его в `running`, извлекает plain text существующим parser
 service и сохраняет текст только во внутреннем поле `Resume.extracted_text`. При успехе одной
@@ -386,7 +413,7 @@ service и сохраняет текст только во внутреннем 
 `Job: running → failed` и `Resume: uploaded → failed`.
 
 Для этого MVP Resume имеет только переходы `uploaded → parsed` и `uploaded → failed`. Статус
-`parsing` не используется. `GET /jobs/{job_id}` — единственный публичный способ polling
+`parsing` не используется. `GET /api/v1/jobs/{job_id}` — единственный публичный способ polling
 состояния обработки; отдельный endpoint результата parsing не нужен. Полный
 `Resume.extracted_text` не публикуется через публичный API и предназначен для будущих внутренних
 этапов обработки.
@@ -2784,19 +2811,24 @@ Error schema:
 
 ### Resume
 
-- `POST /candidate/resumes`
-- `GET /candidate/resumes`
-- `GET /candidate/resumes/{id}`
-- `POST /candidate/resumes/{id}/parse`
+- `POST /api/v1/candidate/resumes`
+- `GET /api/v1/candidate/resumes`
+- `GET /api/v1/candidate/resumes/{resume_id}`
 
-`POST /candidate/resumes/{id}/parse` запускает только plain-text parsing Job и не возвращает
-извлечённый текст. Отдельного endpoint для parsing result нет.
+`POST /api/v1/candidate/resumes` возвращает `202 Accepted` с exact body из ровно двух top-level JSON полей
+`{"resume_id":"<UUID>","job_id":"<UUID>"}` и создаёт initial pending plain-text parsing Job.
+`POST /api/v1/candidate/resumes/{resume_id}/parse` не входит в canonical initial parsing contract,
+и frontend MUST NOT вызывать его после successful upload; это уточнение само по себе не требует
+physical removal existing compatibility route. Initial parsing создаётся и schedule-ится
+исключительно через `POST /api/v1/candidate/resumes`. Отдельного endpoint для parsing result нет.
+Existing retry endpoint остаётся только для retry eligible failed parsing и не является initial
+parsing entry point.
 
 ### Jobs
 
-- `GET /jobs/{id}`
+- `GET /api/v1/jobs/{job_id}`
 
-`GET /jobs/{id}` является единственным публичным polling endpoint для Resume processing.
+`GET /api/v1/jobs/{job_id}` является единственным публичным polling endpoint для Resume processing.
 
 ### Evidence
 
@@ -3230,12 +3262,12 @@ Billing payment integration не обязана быть рабочей в Hacka
 ### Stage 6B — Resume Parsing Job
 
 - jobs table;
-- BackgroundTasks trigger;
+- upload-created pending `resume_parse` Job and post-commit `BackgroundTasks` trigger with `job_id`;
 - pending → running → completed/failed;
 - safe PDF/DOCX plain-text extraction into internal `Resume.extracted_text`;
 - `Resume: uploaded → parsed|failed` without a `parsing` status;
 - `GET /api/v1/jobs/{job_id}`;
-- upload response returns job reference;
+- upload returns `202 Accepted` with exactly two top-level JSON fields: `resume_id` and `job_id`;
 - tests for idempotency and failures.
 
 Stage 6B не включает structured extraction, contacts, education, projects, skills, Evidence,
@@ -3565,11 +3597,16 @@ Protected attributes не запрашиваются для scoring.
 3. Backend повторно проверяет размер, extension и MIME.
 4. Генерируется безопасное server-side имя.
 5. Файл сохраняется.
-6. Создаётся Resume record со статусом `uploaded`.
+6. Создаётся Resume record со статусом `uploaded` и один pending parsing Job, связанный с Resume.
 7. Предыдущий active resume переводится в `superseded`, если политика допускает только один active resume.
-8. Создаётся parsing job.
-9. API возвращает resume_id и job_id.
-10. Frontend начинает polling.
+8. Resume и pending Job commit-ятся одной database transaction.
+9. После commit FastAPI `BackgroundTasks` запускает canonical worker только с `job_id`; worker
+   создаёт и владеет собственной `SessionLocal`, а request Session ему не передаётся.
+10. API возвращает HTTP `202 Accepted` и exact JSON body
+    `{"resume_id":"<UUID>","job_id":"<UUID>"}` без дополнительных top-level полей.
+11. Frontend немедленно начинает polling `GET /api/v1/jobs/{job_id}`; отдельный parse request
+    после upload не требуется, не входит в canonical flow и не требует physical removal existing
+    compatibility route этим уточнением.
 
 ### 91.2 Parsing
 

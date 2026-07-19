@@ -288,3 +288,49 @@ Within this patch's narrow scope, deterministic re-extraction is limited to the
 accepted dependency-manifest pipeline. Repository-language extraction is
 explicitly deferred and MUST NOT be added in Stage 9.10A–9.10D. This limited
 scope has priority over the broader repository-language wording in v4.2 §17.5.
+
+## Resume Upload and Initial Parsing Contract Clarification
+
+This section overrides every conflicting Resume upload or initial parsing statement in v4.2 and
+v4.3. It does not change retry eligibility, failure-state rules, Job types, Job statuses, Job routes,
+or any accepted Stage 7 through Stage 9.10C contract.
+
+The canonical initial Resume upload endpoint is `POST /api/v1/candidate/resumes`. The plural path
+is normative. A successful upload is the only normal entry point for initial Resume parsing and
+atomically creates the persisted Resume file record, the Resume database record, and exactly one
+pending `resume_parse` Job associated with that Resume. The Resume and pending Job commit in one
+database transaction.
+
+The canonical successful response is HTTP `202 Accepted` with exactly this JSON body:
+
+```json
+{
+  "resume_id": "<UUID>",
+  "job_id": "<UUID>"
+}
+```
+
+The body has exactly two top-level JSON fields with snake_case names. Both values are JSON strings
+containing UUIDs. There is no envelope, data wrapper, message, status, or additional top-level
+field. HTTP `202 Accepted` means the Resume and parsing Job have been persisted successfully and
+asynchronous parsing has been accepted; parsing is not necessarily complete.
+
+Before commit, Resume creation and pending Job creation are one atomic database operation. If
+Resume creation fails, no parsing Job is persisted; if Job creation fails, no Resume from that
+upload is persisted; in either case background processing is not scheduled. Only after a successful
+commit may FastAPI `BackgroundTasks` schedule the canonical resume parsing worker. The task receives
+`job_id`, never a request-scoped SQLAlchemy Session. The worker opens, owns, and closes its own
+`SessionLocal` lifecycle. If scheduling invocation fails after a successful commit, already committed
+records are not rolled back by this rule.
+
+The frontend flow is: `POST /api/v1/candidate/resumes`, receive `202 Accepted` with `resume_id` and
+`job_id`, poll `GET /api/v1/jobs/{job_id}`, then retrieve the parsed Resume after successful
+completion. The frontend MUST NOT make a separate parse request after successful upload.
+
+`POST /api/v1/candidate/resumes/{resume_id}/parse` is not part of the canonical initial
+upload/parsing flow, is no longer the canonical entry point for initial parsing, and the frontend
+MUST NOT call it after successful upload. Initial parsing is created and scheduled exclusively
+through `POST /api/v1/candidate/resumes`. This clarification does not by itself require physical
+removal of an already-existing compatibility route. The existing retry endpoint remains distinct:
+it is used only for an eligible failed parsing retry under the existing retry contract, never as the
+normal initial parsing entry point or a replacement for upload-created parsing.
