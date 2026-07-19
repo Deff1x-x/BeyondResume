@@ -9,7 +9,9 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from app.api.dependencies import require_candidate
 from app.api.errors import api_error
+from app.core.config import settings
 from app.db.session import get_db
+from app.models.candidate_profile import CandidateProfile
 from app.models.job import Job, JobStatus, JobType
 from app.main import app
 from app.models.resume import Resume
@@ -118,6 +120,7 @@ def test_resume_upload_profile_required(
         ("UnsupportedResumeTypeError", 415, "UNSUPPORTED_RESUME_TYPE"),
         ("ResumeFileTooLargeError", 413, "RESUME_FILE_TOO_LARGE"),
         ("EmptyResumeFileError", 422, "VALIDATION_ERROR"),
+        ("InvalidResumeContentError", 422, "VALIDATION_ERROR"),
     ],
 )
 def test_resume_upload_error_mapping(
@@ -143,6 +146,63 @@ def test_resume_upload_error_mapping(
 
     assert response.status_code == status_code
     assert response.json()["error"]["code"] == code
+
+
+@pytest.mark.parametrize(
+    ("filename", "mime_type", "content"),
+    [
+        ("resume.pdf", "application/pdf", b"not a PDF"),
+        (
+            "resume.docx",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            b"not a DOCX archive",
+        ),
+    ],
+)
+def test_resume_upload_rejects_malformed_content_without_persistence_or_scheduling(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path,
+    filename: str,
+    mime_type: str,
+    content: bytes,
+) -> None:
+    from app.api.v1 import resume as resume_api
+
+    candidate = make_user()
+    authorize_candidate(candidate)
+    profile = CandidateProfile(
+        id=uuid4(),
+        user_id=candidate.id,
+        display_name="Candidate",
+        onboarding_status="profile_completed",
+    )
+    session = Mock()
+    session.execute.return_value.scalar_one_or_none.return_value = profile
+    app.dependency_overrides[get_db] = lambda: session
+    monkeypatch.setattr(settings, "upload_dir", str(tmp_path))
+    worker_calls: list[tuple[object, ...]] = []
+
+    async def run_worker(*args: object) -> None:
+        worker_calls.append(args)
+
+    monkeypatch.setattr(resume_api, "run_resume_parse_job_task", run_worker)
+
+    response = client.post(
+        "/api/v1/candidate/resumes", files={"file": (filename, content, mime_type)}
+    )
+
+    assert response.status_code == 422
+    body = response.json()
+    assert body["error"]["code"] == "VALIDATION_ERROR"
+    assert body["error"]["message"] == "Validation error"
+    assert body["error"]["details"] == [{"field": "file", "issue": "corrupted_file"}]
+    assert "BadZipFile" not in str(body)
+    assert "InvalidResumeContentError" not in str(body)
+    session.add.assert_not_called()
+    session.commit.assert_not_called()
+    assert list(tmp_path.iterdir()) == []
+    assert worker_calls == []
 
 
 def test_resume_upload_missing_file_and_openapi(client: TestClient) -> None:

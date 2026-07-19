@@ -15,6 +15,7 @@ from app.schemas.resume import JobPollingResponse, ResumeResponse, ResumeUploadA
 from app.services.resume import (
     CandidateProfileRequiredError,
     EmptyResumeFileError,
+    InvalidResumeContentError,
     MissingResumeFilenameError,
     ResumeFileTooLargeError,
     ResumeFilenameTooLongError,
@@ -70,6 +71,13 @@ async def create_resume(
             "VALIDATION_ERROR",
             "Validation error",
             details=[{"field": "file", "issue": "empty_file"}],
+        ) from None
+    except InvalidResumeContentError:
+        raise api_error(
+            422,
+            "VALIDATION_ERROR",
+            "Validation error",
+            details=[{"field": "file", "issue": "corrupted_file"}],
         ) from None
     except MissingResumeFilenameError:
         raise api_error(

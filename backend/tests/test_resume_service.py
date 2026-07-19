@@ -10,6 +10,7 @@ from app.models.candidate_profile import CandidateProfile
 from app.models.job import Job
 from app.services.resume import (
     CandidateProfileRequiredError,
+    InvalidResumeContentError,
     ResumeFileTooLargeError,
     upload_resume,
 )
@@ -110,6 +111,40 @@ def test_upload_rejects_oversized_file_and_cleans_partial_file(
 
     assert list(tmp_path.iterdir()) == []
     session.add.assert_not_called()
+    assert upload_file.closed is True
+
+
+@pytest.mark.parametrize(
+    ("filename", "mime_type", "content"),
+    [
+        ("resume.pdf", "application/pdf", b"not a PDF"),
+        (
+            "resume.docx",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            b"not a DOCX archive",
+        ),
+    ],
+)
+def test_upload_rejects_malformed_content_before_file_or_database_mutation(
+    tmp_path,
+    monkeypatch: pytest.MonkeyPatch,
+    filename: str,
+    mime_type: str,
+    content: bytes,
+) -> None:
+    from app.core.config import settings
+
+    profile = make_profile()
+    session = make_session(profile)
+    monkeypatch.setattr(settings, "upload_dir", str(tmp_path))
+    upload_file = FakeUploadFile(filename, mime_type, content)
+
+    with pytest.raises(InvalidResumeContentError):
+        asyncio.run(upload_resume(session, profile.user_id, upload_file))
+
+    session.add.assert_not_called()
+    session.commit.assert_not_called()
+    assert list(tmp_path.iterdir()) == []
     assert upload_file.closed is True
 
 
