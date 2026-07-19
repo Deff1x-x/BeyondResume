@@ -1,4 +1,5 @@
 from contextlib import suppress
+from collections.abc import AsyncIterable
 from dataclasses import dataclass
 from hashlib import sha256
 from io import BytesIO
@@ -6,7 +7,6 @@ from pathlib import Path
 from zipfile import BadZipFile, ZipFile
 from uuid import UUID, uuid4
 
-from fastapi import UploadFile
 from sqlalchemy import select, update
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
@@ -57,7 +57,14 @@ class InvalidResumeContentError(Exception):
     pass
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
+class ResumeUploadInput:
+    filename: str | None
+    content_type: str | None
+    chunks: AsyncIterable[bytes]
+
+
+@dataclass(frozen=True, slots=True)
 class ResumeUploadResult:
     resume: Resume
     job: Job
@@ -123,34 +130,17 @@ def _validate_content(extension: str, content: bytes) -> None:
 
 
 async def upload_resume(
-    session: Session, user_id: UUID, upload_file: UploadFile
-) -> ResumeUploadResult:
-    operation_error: BaseException | None = None
-    try:
-        return await _upload_resume(session, user_id, upload_file)
-    except BaseException as error:
-        operation_error = error
-        raise
-    finally:
-        try:
-            await upload_file.close()
-        except Exception:
-            if operation_error is None:
-                raise
-
-
-async def _upload_resume(
-    session: Session, user_id: UUID, upload_file: UploadFile
+    session: Session, user_id: UUID, upload: ResumeUploadInput
 ) -> ResumeUploadResult:
     profile = get_candidate_profile(session, user_id)
     if profile is None:
         raise CandidateProfileRequiredError
 
-    original_filename = _basename(upload_file.filename)
-    extension = _extension_for(original_filename, upload_file.content_type)
+    original_filename = _basename(upload.filename)
+    extension = _extension_for(original_filename, upload.content_type)
     upload_dir = Path(settings.upload_dir)
     content = bytearray()
-    while chunk := await upload_file.read(CHUNK_SIZE):
+    async for chunk in upload.chunks:
         content.extend(chunk)
         if len(content) > MAX_RESUME_BYTES:
             raise ResumeFileTooLargeError
@@ -176,7 +166,7 @@ async def _upload_resume(
         candidate_id=profile.id,
         original_filename=original_filename,
         stored_path=str(destination),
-        mime_type=upload_file.content_type,
+        mime_type=upload.content_type,
         file_size_bytes=len(content),
         checksum=checksum.hexdigest(),
         extracted_text=None,

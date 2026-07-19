@@ -1,4 +1,5 @@
 import asyncio
+from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 from unittest.mock import Mock
 from uuid import uuid4
@@ -12,6 +13,7 @@ from app.services.resume import (
     CandidateProfileRequiredError,
     InvalidResumeContentError,
     ResumeFileTooLargeError,
+    ResumeUploadInput,
     upload_resume,
 )
 
@@ -22,15 +24,24 @@ class FakeUploadFile:
         self.content_type = content_type
         self._content = content
         self._offset = 0
-        self.closed = False
 
     async def read(self, size: int) -> bytes:
         chunk = self._content[self._offset : self._offset + size]
         self._offset += len(chunk)
         return chunk
 
-    async def close(self) -> None:
-        self.closed = True
+
+async def upload_chunks(upload_file: FakeUploadFile) -> AsyncIterator[bytes]:
+    while chunk := await upload_file.read(64 * 1024):
+        yield chunk
+
+
+def make_upload_input(upload_file: FakeUploadFile) -> ResumeUploadInput:
+    return ResumeUploadInput(
+        filename=upload_file.filename,
+        content_type=upload_file.content_type,
+        chunks=upload_chunks(upload_file),
+    )
 
 
 def make_profile() -> CandidateProfile:
@@ -65,7 +76,7 @@ def test_upload_streams_file_and_creates_uploaded_resume(
         upload_resume(
             session,
             profile.user_id,
-            upload_file,
+            make_upload_input(upload_file),
         )
     )
     resume = upload_result.resume
@@ -86,7 +97,6 @@ def test_upload_streams_file_and_creates_uploaded_resume(
     )
     assert job.resume_id == resume.id
     session.commit.assert_called_once()
-    assert upload_file.closed is True
 
 
 def test_upload_rejects_oversized_file_and_cleans_partial_file(
@@ -105,13 +115,12 @@ def test_upload_rejects_oversized_file_and_cleans_partial_file(
             upload_resume(
                 session,
                 profile.user_id,
-                upload_file,
+                make_upload_input(upload_file),
             )
         )
 
     assert list(tmp_path.iterdir()) == []
     session.add.assert_not_called()
-    assert upload_file.closed is True
 
 
 @pytest.mark.parametrize(
@@ -140,12 +149,11 @@ def test_upload_rejects_malformed_content_before_file_or_database_mutation(
     upload_file = FakeUploadFile(filename, mime_type, content)
 
     with pytest.raises(InvalidResumeContentError):
-        asyncio.run(upload_resume(session, profile.user_id, upload_file))
+        asyncio.run(upload_resume(session, profile.user_id, make_upload_input(upload_file)))
 
     session.add.assert_not_called()
     session.commit.assert_not_called()
     assert list(tmp_path.iterdir()) == []
-    assert upload_file.closed is True
 
 
 def test_upload_database_failure_rolls_back_and_removes_file(
@@ -164,13 +172,12 @@ def test_upload_database_failure_rolls_back_and_removes_file(
             upload_resume(
                 session,
                 profile.user_id,
-                upload_file,
+                make_upload_input(upload_file),
             )
         )
 
     session.rollback.assert_called_once()
     assert list(tmp_path.iterdir()) == []
-    assert upload_file.closed is True
 
 
 def test_upload_job_creation_failure_rolls_back_resume_and_removes_file(
@@ -190,15 +197,16 @@ def test_upload_job_creation_failure_rolls_back_resume_and_removes_file(
     upload_file = FakeUploadFile("resume.pdf", "application/pdf", b"%PDF-1.4\ncontent")
 
     with pytest.raises(SQLAlchemyError):
-        asyncio.run(upload_resume(session, profile.user_id, upload_file))
+        asyncio.run(upload_resume(session, profile.user_id, make_upload_input(upload_file)))
 
     session.rollback.assert_called_once()
     session.commit.assert_not_called()
     assert list(tmp_path.iterdir()) == []
-    assert upload_file.closed is True
 
 
-def test_upload_storage_failure_closes_file(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_upload_storage_failure_does_not_persist_resume(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     from app.core.config import settings
     from app.services.resume import ResumeStorageError
 
@@ -210,10 +218,9 @@ def test_upload_storage_failure_closes_file(tmp_path, monkeypatch: pytest.Monkey
     upload_file = FakeUploadFile("resume.pdf", "application/pdf", b"%PDF-1.4\ncontent")
 
     with pytest.raises(ResumeStorageError):
-        asyncio.run(upload_resume(session, profile.user_id, upload_file))
+        asyncio.run(upload_resume(session, profile.user_id, make_upload_input(upload_file)))
 
     session.add.assert_not_called()
-    assert upload_file.closed is True
 
 
 def test_upload_requires_existing_candidate_profile(
@@ -229,7 +236,7 @@ def test_upload_requires_existing_candidate_profile(
             upload_resume(
                 session,
                 uuid4(),
-                FakeUploadFile("resume.pdf", "application/pdf", b"content"),
+                make_upload_input(FakeUploadFile("resume.pdf", "application/pdf", b"content")),
             )
         )
 

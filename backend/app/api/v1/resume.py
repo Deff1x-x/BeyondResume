@@ -1,3 +1,4 @@
+from collections.abc import AsyncIterator
 from typing import Annotated, Literal, cast
 from uuid import UUID
 
@@ -14,12 +15,15 @@ from app.models.user import User
 from app.schemas.resume import JobPollingResponse, ResumeResponse, ResumeUploadAcceptedResponse
 from app.services.resume import (
     CandidateProfileRequiredError,
+    CHUNK_SIZE,
     EmptyResumeFileError,
     InvalidResumeContentError,
     MissingResumeFilenameError,
     ResumeFileTooLargeError,
     ResumeFilenameTooLongError,
     ResumeStorageError,
+    ResumeUploadInput,
+    ResumeUploadResult,
     UnsupportedResumeTypeError,
     upload_resume,
     get_current_resume,
@@ -36,6 +40,36 @@ from app.services.resume_parsing import run_resume_parse_job_task
 router = APIRouter(prefix="/candidate", tags=["candidate"])
 
 
+async def _upload_file_chunks(file: UploadFile) -> AsyncIterator[bytes]:
+    while chunk := await file.read(CHUNK_SIZE):
+        yield chunk
+
+
+async def _upload_resume_from_request(
+    session: Session, user_id: UUID, file: UploadFile
+) -> ResumeUploadResult:
+    operation_error: BaseException | None = None
+    try:
+        return await upload_resume(
+            session,
+            user_id,
+            ResumeUploadInput(
+                filename=file.filename,
+                content_type=file.content_type,
+                chunks=_upload_file_chunks(file),
+            ),
+        )
+    except BaseException as error:
+        operation_error = error
+        raise
+    finally:
+        try:
+            await file.close()
+        except Exception:
+            if operation_error is None:
+                raise
+
+
 @router.post("/resumes", response_model=ResumeUploadAcceptedResponse, status_code=202)
 async def create_resume(
     file: Annotated[UploadFile, File()],
@@ -44,7 +78,7 @@ async def create_resume(
     session: Annotated[Session, Depends(get_db)],
 ) -> ResumeUploadAcceptedResponse:
     try:
-        upload_result = await upload_resume(session, current_user.id, file)
+        upload_result = await _upload_resume_from_request(session, current_user.id, file)
     except CandidateProfileRequiredError:
         raise api_error(
             409,
