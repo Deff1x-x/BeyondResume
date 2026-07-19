@@ -33,7 +33,7 @@ export function EvidenceToolbar({
             value={search}
             onChange={(event) => onSearchChange(event.target.value)}
             placeholder="Search by title or description"
-            className="mt-1.5 min-h-control w-full rounded-button border border-border bg-background px-3 text-sm text-ink outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/30"
+            className="mt-1.5 min-h-control w-full rounded-button border border-border bg-background px-3 text-sm text-ink outline-none transition-colors focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2"
           />
         </label>
         <label className="w-full text-sm text-secondary sm:w-48">
@@ -43,7 +43,7 @@ export function EvidenceToolbar({
             value={skill}
             onChange={(event) => onSkillChange(event.target.value)}
             placeholder="e.g. Python"
-            className="mt-1.5 min-h-control w-full rounded-button border border-border bg-background px-3 text-sm text-ink outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/30"
+            className="mt-1.5 min-h-control w-full rounded-button border border-border bg-background px-3 text-sm text-ink outline-none transition-colors focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2"
           />
         </label>
       </div>
@@ -63,8 +63,8 @@ export function EvidenceToolbar({
               onClick={() => onSourceFilterChange(option.value)}
               className={
                 selected
-                  ? "min-h-control rounded-button border border-ink bg-ink px-3 text-sm font-medium text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-                  : "min-h-control rounded-button border border-border bg-surface px-3 text-sm font-medium text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                  ? "min-h-control rounded-button border border-ink bg-ink px-3 text-sm font-medium text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2"
+                  : "min-h-control rounded-button border border-border bg-surface px-3 text-sm font-medium text-ink transition-colors hover:bg-surface-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2"
               }
             >
               {option.label}

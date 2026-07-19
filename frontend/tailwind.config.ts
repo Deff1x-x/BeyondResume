@@ -16,11 +16,18 @@ const config: Config = {
         warning: "#D97706",
         danger: "#DC2626",
         background: "#FAFBFC",
-        surface: "#FFFFFF",
-        border: "#E5E7EB",
+        surface: {
+          DEFAULT: "#FFFFFF",
+          subtle: "#F4F6F8"
+        },
+        border: {
+          DEFAULT: "#E5E7EB",
+          strong: "#D1D5DB"
+        },
         ink: "#111827",
         secondary: "#4B5563",
-        muted: "#9CA3AF"
+        muted: "#9CA3AF",
+        "focus-ring": "#2563EB"
       },
       borderRadius: {
         button: "12px",

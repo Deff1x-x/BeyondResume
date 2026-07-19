@@ -1,5 +1,17 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle
+} from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
+import { SectionHeader } from "@/components/ui/section-header";
+import { SkeletonCard } from "@/components/ui/skeleton";
 import { ApiClientError } from "@/lib/api/error";
 import type { CandidateDashboardResponse } from "@/lib/api/types/dashboard";
 import { useCandidateDashboardQuery } from "@/lib/dashboard/hooks";
@@ -28,17 +40,21 @@ function DashboardCard({
   actionLabel
 }: Readonly<DashboardCardProps>) {
   return (
-    <article className="rounded-card border border-border bg-background p-4">
-      <h3 className="text-sm font-semibold text-ink">{title}</h3>
-      <p className="mt-2 text-2xl font-semibold text-ink">{summary}</p>
-      {detail ? <p className="mt-2 text-sm leading-6 text-secondary">{detail}</p> : null}
-      <a
-        href={href}
-        className="mt-4 inline-flex min-h-control items-center rounded-button border border-border bg-surface px-4 text-sm font-medium text-ink"
-      >
-        {actionLabel}
-      </a>
-    </article>
+    <Card className="bg-background">
+      <CardHeader>
+        <CardTitle>{title}</CardTitle>
+        <p className="text-2xl font-semibold tabular-nums text-ink">{summary}</p>
+        {detail ? <CardDescription>{detail}</CardDescription> : null}
+      </CardHeader>
+      <CardFooter className="border-t-0 pt-0">
+        <a
+          href={href}
+          className="inline-flex min-h-control items-center rounded-button border border-border bg-surface px-4 text-sm font-medium text-ink transition-colors hover:bg-surface-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2"
+        >
+          {actionLabel}
+        </a>
+      </CardFooter>
+    </Card>
   );
 }
 
@@ -93,62 +109,67 @@ export function CandidateDashboardSection({ enabled }: Readonly<{ enabled: boole
 
   if (!enabled) {
     return (
-      <section
-        className="rounded-card border border-border bg-surface p-6 lg:col-span-2"
-        aria-labelledby="dashboard-section-title"
-      >
-        <h2 id="dashboard-section-title" className="text-xl font-semibold text-ink">
-          Dashboard
-        </h2>
-        <p className="mt-3 text-sm leading-6 text-secondary">
-          The candidate dashboard is available only to candidate accounts.
-        </p>
-      </section>
+      <Card className="lg:col-span-2" aria-labelledby="dashboard-section-title">
+        <CardContent className="p-6">
+          <SectionHeader
+            title="Dashboard"
+            titleId="dashboard-section-title"
+            description="The candidate dashboard is available only to candidate accounts."
+          />
+        </CardContent>
+      </Card>
     );
   }
 
   return (
-    <section
-      className="rounded-card border border-border bg-surface p-6 lg:col-span-2"
-      aria-labelledby="dashboard-section-title"
-    >
-      <h2 id="dashboard-section-title" className="text-xl font-semibold text-ink">
-        Dashboard
-      </h2>
-      <p className="mt-2 text-sm text-secondary">
-        A summary of your GitHub, evidence, skill passport, and roadmap.
-      </p>
+    <Card className="lg:col-span-2" aria-labelledby="dashboard-section-title">
+      <CardContent className="space-y-6 p-6">
+        <SectionHeader
+          title="Dashboard"
+          titleId="dashboard-section-title"
+          description="A summary of your GitHub, evidence, skill passport, and roadmap."
+        />
 
-      <div className="mt-6">
-        {dashboardQuery.isLoading ? (
-          <p className="text-sm text-secondary" role="status">
-            Loading dashboard…
-          </p>
-        ) : null}
-
-        {dashboardQuery.isError ? (
-          <div>
-            <p className="text-sm text-danger" role="alert">
-              {errorMessage(dashboardQuery.error)}
-            </p>
-            <button
-              type="button"
-              onClick={() => void dashboardQuery.refetch()}
-              className="mt-4 min-h-control rounded-button border border-border bg-surface px-4 text-sm font-medium text-ink"
+        <div aria-live="polite">
+          {dashboardQuery.isLoading ? (
+            <div
+              className="grid gap-4 sm:grid-cols-2"
+              role="status"
+              aria-label="Loading dashboard"
             >
-              Try again
-            </button>
-          </div>
-        ) : null}
+              <SkeletonCard />
+              <SkeletonCard />
+              <SkeletonCard />
+              <SkeletonCard />
+            </div>
+          ) : null}
 
-        {dashboardQuery.data ? (
-          <div className="grid gap-4 sm:grid-cols-2">
-            {dashboardCards(dashboardQuery.data).map((card) => (
-              <DashboardCard key={card.title} {...card} />
-            ))}
-          </div>
-        ) : null}
-      </div>
-    </section>
+          {dashboardQuery.isError ? (
+            <EmptyState
+              role="alert"
+              title="Dashboard unavailable"
+              description={errorMessage(dashboardQuery.error)}
+              primaryAction={
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => void dashboardQuery.refetch()}
+                >
+                  Try again
+                </Button>
+              }
+            />
+          ) : null}
+
+          {dashboardQuery.data ? (
+            <div className="grid gap-4 sm:grid-cols-2">
+              {dashboardCards(dashboardQuery.data).map((card) => (
+                <DashboardCard key={card.title} {...card} />
+              ))}
+            </div>
+          ) : null}
+        </div>
+      </CardContent>
+    </Card>
   );
 }

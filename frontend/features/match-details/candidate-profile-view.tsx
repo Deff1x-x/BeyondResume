@@ -2,6 +2,10 @@
 
 import Link from "next/link";
 
+import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
+import { PageHeader } from "@/components/ui/page-header";
+import { SkeletonCard, SkeletonListRow } from "@/components/ui/skeleton";
 import { CandidateSummaryCard } from "@/features/match-details/candidate-summary-card";
 import { EvidenceCard } from "@/features/match-details/evidence-card";
 import { RoadmapCard } from "@/features/match-details/roadmap-card";
@@ -22,6 +26,23 @@ function errorMessage(error: unknown): string {
   return "Match details could not be loaded. Please try again.";
 }
 
+function MatchDetailsSkeleton() {
+  return (
+    <div
+      className="grid gap-8 lg:grid-cols-[minmax(0,35%)_minmax(0,65%)]"
+      role="status"
+      aria-label="Loading candidate profile"
+    >
+      <SkeletonCard className="min-h-64" />
+      <div className="space-y-4">
+        <SkeletonListRow />
+        <SkeletonListRow />
+        <SkeletonListRow />
+      </div>
+    </div>
+  );
+}
+
 export function CandidateProfileView({
   candidateId,
   vacancyId,
@@ -31,33 +52,57 @@ export function CandidateProfileView({
 
   if (!enabled) {
     return (
-      <p className="text-sm text-secondary" role="status">
-        Match details are available only to employer accounts.
-      </p>
+      <EmptyState
+        title="Employer access required"
+        description="Match details are available only to employer accounts."
+      />
     );
   }
 
   if (detailsQuery.isLoading) {
     return (
-      <p className="text-sm text-secondary" role="status">
-        Loading candidate profile…
-      </p>
+      <div className="space-y-8">
+        <PageHeader
+          title="Candidate profile"
+          description="Loading match details…"
+          breadcrumb={
+            <Link
+              href="/"
+              className="font-medium text-primary underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2"
+            >
+              ← Back to employer workspace
+            </Link>
+          }
+        />
+        <MatchDetailsSkeleton />
+      </div>
     );
   }
 
   if (detailsQuery.isError || !detailsQuery.data) {
     return (
-      <div>
-        <p className="text-sm text-danger" role="alert">
-          {errorMessage(detailsQuery.error)}
-        </p>
-        <button
-          type="button"
-          onClick={() => void detailsQuery.refetch()}
-          className="mt-4 min-h-control rounded-button border border-border bg-surface px-4 text-sm font-medium text-ink"
-        >
-          Try again
-        </button>
+      <div className="space-y-8">
+        <PageHeader
+          title="Candidate profile"
+          breadcrumb={
+            <Link
+              href="/"
+              className="font-medium text-primary underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2"
+            >
+              ← Back to employer workspace
+            </Link>
+          }
+        />
+        <EmptyState
+          role="alert"
+          title="Could not load match details"
+          description={errorMessage(detailsQuery.error)}
+          primaryAction={
+            <Button type="button" variant="secondary" onClick={() => void detailsQuery.refetch()}>
+              Try again
+            </Button>
+          }
+        />
       </div>
     );
   }
@@ -66,16 +111,25 @@ export function CandidateProfileView({
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <Link
-          href="/"
-          className="inline-flex min-h-control items-center text-sm font-medium text-primary underline-offset-2 hover:underline"
-        >
-          ← Back to employer workspace
-        </Link>
-      </div>
+      <PageHeader
+        title={details.candidate.name}
+        description={
+          details.candidate.headline?.trim()
+            ? details.candidate.headline
+            : "Candidate match profile for this vacancy."
+        }
+        breadcrumb={
+          <Link
+            href="/"
+            className="font-medium text-primary underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2"
+          >
+            ← Back to employer workspace
+          </Link>
+        }
+        titleId="candidate-profile-title"
+      />
 
-      <div className="grid gap-8 lg:grid-cols-[minmax(0,35%)_minmax(0,65%)]">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,35%)_minmax(0,65%)] lg:gap-8">
         <CandidateSummaryCard
           candidate={details.candidate}
           score={details.match.score}

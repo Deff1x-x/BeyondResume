@@ -1,3 +1,5 @@
+import { Badge, StatusBadge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import type { EvidenceHubItem } from "@/lib/api/types/evidence";
 
 import { EvidenceSkillBadges } from "./evidence-skill-badges";
@@ -22,46 +24,41 @@ function formatRelativeUpdated(value: string): string {
   return new Intl.DateTimeFormat("en", { dateStyle: "medium" }).format(new Date(value));
 }
 
-function verificationLabel(status: string | null): string {
-  if (!status) {
-    return "Verification status unknown";
-  }
-  if (status === "unverified") {
-    return "Unverified evidence";
-  }
-  return status.replaceAll("_", " ");
-}
-
 export function EvidenceCard({ item }: Readonly<{ item: EvidenceHubItem }>) {
   const title = item.title?.trim() || item.source.label;
-  const badge = item.source.label;
 
   return (
-    <article className="rounded-card border border-border bg-background px-4 py-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-button border border-border bg-surface px-2 py-0.5 text-xs font-medium text-secondary">
-              {badge}
-            </span>
-            <h3 className="break-words text-sm font-semibold text-ink">{title}</h3>
+    <Card className="bg-background">
+      <CardContent className="px-4 py-4 sm:px-4 sm:pb-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="neutral">{item.source.label}</Badge>
+              <h3 className="break-words text-sm font-semibold text-ink">{title}</h3>
+            </div>
+            {item.description ? (
+              <p className="mt-2 text-sm leading-6 text-secondary">{item.description}</p>
+            ) : (
+              <p className="mt-2 text-sm text-secondary">No description available.</p>
+            )}
           </div>
-          {item.description ? (
-            <p className="mt-2 text-sm leading-6 text-secondary">{item.description}</p>
+          <p className="shrink-0 text-xs text-secondary">
+            {formatRelativeUpdated(item.updated_at)}
+          </p>
+        </div>
+
+        <div className="mt-3">
+          <EvidenceSkillBadges skills={item.skills} />
+        </div>
+
+        <div className="mt-3">
+          {item.verification_status ? (
+            <StatusBadge status={item.verification_status} />
           ) : (
-            <p className="mt-2 text-sm text-secondary">No description available.</p>
+            <StatusBadge status="unknown" label="Verification status unknown" />
           )}
         </div>
-        <p className="shrink-0 text-xs text-secondary">{formatRelativeUpdated(item.updated_at)}</p>
-      </div>
-
-      <div className="mt-3">
-        <EvidenceSkillBadges skills={item.skills} />
-      </div>
-
-      <p className="mt-3 text-xs text-secondary" aria-label="Verification status">
-        {verificationLabel(item.verification_status)}
-      </p>
-    </article>
+      </CardContent>
+    </Card>
   );
 }

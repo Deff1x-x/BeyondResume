@@ -1,3 +1,4 @@
+import { Badge } from "@/components/ui/badge";
 import type { EvidenceHubSkill } from "@/lib/api/types/evidence";
 
 export function EvidenceSkillBadges({
@@ -10,11 +11,10 @@ export function EvidenceSkillBadges({
   return (
     <ul className="flex flex-wrap gap-2" aria-label="Linked skills">
       {skills.map((skill) => (
-        <li
-          key={skill.id}
-          className="rounded-button border border-border bg-background px-2.5 py-1 text-xs font-medium text-ink"
-        >
-          {skill.name}
+        <li key={skill.id} className="min-w-0 max-w-full">
+          <Badge variant="neutral" title={skill.name}>
+            {skill.name}
+          </Badge>
         </li>
       ))}
     </ul>

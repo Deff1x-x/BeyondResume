@@ -2,6 +2,8 @@
 
 import { useDeferredValue, useMemo, useState } from "react";
 
+import { Card, CardContent } from "@/components/ui/card";
+import { SectionHeader } from "@/components/ui/section-header";
 import { ApiClientError } from "@/lib/api/error";
 import { useEvidenceHubQuery } from "@/lib/evidence/hooks";
 
@@ -51,42 +53,35 @@ export function EvidenceHubSection({ enabled }: Readonly<{ enabled: boolean }>) 
     return null;
   }
 
+  const sourceLabel =
+    sourceFilter === "all" ? "All" : sourceFilter === "github" ? "GitHub" : "Resume";
+
   return (
-    <section
+    <Card
       id="evidence-hub"
-      className="rounded-card border border-border bg-surface p-6 lg:col-span-2"
+      className="lg:col-span-2"
       aria-labelledby="evidence-hub-section-title"
     >
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0">
-          <h2 id="evidence-hub-section-title" className="text-xl font-semibold text-ink">
-            Evidence
-          </h2>
-          <p className="mt-2 text-sm leading-6 text-secondary">
-            All confirmations of experience and skills from connected sources.
-          </p>
-        </div>
-        <div className="shrink-0 text-sm text-secondary sm:text-right">
-          <p>
-            <span className="font-medium text-ink">
-              {evidenceQuery.data?.total ?? "—"}
-            </span>{" "}
-            evidence
-          </p>
-          <p className="mt-1">
-            Source:{" "}
-            <span className="font-medium text-ink">
-              {sourceFilter === "all"
-                ? "All"
-                : sourceFilter === "github"
-                  ? "GitHub"
-                  : "Resume"}
-            </span>
-          </p>
-        </div>
-      </div>
+      <CardContent className="space-y-6 p-6">
+        <SectionHeader
+          title="Evidence"
+          titleId="evidence-hub-section-title"
+          description="All confirmations of experience and skills from connected sources."
+          action={
+            <div className="text-sm text-secondary sm:text-right">
+              <p>
+                <span className="font-medium text-ink">
+                  {evidenceQuery.data?.total ?? "—"}
+                </span>{" "}
+                evidence
+              </p>
+              <p className="mt-1">
+                Source: <span className="font-medium text-ink">{sourceLabel}</span>
+              </p>
+            </div>
+          }
+        />
 
-      <div className="mt-6">
         <EvidenceToolbar
           search={search}
           sourceFilter={sourceFilter}
@@ -95,36 +90,36 @@ export function EvidenceHubSection({ enabled }: Readonly<{ enabled: boolean }>) 
           onSourceFilterChange={setSourceFilter}
           onSkillChange={setSkill}
         />
-      </div>
 
-      <div className="mt-4" aria-live="polite">
-        {evidenceQuery.isLoading ? <EvidenceSkeleton /> : null}
+        <div aria-live="polite">
+          {evidenceQuery.isLoading ? <EvidenceSkeleton /> : null}
 
-        {evidenceQuery.isError ? (
-          <EvidenceEmptyState
-            variant="error"
-            message={errorMessage(evidenceQuery.error)}
-            onRetry={() => {
-              void evidenceQuery.refetch();
-            }}
-          />
-        ) : null}
+          {evidenceQuery.isError ? (
+            <EvidenceEmptyState
+              variant="error"
+              message={errorMessage(evidenceQuery.error)}
+              onRetry={() => {
+                void evidenceQuery.refetch();
+              }}
+            />
+          ) : null}
 
-        {!evidenceQuery.isLoading &&
-        !evidenceQuery.isError &&
-        (evidenceQuery.data?.items.length ?? 0) === 0 ? (
-          <EvidenceEmptyState
-            variant={hasFilters ? "filtered" : "none"}
-            onClearFilters={hasFilters ? clearFilters : undefined}
-          />
-        ) : null}
+          {!evidenceQuery.isLoading &&
+          !evidenceQuery.isError &&
+          (evidenceQuery.data?.items.length ?? 0) === 0 ? (
+            <EvidenceEmptyState
+              variant={hasFilters ? "filtered" : "none"}
+              onClearFilters={hasFilters ? clearFilters : undefined}
+            />
+          ) : null}
 
-        {!evidenceQuery.isLoading &&
-        !evidenceQuery.isError &&
-        (evidenceQuery.data?.items.length ?? 0) > 0 ? (
-          <EvidenceList items={evidenceQuery.data?.items ?? []} />
-        ) : null}
-      </div>
-    </section>
+          {!evidenceQuery.isLoading &&
+          !evidenceQuery.isError &&
+          (evidenceQuery.data?.items.length ?? 0) > 0 ? (
+            <EvidenceList items={evidenceQuery.data?.items ?? []} />
+          ) : null}
+        </div>
+      </CardContent>
+    </Card>
   );
 }
