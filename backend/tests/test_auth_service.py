@@ -49,6 +49,7 @@ def test_candidate_registration_creates_profile_and_audit_event_atomically(
     assert audit_event.event_type == "user_registered"
     assert sum(isinstance(item, CandidateProfile) for item in added) == 1
     assert sum(isinstance(item, AuditEvent) for item in added) == 1
+    session.flush.assert_called_once()
     session.commit.assert_called_once()
 
 

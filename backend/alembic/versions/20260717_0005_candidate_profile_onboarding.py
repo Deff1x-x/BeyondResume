@@ -32,12 +32,19 @@ def upgrade() -> None:
         nullable=True,
         server_default=None,
     )
+    # PostgreSQL cannot cast a varchar default to a new ENUM type in one ALTER.
+    op.execute("ALTER TABLE candidate_profiles ALTER COLUMN onboarding_status DROP DEFAULT")
     op.alter_column(
         "candidate_profiles",
         "onboarding_status",
         existing_type=sa.String(length=30),
         type_=onboarding_status,
         postgresql_using="onboarding_status::candidate_onboarding_status",
+    )
+    op.execute(
+        "ALTER TABLE candidate_profiles "
+        "ALTER COLUMN onboarding_status "
+        "SET DEFAULT 'profile_required'::candidate_onboarding_status"
     )
     op.add_column(
         "candidate_profiles", sa.Column("english_level", sa.String(length=50), nullable=True)

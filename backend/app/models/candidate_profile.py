@@ -36,7 +36,12 @@ class CandidateProfile(TimestampMixin, Base):
     summary: Mapped[str | None] = mapped_column("bio", Text, nullable=True)
     data_processing_consent: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     onboarding_status: Mapped[OnboardingStatus] = mapped_column(
-        SqlEnum(OnboardingStatus, name="candidate_onboarding_status"), nullable=False
+        SqlEnum(
+            OnboardingStatus,
+            name="candidate_onboarding_status",
+            values_callable=lambda enum_cls: [member.value for member in enum_cls],
+        ),
+        nullable=False,
     )
     salary_expectation: Mapped[str | None] = mapped_column(String(100), nullable=True)
     preferred_employment_type: Mapped[str | None] = mapped_column(String(50), nullable=True)

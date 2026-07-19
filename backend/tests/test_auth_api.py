@@ -137,6 +137,31 @@ def test_register_returns_verification_requirement_outside_demo_mode(
     assert response.json() == {"verification_required": True}
 
 
+def test_register_returns_auth_config_error_when_jwt_secret_missing(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.api.v1 import auth
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings, "jwt_secret", "")
+    monkeypatch.setattr(auth, "register_user", lambda *_args, **_kwargs: make_user("candidate"))
+
+    response = client.post(
+        "/api/v1/auth/register",
+        json={
+            "email": "candidate@example.com",
+            "password": "StrongPass123",
+            "password_confirmation": "StrongPass123",
+            "role": "candidate",
+            "terms_accepted": True,
+            "privacy_accepted": True,
+        },
+    )
+
+    assert response.status_code == 500
+    assert response.json()["error"]["code"] == "AUTH_CONFIG_ERROR"
+
+
 @pytest.mark.parametrize(
     "payload, error_code",
     [

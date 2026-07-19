@@ -62,6 +62,9 @@ def register_user(
     )
     try:
         session.add(user)
+        # Persist the user row before dependent audit/profile inserts. AuditEvent has a
+        # FK to users but no ORM relationship, so SQLAlchemy may otherwise flush it first.
+        session.flush()
         if role == "candidate":
             session.add(create_empty_candidate_profile(user.id))
         session.add(create_user_registered_audit_event(user.id))

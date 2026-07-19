@@ -58,7 +58,16 @@ def register(
         raise api_error(500, "INTERNAL_ERROR", "Unable to register user") from None
 
     if user.status == "active":
-        return TokenResponse(access_token=create_access_token(user.id))
+        try:
+            access_token = create_access_token(user.id)
+        except RuntimeError:
+            # Misconfigured JWT_SECRET must not surface as an opaque framework 500.
+            raise api_error(
+                500,
+                "AUTH_CONFIG_ERROR",
+                "Authentication is not configured",
+            ) from None
+        return TokenResponse(access_token=access_token)
     return VerificationRequiredResponse()
 
 
