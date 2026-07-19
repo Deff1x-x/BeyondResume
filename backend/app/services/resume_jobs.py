@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import cast
 from uuid import UUID
@@ -21,6 +22,14 @@ class JobTransitionError(Exception):
 
 class ResumeTransitionError(Exception):
     """The requested resume lifecycle transition is not allowed."""
+
+
+@dataclass(frozen=True, slots=True)
+class ResumeRetryResult:
+    """The retry Job and whether this request created it after committing."""
+
+    job: Job
+    should_schedule: bool
 
 
 def claim_job(session: Session, job_id: UUID) -> Job:
@@ -100,7 +109,7 @@ def fail_job(session: Session, job: Job, code: str, message: str) -> Job:
     return job
 
 
-def retry_failed_resume(session: Session, resume: Resume) -> Job:
+def retry_failed_resume(session: Session, resume: Resume) -> ResumeRetryResult:
     if resume.parse_status != "failed":
         raise ResumeTransitionError("Only a failed resume can be retried")
     active = session.execute(
@@ -111,7 +120,7 @@ def retry_failed_resume(session: Session, resume: Resume) -> Job:
         )
     ).scalar_one_or_none()
     if active is not None:
-        return active
+        return ResumeRetryResult(job=active, should_schedule=False)
     job = Job(resume_id=resume.id, job_type=JobType.RESUME_PARSE, status=JobStatus.PENDING)
     # `uploaded` is the only non-terminal state in the specified Resume lifecycle.
     # A retry therefore reopens the failed resume before its new Job is committed.
@@ -130,12 +139,12 @@ def retry_failed_resume(session: Session, resume: Resume) -> Job:
             )
         ).scalar_one_or_none()
         if active is not None:
-            return active
+            return ResumeRetryResult(job=active, should_schedule=False)
         raise
     except SQLAlchemyError:
         session.rollback()
         raise
-    return job
+    return ResumeRetryResult(job=job, should_schedule=True)
 
 
 def request_resume_parse(session: Session, resume: Resume) -> Job:
@@ -150,7 +159,7 @@ def request_resume_parse(session: Session, resume: Resume) -> Job:
     if active is not None:
         return active
     if resume.parse_status == "failed":
-        return retry_failed_resume(session, resume)
+        return retry_failed_resume(session, resume).job
     if resume.parse_status != "uploaded":
         raise ResumeTransitionError("Resume parsing is not available for this status")
 

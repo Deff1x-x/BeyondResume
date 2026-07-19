@@ -124,10 +124,12 @@ def test_retry_creates_one_new_pending_job_for_failed_resume() -> None:
     session = Mock()
     session.execute.return_value = SimpleNamespace(scalar_one_or_none=lambda: None)
 
-    job = retry_failed_resume(session, resume)
+    result = retry_failed_resume(session, resume)
+    job = result.job
 
     assert job.status == JobStatus.PENDING
     assert job.resume_id == resume.id
+    assert result.should_schedule is True
     assert resume.parse_status == "uploaded"
     session.add.assert_called_once_with(job)
     session.commit.assert_called_once()
@@ -138,6 +140,18 @@ def test_retry_rejects_non_failed_resume() -> None:
         retry_failed_resume(Mock(), make_resume())
 
 
+def test_retry_commit_error_rolls_back_without_returning_a_scheduling_result() -> None:
+    resume = make_resume("failed")
+    session = Mock()
+    session.execute.return_value = SimpleNamespace(scalar_one_or_none=lambda: None)
+    session.commit.side_effect = SQLAlchemyError("commit failed")
+
+    with pytest.raises(SQLAlchemyError):
+        retry_failed_resume(session, resume)
+
+    session.rollback.assert_called_once()
+
+
 def test_failed_resume_retry_claim_and_complete_clears_previous_error() -> None:
     resume = make_resume("failed")
     resume.failed_at = datetime.now(UTC)
@@ -146,7 +160,7 @@ def test_failed_resume_retry_claim_and_complete_clears_previous_error() -> None:
     retry_session = Mock()
     retry_session.execute.return_value = SimpleNamespace(scalar_one_or_none=lambda: None)
 
-    job = retry_failed_resume(retry_session, resume)
+    job = retry_failed_resume(retry_session, resume).job
     assert resume.parse_status == "uploaded"
     job.status = JobStatus.RUNNING  # State after the atomic claim and re-read.
     complete_session = Mock()
@@ -171,7 +185,7 @@ def test_failed_resume_retry_claim_and_fail_replaces_previous_error() -> None:
     retry_session = Mock()
     retry_session.execute.return_value = SimpleNamespace(scalar_one_or_none=lambda: None)
 
-    job = retry_failed_resume(retry_session, resume)
+    job = retry_failed_resume(retry_session, resume).job
     job.status = JobStatus.RUNNING  # State after the atomic claim and re-read.
     fail_session = Mock()
     fail_session.execute.return_value = SimpleNamespace(scalar_one=lambda: resume)
@@ -194,9 +208,10 @@ def test_retry_with_active_parse_job_does_not_change_failed_resume() -> None:
     session = Mock()
     session.execute.return_value = SimpleNamespace(scalar_one_or_none=lambda: active)
 
-    returned = retry_failed_resume(session, resume)
+    result = retry_failed_resume(session, resume)
 
-    assert returned is active
+    assert result.job is active
+    assert result.should_schedule is False
     assert resume.parse_status == "failed"
     assert resume.parse_error_code == "OLD_ERROR"
     session.add.assert_not_called()

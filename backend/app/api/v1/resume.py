@@ -172,6 +172,7 @@ def request_resume_parsing(
 
 @router.post("/resume/retry", response_model=JobPollingResponse, status_code=201)
 def retry_resume_processing(
+    background_tasks: BackgroundTasks,
     current_user: Annotated[User, Depends(require_candidate)],
     session: Annotated[Session, Depends(get_db)],
 ) -> JobPollingResponse:
@@ -179,13 +180,16 @@ def retry_resume_processing(
     if resume is None:
         raise api_error(404, "RESUME_NOT_FOUND", "Current resume not found")
     try:
-        job = retry_failed_resume(session, resume)
+        retry_result = retry_failed_resume(session, resume)
     except ResumeTransitionError:
         raise api_error(409, "RESUME_RETRY_NOT_ALLOWED", "Resume retry is not available") from None
     except SQLAlchemyError:
         session.rollback()
         raise api_error(500, "DATABASE_ERROR", "Database operation failed") from None
 
+    job = retry_result.job
+    if retry_result.should_schedule:
+        background_tasks.add_task(run_resume_parse_job_task, job.id)
     return JobPollingResponse(
         id=job.id,
         status=job.status,

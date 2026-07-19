@@ -5,6 +5,7 @@ from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.api.dependencies import require_candidate
 from app.api.errors import api_error
@@ -271,6 +272,7 @@ def test_resume_retry_returns_new_pending_job(
     client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from app.api.v1 import resume as resume_api
+    from app.services.resume_jobs import ResumeRetryResult
 
     candidate = make_user()
     authorize_candidate(candidate)
@@ -285,17 +287,93 @@ def test_resume_retry_returns_new_pending_job(
     )
     monkeypatch.setattr(resume_api, "get_current_resume", lambda *_args: failed_resume)
 
-    def retry(*_args: object) -> Job:
+    def retry(*_args: object) -> ResumeRetryResult:
         failed_resume.parse_status = "uploaded"
-        return job
+        return ResumeRetryResult(job=job, should_schedule=True)
 
     monkeypatch.setattr(resume_api, "retry_failed_resume", retry)
+    worker_calls: list[tuple[object, ...]] = []
+
+    async def run_worker(*args: object) -> None:
+        worker_calls.append(args)
+
+    monkeypatch.setattr(resume_api, "run_resume_parse_job_task", run_worker)
 
     response = client.post("/api/v1/candidate/resume/retry")
 
     assert response.status_code == 201
     assert response.json()["status"] == "pending"
     assert response.json()["resume_status"] == "uploaded"
+    assert worker_calls == [(job.id,)]
+
+
+def test_resume_retry_returns_active_job_without_scheduling_worker(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.api.v1 import resume as resume_api
+    from app.services.resume_jobs import ResumeRetryResult
+
+    authorize_candidate(make_user())
+    failed_resume = make_resume()
+    failed_resume.parse_status = "failed"
+    active = Job(
+        id=uuid4(),
+        resume_id=failed_resume.id,
+        job_type=JobType.RESUME_PARSE,
+        status=JobStatus.RUNNING,
+        created_at=datetime.now(UTC),
+        started_at=datetime.now(UTC),
+    )
+    monkeypatch.setattr(resume_api, "get_current_resume", lambda *_args: failed_resume)
+    monkeypatch.setattr(
+        resume_api,
+        "retry_failed_resume",
+        lambda *_args: ResumeRetryResult(job=active, should_schedule=False),
+    )
+    worker_calls: list[tuple[object, ...]] = []
+
+    async def run_worker(*args: object) -> None:
+        worker_calls.append(args)
+
+    monkeypatch.setattr(resume_api, "run_resume_parse_job_task", run_worker)
+
+    response = client.post("/api/v1/candidate/resume/retry")
+
+    assert response.status_code == 201
+    assert response.json()["id"] == str(active.id)
+    assert response.json()["status"] == "running"
+    assert worker_calls == []
+
+
+def test_resume_retry_service_error_does_not_schedule_worker(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.api.v1 import resume as resume_api
+
+    authorize_candidate(make_user())
+    failed_resume = make_resume()
+    failed_resume.parse_status = "failed"
+    session = Mock()
+    app.dependency_overrides[get_db] = lambda: session
+    monkeypatch.setattr(resume_api, "get_current_resume", lambda *_args: failed_resume)
+
+    def retry(*_args: object) -> Job:
+        raise SQLAlchemyError("database failure")
+
+    monkeypatch.setattr(resume_api, "retry_failed_resume", retry)
+    worker_calls: list[tuple[object, ...]] = []
+
+    async def run_worker(*args: object) -> None:
+        worker_calls.append(args)
+
+    monkeypatch.setattr(resume_api, "run_resume_parse_job_task", run_worker)
+
+    response = client.post("/api/v1/candidate/resume/retry")
+
+    assert response.status_code == 500
+    assert response.json()["error"]["code"] == "DATABASE_ERROR"
+    assert worker_calls == []
+    session.rollback.assert_called_once()
 
 
 def test_resume_retry_rejects_non_failed_current_resume(
