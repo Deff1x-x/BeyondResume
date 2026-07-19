@@ -231,16 +231,30 @@ def test_resume_member_read_uses_plural_path(
     client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from app.api.v1 import resume as resume_api
+    from app.schemas.resume import ResumeResponse
 
     candidate = make_user()
     resume = make_resume()
     authorize_candidate(candidate)
     monkeypatch.setattr(resume_api, "get_candidate_resume", lambda *_args: resume)
+    monkeypatch.setattr(
+        resume_api,
+        "build_resume_response",
+        lambda _session, value: ResumeResponse(
+            id=value.id,
+            original_filename=value.original_filename,
+            mime_type=value.mime_type,
+            file_size=value.file_size,
+            status=value.parse_status,  # type: ignore[arg-type]
+            uploaded_at=value.created_at,
+        ),
+    )
 
     response = client.get(f"/api/v1/candidate/resumes/{resume.id}")
 
     assert response.status_code == 200
     assert response.json()["id"] == str(resume.id)
+    assert response.json()["evidence_id"] is None
 
 
 def test_resume_upload_requires_bearer_token(client: TestClient) -> None:

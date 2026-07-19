@@ -68,6 +68,21 @@ function CurrentResume({ resume }: Readonly<{ resume: ResumeResponse }>) {
           <p className="mt-1 text-sm text-secondary">
             Uploaded {formatUploadedAt(resume.uploaded_at)}
           </p>
+          {resume.parsed_at ? (
+            <p className="mt-1 text-sm text-secondary">
+              Parsed {formatUploadedAt(resume.parsed_at)}
+            </p>
+          ) : null}
+          {resume.extracted_text_length != null ? (
+            <p className="mt-1 text-sm text-secondary">
+              Extracted text: {resume.extracted_text_length.toLocaleString("en")} characters
+            </p>
+          ) : null}
+          {resume.evidence_id ? (
+            <p className="mt-1 text-sm text-secondary">
+              Evidence linked · id {resume.evidence_id}
+            </p>
+          ) : null}
         </div>
         <span className="rounded-button border border-border bg-surface px-3 py-2 text-sm text-ink">
           {resume.status}
@@ -148,7 +163,8 @@ export function ResumeSection({ enabled }: Readonly<{ enabled: boolean }>) {
         Resume
       </h2>
       <p className="mt-2 text-sm text-secondary">
-        Upload a PDF or DOCX resume. The maximum file size is 8 MiB.
+        Upload a PDF resume to extract text and attach it to your Evidence pipeline. The maximum
+        file size is 8 MiB.
       </p>
 
       <div className="mt-6 space-y-6">
@@ -179,7 +195,7 @@ export function ResumeSection({ enabled }: Readonly<{ enabled: boolean }>) {
           <div className="rounded-card border border-border bg-background p-4">
             <p className="text-sm font-medium text-ink">No resume uploaded</p>
             <p className="mt-2 text-sm text-secondary">
-              Choose a PDF or DOCX file below to create your current resume.
+              Choose a PDF file below to create your current resume.
             </p>
           </div>
         ) : null}
@@ -196,7 +212,8 @@ export function ResumeSection({ enabled }: Readonly<{ enabled: boolean }>) {
             ) : null}
             {job.status === "completed" ? (
               <p className="mt-2 text-sm text-success">
-                Processing completed. The current resume has been refreshed.
+                Processing completed. Text was extracted and Evidence was created for this
+                document.
               </p>
             ) : null}
             {isTerminalFailure ? (

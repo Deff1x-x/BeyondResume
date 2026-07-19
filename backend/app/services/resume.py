@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from hashlib import sha256
 from io import BytesIO
 from pathlib import Path
+from typing import Literal, cast
 from zipfile import BadZipFile, ZipFile
 from uuid import UUID, uuid4
 
@@ -13,9 +14,10 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.models.candidate_profile import CandidateProfile
+from app.models.job import Job, JobStatus, JobType
 from app.models.resume import Resume
-from app.models.job import Job
-from app.models.job import JobStatus, JobType
+from app.schemas.resume import ResumeResponse
+from app.services.resume_evidence import get_resume_evidence
 
 MAX_RESUME_BYTES = 8 * 1024 * 1024
 CHUNK_SIZE = 64 * 1024
@@ -196,3 +198,19 @@ def get_download_path(resume: Resume) -> Path:
     if root not in path.parents or not path.is_file():
         raise ResumeStorageError
     return path
+
+
+def build_resume_response(session: Session, resume: Resume) -> ResumeResponse:
+    evidence = get_resume_evidence(session, resume.id)
+    text = resume.extracted_text
+    return ResumeResponse(
+        id=resume.id,
+        original_filename=resume.original_filename,
+        mime_type=resume.mime_type,
+        file_size=resume.file_size,
+        status=cast(Literal["uploaded", "parsed", "failed"], resume.parse_status),
+        uploaded_at=resume.uploaded_at,
+        parsed_at=resume.parsed_at,
+        extracted_text_length=len(text) if text is not None else None,
+        evidence_id=evidence.id if evidence is not None else None,
+    )

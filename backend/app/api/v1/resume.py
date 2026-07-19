@@ -25,6 +25,7 @@ from app.services.resume import (
     ResumeUploadInput,
     ResumeUploadResult,
     UnsupportedResumeTypeError,
+    build_resume_response,
     upload_resume,
     get_current_resume,
     get_candidate_resume,
@@ -146,7 +147,7 @@ def get_resume(
     resume = get_current_resume(session, current_user.id)
     if resume is None:
         raise api_error(404, "RESUME_NOT_FOUND", "Current resume not found")
-    return ResumeResponse.model_validate(resume)
+    return build_resume_response(session, resume)
 
 
 @router.get("/resumes/{resume_id}", response_model=ResumeResponse)
@@ -158,7 +159,7 @@ def get_resume_by_id(
     resume = get_candidate_resume(session, current_user.id, resume_id)
     if resume is None:
         raise api_error(404, "RESUME_NOT_FOUND", "Resume not found")
-    return ResumeResponse.model_validate(resume)
+    return build_resume_response(session, resume)
 
 
 @router.get("/resume/download")

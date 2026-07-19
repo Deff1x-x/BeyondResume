@@ -8,7 +8,10 @@ import {
   retryResumeProcessing,
   uploadResume
 } from "@/lib/api/resume";
+import { candidateDashboardQueryKey } from "@/lib/dashboard/hooks";
 import { jobQueryKey, useJobQuery } from "@/lib/jobs/hooks";
+import { roadmapQueryKey } from "@/lib/roadmap/hooks";
+import { skillPassportQueryKey } from "@/lib/skill-passport/hooks";
 
 export const currentResumeQueryKey = ["candidate", "resume", "current"] as const;
 
@@ -46,6 +49,9 @@ export function useResumeJobQuery(jobId: string | null) {
   useEffect(() => {
     if (query.data?.status === "completed") {
       void queryClient.invalidateQueries({ queryKey: currentResumeQueryKey });
+      void queryClient.invalidateQueries({ queryKey: skillPassportQueryKey });
+      void queryClient.invalidateQueries({ queryKey: roadmapQueryKey });
+      void queryClient.invalidateQueries({ queryKey: candidateDashboardQueryKey });
     }
   }, [query.data?.status, queryClient]);
 

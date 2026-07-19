@@ -12,4 +12,7 @@ export type ResumeResponse = {
   file_size: number;
   status: ResumeStatus;
   uploaded_at: string;
+  parsed_at: string | null;
+  extracted_text_length: number | null;
+  evidence_id: string | null;
 };

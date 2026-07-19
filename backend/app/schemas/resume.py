@@ -21,6 +21,9 @@ class ResumeResponse(BaseModel):
     file_size: int
     status: Literal["uploaded", "parsed", "failed"]
     uploaded_at: datetime
+    parsed_at: datetime | None = None
+    extracted_text_length: int | None = None
+    evidence_id: UUID | None = None
 
 
 class JobPollingResponse(BaseModel):

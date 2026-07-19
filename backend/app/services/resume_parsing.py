@@ -11,6 +11,7 @@ from app.db.session import SessionLocal
 from app.models.job import Job, JobType
 from app.models.resume import Resume
 from app.services.resume import ResumeStorageError, get_download_path
+from app.services.resume_evidence import generate_resume_evidence
 from app.services.resume_jobs import (
     JobTransitionError,
     claim_job,
@@ -137,6 +138,12 @@ async def run_resume_parse_job(session: Session, job_id: UUID) -> Job:
         return fail_job(session, job, code, message)
 
     resume.extracted_text = text
+    try:
+        # Attach the parsed resume to the shared Evidence pipeline (no AI / skills yet).
+        generate_resume_evidence(session, resume)
+    except (ValueError, SQLAlchemyError):
+        resume.extracted_text = None
+        return fail_job(session, job, "INTERNAL_ERROR", "Resume processing failed")
     return complete_job(session, job)
 
 

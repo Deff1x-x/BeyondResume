@@ -55,7 +55,14 @@ def test_worker_saves_plain_text_and_completes_job(monkeypatch: pytest.MonkeyPat
         job.status = JobStatus.COMPLETED
         return job
 
+    evidence_calls: list[Resume] = []
+
+    def generate_evidence(_: Mock, received: Resume) -> object:
+        evidence_calls.append(received)
+        return object()
+
     monkeypatch.setattr(resume_parsing, "extract_plain_text", extract)
+    monkeypatch.setattr(resume_parsing, "generate_resume_evidence", generate_evidence)
     monkeypatch.setattr(resume_parsing, "complete_job", complete)
 
     result = asyncio.run(run_resume_parse_job(session, job.id))
@@ -63,6 +70,43 @@ def test_worker_saves_plain_text_and_completes_job(monkeypatch: pytest.MonkeyPat
     assert result.status == JobStatus.COMPLETED
     assert resume.parse_status == "parsed"
     assert resume.extracted_text == "Python\nFastAPI"
+    assert evidence_calls == [resume]
+
+
+def test_worker_marks_failed_when_evidence_generation_errors(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.services import resume_parsing
+
+    resume = make_resume()
+    job = make_running_job(resume)
+    session = Mock()
+    monkeypatch.setattr(resume_parsing, "claim_job", lambda *_args: job)
+    monkeypatch.setattr(resume_parsing, "get_resume", lambda *_args: resume)
+    monkeypatch.setattr(resume_parsing, "get_download_path", lambda *_args: Path("safe.pdf"))
+
+    async def extract(_: Resume, **_kwargs: object) -> str:
+        return "Python\nFastAPI"
+
+    def generate_evidence(_: Mock, received: Resume) -> object:
+        raise ValueError("Resume evidence requires non-empty extracted text")
+
+    def fail(_: Mock, received_job: Job, code: str, message: str) -> Job:
+        assert received_job is job
+        assert code == "INTERNAL_ERROR"
+        assert resume.extracted_text is None
+        resume.parse_status = "failed"
+        job.status = JobStatus.FAILED
+        return job
+
+    monkeypatch.setattr(resume_parsing, "extract_plain_text", extract)
+    monkeypatch.setattr(resume_parsing, "generate_resume_evidence", generate_evidence)
+    monkeypatch.setattr(resume_parsing, "fail_job", fail)
+
+    result = asyncio.run(run_resume_parse_job(session, job.id))
+
+    assert result.status == JobStatus.FAILED
+    assert resume.parse_status == "failed"
 
 
 def test_worker_marks_resume_and_job_failed_on_parser_error(
