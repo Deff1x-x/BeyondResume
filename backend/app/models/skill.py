@@ -10,6 +10,7 @@ from app.db.base import Base, TimestampMixin
 if TYPE_CHECKING:
     from app.models.evidence_skill_link import EvidenceSkillLink
     from app.models.skill_alias import SkillAlias
+    from app.models.vacancy_skill_requirement import VacancySkillRequirement
 
 
 class Skill(TimestampMixin, Base):
@@ -26,3 +27,6 @@ class Skill(TimestampMixin, Base):
 
     aliases: Mapped[list["SkillAlias"]] = relationship(back_populates="skill")
     evidence_skill_links: Mapped[list["EvidenceSkillLink"]] = relationship(back_populates="skill")
+    vacancy_skill_requirements: Mapped[list["VacancySkillRequirement"]] = relationship(
+        back_populates="skill"
+    )

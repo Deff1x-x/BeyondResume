@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { CandidateProfileSection } from "@/features/candidate-profile-section";
+import { EmployerSection } from "@/features/employer-section";
 import { GitHubSection } from "@/features/github-section";
 import { ResumeSection } from "@/features/resume-section";
 import { RoadmapSection } from "@/features/roadmap-section";
@@ -73,7 +74,9 @@ export default function HomePage() {
       <header className="flex flex-col gap-6 border-b border-border pb-8 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
           <p className="text-sm font-medium text-primary">BeyondResume</p>
-          <h1 className="mt-2 text-3xl font-semibold text-ink">Candidate workspace</h1>
+          <h1 className="mt-2 text-3xl font-semibold text-ink">
+            {user.role === "employer" ? "Employer workspace" : "Candidate workspace"}
+          </h1>
           <p className="mt-2 break-words text-sm text-secondary">
             Signed in as <span className="font-medium text-ink">{user.email}</span> · {user.role}
           </p>
@@ -88,11 +91,17 @@ export default function HomePage() {
       </header>
 
       <div className="mt-8 grid gap-6 lg:grid-cols-2">
-        <CandidateProfileSection enabled={user.role === "candidate"} />
-        <ResumeSection enabled={user.role === "candidate"} />
-        <GitHubSection enabled={user.role === "candidate"} />
-        <SkillPassportSection enabled={user.role === "candidate"} />
-        <RoadmapSection enabled={user.role === "candidate"} />
+        {user.role === "employer" ? (
+          <EmployerSection enabled />
+        ) : (
+          <>
+            <CandidateProfileSection enabled={user.role === "candidate"} />
+            <ResumeSection enabled={user.role === "candidate"} />
+            <GitHubSection enabled={user.role === "candidate"} />
+            <SkillPassportSection enabled={user.role === "candidate"} />
+            <RoadmapSection enabled={user.role === "candidate"} />
+          </>
+        )}
       </div>
     </main>
   );

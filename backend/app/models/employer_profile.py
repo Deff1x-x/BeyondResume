@@ -9,6 +9,7 @@ from app.db.base import Base, TimestampMixin
 
 if TYPE_CHECKING:
     from app.models.user import User
+    from app.models.vacancy import Vacancy
 
 
 class EmployerProfile(TimestampMixin, Base):
@@ -23,3 +24,4 @@ class EmployerProfile(TimestampMixin, Base):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     user: Mapped["User"] = relationship(back_populates="employer_profile")
+    vacancies: Mapped[list["Vacancy"]] = relationship(back_populates="employer_profile")

@@ -6,6 +6,7 @@ import { useState, type FormEvent } from "react";
 
 import { isTokenResponse } from "@/lib/api/auth";
 import { ApiClientError } from "@/lib/api/error";
+import type { Role } from "@/lib/api/types/auth";
 import { useRegister } from "@/lib/auth/hooks";
 
 const VERIFICATION_MESSAGE =
@@ -17,6 +18,7 @@ export default function RegisterPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [passwordConfirmation, setPasswordConfirmation] = useState("");
+  const [role, setRole] = useState<Role>("candidate");
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [privacyAccepted, setPrivacyAccepted] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -32,7 +34,7 @@ export default function RegisterPage() {
         email,
         password,
         password_confirmation: passwordConfirmation,
-        role: "candidate",
+        role,
         terms_accepted: termsAccepted,
         privacy_accepted: privacyAccepted
       });
@@ -58,9 +60,37 @@ export default function RegisterPage() {
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-6 py-16">
       <h1 className="text-2xl font-semibold text-ink">Create account</h1>
-      <p className="mt-2 text-sm text-secondary">Register as a candidate to continue.</p>
+      <p className="mt-2 text-sm text-secondary">
+        Register as a candidate or employer to continue.
+      </p>
 
       <form className="mt-8 space-y-6" onSubmit={handleSubmit} noValidate>
+        <fieldset className="space-y-2" disabled={isSubmitting}>
+          <legend className="text-sm font-medium text-ink">Account type</legend>
+          <div className="flex flex-wrap gap-4">
+            <label className="inline-flex items-center gap-2 text-sm text-ink">
+              <input
+                type="radio"
+                name="role"
+                value="candidate"
+                checked={role === "candidate"}
+                onChange={() => setRole("candidate")}
+              />
+              Candidate
+            </label>
+            <label className="inline-flex items-center gap-2 text-sm text-ink">
+              <input
+                type="radio"
+                name="role"
+                value="employer"
+                checked={role === "employer"}
+                onChange={() => setRole("employer")}
+              />
+              Employer
+            </label>
+          </div>
+        </fieldset>
+
         <div className="space-y-2">
           <label htmlFor="email" className="block text-sm font-medium text-ink">
             Email
