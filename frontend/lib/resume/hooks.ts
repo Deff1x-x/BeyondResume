@@ -3,7 +3,12 @@
 import { useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { getCurrentResume, getResumeJob, uploadResume } from "@/lib/api/resume";
+import {
+  getCurrentResume,
+  getResumeJob,
+  retryResumeProcessing,
+  uploadResume
+} from "@/lib/api/resume";
 import type { JobStatus } from "@/lib/api/types/jobs";
 
 export const currentResumeQueryKey = ["candidate", "resume", "current"] as const;
@@ -34,6 +39,17 @@ export function useCurrentResumeQuery(enabled: boolean) {
 export function useUploadResumeMutation() {
   return useMutation({
     mutationFn: (file: File) => uploadResume(file)
+  });
+}
+
+export function useRetryResumeMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: retryResumeProcessing,
+    onSuccess: (job) => {
+      queryClient.setQueryData(resumeJobQueryKey(job.id), job);
+    }
   });
 }
 

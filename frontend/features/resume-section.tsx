@@ -9,6 +9,7 @@ import {
   isTerminalJobStatus,
   useCurrentResumeQuery,
   useResumeJobQuery,
+  useRetryResumeMutation,
   useUploadResumeMutation
 } from "@/lib/resume/hooks";
 
@@ -81,13 +82,15 @@ export function ResumeSection({ enabled }: Readonly<{ enabled: boolean }>) {
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const currentResumeQuery = useCurrentResumeQuery(enabled);
   const uploadMutation = useUploadResumeMutation();
+  const retryMutation = useRetryResumeMutation();
   const jobQuery = useResumeJobQuery(activeJobId);
 
   const job = jobQuery.data;
   const isProcessing = job?.status === "pending" || job?.status === "running";
   const isTerminalFailure =
     job !== undefined && isTerminalJobStatus(job.status) && job.status !== "completed";
-  const isBusy = uploadMutation.isPending || isProcessing;
+  const canRetry = job?.status === "failed" && job.retry_available;
+  const isBusy = uploadMutation.isPending || retryMutation.isPending || isProcessing;
   const resumeMissing = isResumeMissing(currentResumeQuery.error);
 
   function onFileChange(event: ChangeEvent<HTMLInputElement>) {
@@ -104,6 +107,18 @@ export function ResumeSection({ enabled }: Readonly<{ enabled: boolean }>) {
     uploadMutation.mutate(selectedFile, {
       onSuccess: (response) => {
         setActiveJobId(response.job_id);
+      }
+    });
+  }
+
+  function onRetry() {
+    if (!canRetry || retryMutation.isPending) {
+      return;
+    }
+
+    retryMutation.mutate(undefined, {
+      onSuccess: (response) => {
+        setActiveJobId(response.id);
       }
     });
   }
@@ -188,6 +203,23 @@ export function ResumeSection({ enabled }: Readonly<{ enabled: boolean }>) {
               <p className="mt-2 text-sm text-danger" role="alert">
                 {jobFailureMessage(job)}
               </p>
+            ) : null}
+            {canRetry ? (
+              <div className="mt-4">
+                <button
+                  type="button"
+                  onClick={onRetry}
+                  disabled={retryMutation.isPending}
+                  className="min-h-control rounded-button bg-primary px-4 text-sm font-medium text-white disabled:opacity-60"
+                >
+                  {retryMutation.isPending ? "Retrying…" : "Retry processing"}
+                </button>
+                {retryMutation.isError ? (
+                  <p className="mt-2 text-sm text-danger" role="alert">
+                    {errorMessage(retryMutation.error)}
+                  </p>
+                ) : null}
+              </div>
             ) : null}
           </div>
         ) : null}
