@@ -9,6 +9,7 @@ import {
   uploadResume
 } from "@/lib/api/resume";
 import { candidateDashboardQueryKey } from "@/lib/dashboard/hooks";
+import { evidenceHubQueryKeyRoot } from "@/lib/evidence/hooks";
 import { jobQueryKey, useJobQuery } from "@/lib/jobs/hooks";
 import { roadmapQueryKey } from "@/lib/roadmap/hooks";
 import { skillPassportQueryKey } from "@/lib/skill-passport/hooks";
@@ -52,6 +53,7 @@ export function useResumeJobQuery(jobId: string | null) {
       void queryClient.invalidateQueries({ queryKey: skillPassportQueryKey });
       void queryClient.invalidateQueries({ queryKey: roadmapQueryKey });
       void queryClient.invalidateQueries({ queryKey: candidateDashboardQueryKey });
+      void queryClient.invalidateQueries({ queryKey: evidenceHubQueryKeyRoot });
     }
   }, [query.data?.status, queryClient]);
 

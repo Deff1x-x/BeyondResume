@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { CandidateDashboardSection } from "@/features/candidate-dashboard-section";
 import { CandidateProfileSection } from "@/features/candidate-profile-section";
 import { EmployerSection } from "@/features/employer-section";
+import { EvidenceHubSection } from "@/features/evidence-hub/evidence-hub-section";
 import { GitHubSection } from "@/features/github-section";
 import { ResumeSection } from "@/features/resume-section";
 import { RoadmapSection } from "@/features/roadmap-section";
@@ -98,6 +99,7 @@ export default function HomePage() {
           <>
             <CandidateDashboardSection enabled={user.role === "candidate"} />
             <CandidateProfileSection enabled={user.role === "candidate"} />
+            <EvidenceHubSection enabled={user.role === "candidate"} />
             <ResumeSection enabled={user.role === "candidate"} />
             <GitHubSection enabled={user.role === "candidate"} />
             <SkillPassportSection enabled={user.role === "candidate"} />

@@ -62,7 +62,7 @@ function dashboardCards(data: CandidateDashboardResponse): DashboardCardProps[] 
         data.evidence.count === 1
           ? "1 evidence item collected from your sources."
           : `${data.evidence.count} evidence items collected from your sources.`,
-      href: "#github-section-title",
+      href: "#evidence-hub-section-title",
       actionLabel: "View evidence"
     },
     {
