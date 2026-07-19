@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { CandidateProfileSection } from "@/features/candidate-profile-section";
+import { ResumeSection } from "@/features/resume-section";
 import { useCurrentUser, useLogout } from "@/lib/auth/hooks";
 
 export default function HomePage() {
@@ -85,19 +86,7 @@ export default function HomePage() {
 
       <div className="mt-8 grid gap-6 lg:grid-cols-2">
         <CandidateProfileSection enabled={user.role === "candidate"} />
-
-        <section
-          className="rounded-card border border-border bg-surface p-6"
-          aria-labelledby="resume-section-title"
-        >
-          <h2 id="resume-section-title" className="text-xl font-semibold text-ink">
-            Resume
-          </h2>
-          <p className="mt-3 text-sm leading-6 text-secondary">
-            Resume upload and processing status will appear here when resume management is
-            available.
-          </p>
-        </section>
+        <ResumeSection enabled={user.role === "candidate"} />
       </div>
     </main>
   );
