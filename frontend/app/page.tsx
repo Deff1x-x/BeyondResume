@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
+import { CandidateProfileSection } from "@/features/candidate-profile-section";
 import { useCurrentUser, useLogout } from "@/lib/auth/hooks";
 
 export default function HomePage() {
@@ -83,17 +84,7 @@ export default function HomePage() {
       </header>
 
       <div className="mt-8 grid gap-6 lg:grid-cols-2">
-        <section
-          className="rounded-card border border-border bg-surface p-6"
-          aria-labelledby="profile-section-title"
-        >
-          <h2 id="profile-section-title" className="text-xl font-semibold text-ink">
-            Candidate Profile
-          </h2>
-          <p className="mt-3 text-sm leading-6 text-secondary">
-            Your candidate profile will appear here when profile management is available.
-          </p>
-        </section>
+        <CandidateProfileSection enabled={user.role === "candidate"} />
 
         <section
           className="rounded-card border border-border bg-surface p-6"
