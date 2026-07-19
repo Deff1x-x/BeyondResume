@@ -20,6 +20,7 @@ from app.utils.github_manifests import (
     GitHubManifestWarning,
     GitHubNormalizedDependency,
     GitHubNormalizedManifest,
+    MAX_DISCOVERED_MANIFESTS,
     WARNING_CODES,
     manifest_type,
     normalize_manifest_path,
@@ -327,7 +328,7 @@ def _validate_bounds(snapshot: GitHubRepositorySnapshot) -> None:
     if (
         len(snapshot.languages) > MAX_LANGUAGES
         or len(snapshot.file_tree) > MAX_FILE_TREE_PATHS
-        or len(snapshot.manifest_paths) > MAX_FILE_TREE_PATHS
+        or len(snapshot.manifest_paths) > MAX_DISCOVERED_MANIFESTS
         or (snapshot.readme_text is not None and len(snapshot.readme_text) > MAX_README_CHARS)
     ):
         raise GitHubSnapshotValidationError("GitHub repository snapshot exceeds persistence bounds")

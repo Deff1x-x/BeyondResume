@@ -118,8 +118,32 @@ def manifest_type(path: str) -> tuple[str, str] | None:
     return None
 
 
+def limit_discovered_manifest_paths(
+    manifest_paths: tuple[str, ...],
+) -> tuple[tuple[str, ...], tuple[GitHubManifestWarning, ...]]:
+    """Return the canonical bounded manifest paths and their limit warning."""
+    normalized = tuple(sorted({normalize_manifest_path(path) for path in manifest_paths}))
+    if len(normalized) <= MAX_DISCOVERED_MANIFESTS:
+        return normalized, ()
+    first_overflow_path = normalized[MAX_DISCOVERED_MANIFESTS]
+    kind_info = manifest_type(first_overflow_path)
+    return (
+        normalized[:MAX_DISCOVERED_MANIFESTS],
+        (
+            _warning(
+                first_overflow_path,
+                kind_info[0] if kind_info is not None else None,
+                "manifest_limit_exceeded",
+            ),
+        ),
+    )
+
+
 def normalize_fixture_manifests(
-    manifest_paths: tuple[str, ...], contents: Mapping[str, object]
+    manifest_paths: tuple[str, ...],
+    contents: Mapping[str, object],
+    *,
+    initial_warnings: tuple[GitHubManifestWarning, ...] = (),
 ) -> tuple[tuple[GitHubNormalizedManifest, ...], tuple[GitHubManifestWarning, ...]]:
     """Normalize fixture-only raw contents without exposing them in the DTO."""
     normalized = sorted({normalize_manifest_path(path) for path in manifest_paths})
@@ -130,14 +154,7 @@ def normalize_fixture_manifests(
     for path, kind in discovered:
         if kind is not None:
             known_manifests.append((path, kind))
-    warnings: list[GitHubManifestWarning] = []
-    if len(known_manifests) > MAX_DISCOVERED_MANIFESTS:
-        overflow = known_manifests[MAX_DISCOVERED_MANIFESTS:]
-        first_overflow_path, first_overflow_kind = overflow[0]
-        warnings.append(
-            _warning(first_overflow_path, first_overflow_kind[0], "manifest_limit_exceeded")
-        )
-        known_manifests = known_manifests[:MAX_DISCOVERED_MANIFESTS]
+    warnings: list[GitHubManifestWarning] = list(initial_warnings)
 
     manifests: list[GitHubNormalizedManifest] = []
     total_dependencies = 0

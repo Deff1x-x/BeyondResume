@@ -8,6 +8,7 @@ from app.utils.github_manifests import (
     GitHubManifestWarning,
     GitHubNormalizedManifest,
     InvalidNormalizedDependencyError,
+    limit_discovered_manifest_paths,
     normalize_fixture_manifests,
 )
 
@@ -16,7 +17,6 @@ from app.utils.github_url import GitHubRepositoryURL, is_valid_github_repository
 
 MAX_LANGUAGES: Final = 20
 MAX_FILE_TREE_PATHS: Final = 500
-MAX_MANIFEST_PATHS: Final = 50
 MAX_README_CHARS: Final = 10_000
 GITHUB_SNAPSHOT_SCHEMA_VERSION: Final = 2
 
@@ -161,12 +161,13 @@ def _snapshot_from_fixture(
 
     languages = _string_tuple(fixture, "languages", MAX_LANGUAGES)
     file_tree = _path_tuple(fixture, "file_tree", MAX_FILE_TREE_PATHS)
-    # §17.6 limits manifest processing, not the historical discovered-path field.
-    manifest_paths = _path_tuple(fixture, "manifest_paths", MAX_FILE_TREE_PATHS)
-    if not set(manifest_paths).issubset(file_tree):
+    # §17.6 bounds discovered manifest paths before persistence.
+    discovered_manifest_paths = _path_tuple(fixture, "manifest_paths", MAX_FILE_TREE_PATHS)
+    if not set(discovered_manifest_paths).issubset(file_tree):
         raise GitHubFixtureError("GitHub repository fixture manifest paths must exist in file tree")
+    manifest_paths, limit_warnings = limit_discovered_manifest_paths(discovered_manifest_paths)
 
-    manifests, warnings = _normalized_manifests(fixture, manifest_paths)
+    manifests, warnings = _normalized_manifests(fixture, manifest_paths, limit_warnings)
     return GitHubRepositorySnapshot(
         canonical_url=canonical_url,
         repository_name=repository_name,
@@ -187,13 +188,17 @@ def _snapshot_from_fixture(
 
 
 def _normalized_manifests(
-    fixture: dict[str, object], manifest_paths: tuple[str, ...]
+    fixture: dict[str, object],
+    manifest_paths: tuple[str, ...],
+    limit_warnings: tuple[GitHubManifestWarning, ...],
 ) -> tuple[tuple[GitHubNormalizedManifest, ...], tuple[GitHubManifestWarning, ...]]:
     contents = fixture.get("manifest_contents", {})
     if not isinstance(contents, dict) or not all(isinstance(path, str) for path in contents):
         raise GitHubFixtureError("GitHub repository fixture manifest contents are invalid")
     try:
-        return normalize_fixture_manifests(manifest_paths, contents)
+        return normalize_fixture_manifests(
+            manifest_paths, contents, initial_warnings=limit_warnings
+        )
     except InvalidNormalizedDependencyError:
         raise
     except GitHubManifestValidationError as error:

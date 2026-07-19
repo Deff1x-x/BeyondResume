@@ -4,9 +4,9 @@ from typing import Any, Mapping
 from app.integrations.github import (
     MAX_FILE_TREE_PATHS,
     MAX_LANGUAGES,
-    MAX_MANIFEST_PATHS,
     MAX_README_CHARS,
 )
+from app.utils.github_manifests import MAX_DISCOVERED_MANIFESTS
 from app.utils.github_url import GitHubRepositoryUrlError, parse_github_repository_url
 from app.utils.github_snapshot import (
     GitHubSnapshotValidationError,
@@ -87,7 +87,7 @@ def validate_persisted_github_repository_payload(
     _boolean(payload, "is_demo")
     languages = _string_collection(payload, "languages", MAX_LANGUAGES)
     tree_paths = _string_collection(payload, "tree_paths", MAX_FILE_TREE_PATHS)
-    manifest_paths = _string_collection(payload, "manifest_paths", MAX_MANIFEST_PATHS)
+    manifest_paths = _string_collection(payload, "manifest_paths", MAX_DISCOVERED_MANIFESTS)
     if readme_text is not None and len(readme_text) > MAX_README_CHARS:
         raise GitHubPersistedSnapshotValidationError("GitHub snapshot README is too large")
 

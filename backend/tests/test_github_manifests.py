@@ -12,6 +12,7 @@ from app.utils.github_manifests import (
     normalize_manifest_path,
     parse_manifest,
 )
+from app.utils.github_evidence import validate_persisted_github_repository_payload
 from app.utils.github_snapshot import (
     GitHubSnapshotValidationError,
     UnsupportedGitHubSnapshotSchemaError,
@@ -180,10 +181,8 @@ def test_reader_rejects_extra_nested_fields_and_non_json_metadata() -> None:
         read_github_repository_snapshot_payload(payload)
 
 
-@pytest.mark.parametrize("count", [50, 51])
-def test_demo_provider_applies_manifest_processing_limit_without_rejecting_snapshot(
-    tmp_path, count: int
-) -> None:
+def test_demo_provider_truncates_manifest_paths_once_before_persistence(tmp_path) -> None:
+    count = 51
     paths = [f"manifests/{index:03d}/package.json" for index in range(count)]
     fixture = {
         "canonical_url": "https://github.com/demo-user/demo-api",
@@ -201,15 +200,42 @@ def test_demo_provider_applies_manifest_processing_limit_without_rejecting_snaps
         parse_github_repository_url("https://github.com/demo-user/demo-api")
     )
 
-    assert len(snapshot.manifest_paths) == count
-    assert len(snapshot.normalized_manifests) == min(count, 50)
+    expected_paths = tuple(paths[:50])
+    assert snapshot.manifest_paths == expected_paths
+    assert len(snapshot.normalized_manifests) == 50
     warnings = [
         warning
         for warning in snapshot.manifest_warnings
         if warning.code == "manifest_limit_exceeded"
     ]
-    assert len(warnings) == (1 if count == 51 else 0)
-    assert canonicalize_github_repository_snapshot(snapshot).payload["manifest_paths"]
+    assert len(warnings) == 1
+    assert warnings[0].path == paths[50]
+    canonical = canonicalize_github_repository_snapshot(snapshot)
+    assert canonical.payload["manifest_paths"] == list(expected_paths)
+    assert "manifest_contents" not in canonical.canonical_json
+    assert '{"dependencies":{}}' not in canonical.canonical_json
+    assert (
+        validate_persisted_github_repository_payload(canonical.payload).manifest_paths
+        == expected_paths
+    )
+
+    shuffled_directory = tmp_path / "shuffled"
+    shuffled_directory.mkdir()
+    shuffled_fixture = {
+        **fixture,
+        "file_tree": list(reversed(paths)),
+        "manifest_paths": list(reversed(paths)),
+        "manifest_contents": {path: '{"dependencies":{}}' for path in reversed(paths)},
+    }
+    (shuffled_directory / "demo-user--demo-api.json").write_text(
+        json.dumps(shuffled_fixture), encoding="utf-8"
+    )
+    shuffled_snapshot = DemoGitHubProvider(shuffled_directory).get_repository_snapshot(
+        parse_github_repository_url("https://github.com/demo-user/demo-api")
+    )
+
+    assert shuffled_snapshot.manifest_paths == expected_paths
+    assert canonicalize_github_repository_snapshot(shuffled_snapshot).checksum == canonical.checksum
 
 
 @pytest.mark.parametrize(
