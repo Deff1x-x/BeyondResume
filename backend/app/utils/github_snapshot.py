@@ -134,10 +134,10 @@ def _v2_payload(snapshot: GitHubRepositorySnapshot) -> dict[str, object]:
         "is_public": snapshot.is_public,
         "is_archived": snapshot.is_archived,
         "is_demo": snapshot.is_demo,
-        "languages": list(snapshot.languages),
-        "tree_paths": list(snapshot.file_tree),
+        "languages": sorted(snapshot.languages),
+        "tree_paths": sorted(snapshot.file_tree),
         "readme_text": snapshot.readme_text,
-        "manifest_paths": list(snapshot.manifest_paths),
+        "manifest_paths": sorted(snapshot.manifest_paths),
         "normalized_manifests": [_manifest_payload(value) for value in manifests],
         "manifest_warnings": [_warning_payload(value) for value in warnings],
     }

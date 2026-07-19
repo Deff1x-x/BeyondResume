@@ -7,6 +7,7 @@ from app.utils.github_manifests import (
     GitHubManifestValidationError,
     GitHubManifestWarning,
     GitHubNormalizedManifest,
+    InvalidNormalizedDependencyError,
     normalize_fixture_manifests,
 )
 
@@ -193,6 +194,8 @@ def _normalized_manifests(
         raise GitHubFixtureError("GitHub repository fixture manifest contents are invalid")
     try:
         return normalize_fixture_manifests(manifest_paths, contents)
+    except InvalidNormalizedDependencyError:
+        raise
     except GitHubManifestValidationError as error:
         raise GitHubFixtureError("GitHub repository fixture manifests are invalid") from error
 

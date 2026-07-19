@@ -1,4 +1,4 @@
-from dataclasses import FrozenInstanceError
+from dataclasses import FrozenInstanceError, replace
 import json
 
 import pytest
@@ -65,6 +65,25 @@ def test_oversized_dependency_name_is_fatal() -> None:
         parse_manifest("package.json", json.dumps({"dependencies": {"x" * 256: "1"}}))
 
 
+def test_demo_provider_propagates_fatal_invalid_normalized_dependency(tmp_path) -> None:
+    fixture = {
+        "canonical_url": "https://github.com/demo-user/demo-api",
+        "repository_name": "demo-api",
+        "owner": "demo-user",
+        "is_public": True,
+        "languages": [],
+        "file_tree": ["package.json"],
+        "manifest_paths": ["package.json"],
+        "manifest_contents": {"package.json": json.dumps({"dependencies": {"x" * 256: "1"}})},
+    }
+    (tmp_path / "demo-user--demo-api.json").write_text(json.dumps(fixture), encoding="utf-8")
+
+    with pytest.raises(InvalidNormalizedDependencyError):
+        DemoGitHubProvider(tmp_path).get_repository_snapshot(
+            parse_github_repository_url("https://github.com/demo-user/demo-api")
+        )
+
+
 def test_demo_provider_returns_immutable_v2_snapshot_without_raw_contents() -> None:
     snapshot = DemoGitHubProvider().get_repository_snapshot(
         parse_github_repository_url("https://github.com/demo-user/demo-api")
@@ -108,6 +127,24 @@ def test_normalization_deduplicates_dependencies_in_deterministic_order() -> Non
         ("a", "devDependencies"),
         ("z", "dependencies"),
     ]
+
+
+def test_canonical_v2_serialization_sorts_checksum_relevant_collections() -> None:
+    first = DemoGitHubProvider().get_repository_snapshot(
+        parse_github_repository_url("https://github.com/demo-user/demo-api")
+    )
+    shuffled = replace(
+        first,
+        languages=tuple(reversed(first.languages)),
+        file_tree=tuple(reversed(first.file_tree)),
+        manifest_paths=tuple(reversed(first.manifest_paths)),
+        normalized_manifests=tuple(reversed(first.normalized_manifests)),
+        manifest_warnings=tuple(reversed(first.manifest_warnings)),
+    )
+
+    assert canonicalize_github_repository_snapshot(
+        first
+    ) == canonicalize_github_repository_snapshot(shuffled)
 
 
 def test_dependency_metadata_is_deep_detached_from_caller_data() -> None:
