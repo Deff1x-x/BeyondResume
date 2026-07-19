@@ -18,6 +18,7 @@ from app.services.resume_jobs import (
     complete_job,
     fail_job,
 )
+from app.services.skill_extraction import extract_and_link_evidence_skills
 from app.utils.resume_parse import (
     EmptyExtractedResumeTextError,
     ResumeDocumentParseError,
@@ -139,8 +140,8 @@ async def run_resume_parse_job(session: Session, job_id: UUID) -> Job:
 
     resume.extracted_text = text
     try:
-        # Attach the parsed resume to the shared Evidence pipeline (no AI / skills yet).
-        generate_resume_evidence(session, resume)
+        evidence_result = generate_resume_evidence(session, resume)
+        extract_and_link_evidence_skills(session, evidence_result.evidence_unit)
     except (ValueError, SQLAlchemyError):
         resume.extracted_text = None
         return fail_job(session, job, "INTERNAL_ERROR", "Resume processing failed")

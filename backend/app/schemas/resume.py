@@ -12,6 +12,13 @@ class ResumeUploadAcceptedResponse(BaseModel):
     job_id: UUID
 
 
+class ResumeEvidenceSkillResponse(BaseModel):
+    name: str
+    category: str
+    extraction_method: str
+    evidence_confidence: float
+
+
 class ResumeResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -24,6 +31,7 @@ class ResumeResponse(BaseModel):
     parsed_at: datetime | None = None
     extracted_text_length: int | None = None
     evidence_id: UUID | None = None
+    skills: list[ResumeEvidenceSkillResponse] = []
 
 
 class JobPollingResponse(BaseModel):

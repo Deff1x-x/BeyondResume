@@ -88,6 +88,21 @@ function CurrentResume({ resume }: Readonly<{ resume: ResumeResponse }>) {
           {resume.status}
         </span>
       </div>
+      {resume.skills.length > 0 ? (
+        <div className="mt-4 border-t border-border pt-4">
+          <p className="text-sm font-medium text-ink">Skills</p>
+          <ul className="mt-2 space-y-1">
+            {resume.skills.map((skill) => (
+              <li key={`${skill.name}-${skill.extraction_method}`} className="text-sm text-ink">
+                <span aria-hidden="true" className="mr-2 text-success">
+                  ✓
+                </span>
+                {skill.name}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
     </div>
   );
 }

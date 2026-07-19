@@ -92,18 +92,21 @@ function EvidenceCard({ evidence }: Readonly<{ evidence: EvidenceResponse }>) {
       ) : null}
 
       <div className="mt-3">
-        <p className="text-sm font-medium text-ink">Related skills</p>
+        <p className="text-sm font-medium text-ink">Skills</p>
         {evidence.skills.length === 0 ? (
           <p className="mt-1 text-sm text-secondary">
             No skills are linked to this evidence yet.
           </p>
         ) : (
-          <ul className="mt-2 flex flex-wrap gap-2">
+          <ul className="mt-2 space-y-1">
             {evidence.skills.map((skill) => (
               <li
                 key={`${skill.name}-${skill.extraction_method}`}
-                className="rounded-button border border-border bg-background px-3 py-1 text-sm text-ink"
+                className="text-sm text-ink"
               >
+                <span aria-hidden="true" className="mr-2 text-success">
+                  ✓
+                </span>
                 {skill.name}
                 <span className="ml-2 text-secondary">
                   {evidenceConfidencePercent(skill.evidence_confidence)}

@@ -14,9 +14,11 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.models.candidate_profile import CandidateProfile
+from app.models.evidence_skill_link import EvidenceSkillLink
 from app.models.job import Job, JobStatus, JobType
 from app.models.resume import Resume
-from app.schemas.resume import ResumeResponse
+from app.models.skill import Skill
+from app.schemas.resume import ResumeEvidenceSkillResponse, ResumeResponse
 from app.services.resume_evidence import get_resume_evidence
 
 MAX_RESUME_BYTES = 8 * 1024 * 1024
@@ -203,6 +205,28 @@ def get_download_path(resume: Resume) -> Path:
 def build_resume_response(session: Session, resume: Resume) -> ResumeResponse:
     evidence = get_resume_evidence(session, resume.id)
     text = resume.extracted_text
+    skills: list[ResumeEvidenceSkillResponse] = []
+    if evidence is not None:
+        rows = session.execute(
+            select(
+                Skill.canonical_name,
+                Skill.category,
+                EvidenceSkillLink.extraction_method,
+                EvidenceSkillLink.extraction_confidence,
+            )
+            .join(Skill, Skill.id == EvidenceSkillLink.skill_id)
+            .where(EvidenceSkillLink.evidence_unit_id == evidence.id)
+            .order_by(Skill.canonical_name)
+        ).all()
+        skills = [
+            ResumeEvidenceSkillResponse(
+                name=name,
+                category=category,
+                extraction_method=method,
+                evidence_confidence=float(confidence),
+            )
+            for name, category, method, confidence in rows
+        ]
     return ResumeResponse(
         id=resume.id,
         original_filename=resume.original_filename,
@@ -213,4 +237,5 @@ def build_resume_response(session: Session, resume: Resume) -> ResumeResponse:
         parsed_at=resume.parsed_at,
         extracted_text_length=len(text) if text is not None else None,
         evidence_id=evidence.id if evidence is not None else None,
+        skills=skills,
     )

@@ -19,8 +19,6 @@ from app.services.github_scan import (
     GitHubRepositorySourceNotFoundError,
     GitHubSnapshotIdentityMismatchError,
 )
-from app.services.github_skill_reextraction import reextract_github_evidence_skills
-from app.services.github_skill_reextraction_errors import GitHubEvidenceSourceConsistencyError
 from app.services.jobs import (
     JobTransitionError,
     claim_job,
@@ -29,6 +27,7 @@ from app.services.jobs import (
     get_or_create_active_subject_job,
     SubjectJobRequestResult,
 )
+from app.services.skill_extraction import extract_and_link_evidence_skills
 from app.utils.github_evidence import GitHubPersistedSnapshotValidationError
 from app.utils.github_snapshot import GitHubSnapshotValidationError
 
@@ -70,19 +69,13 @@ def run_github_scan_job(session: Session, job_id: UUID) -> Job:
 
     try:
         scan_result = run_github_repository_scan(session, job.candidate_id, get_github_provider())
-        reextract_github_evidence_skills(
-            session,
-            candidate_id=job.candidate_id,
-            github_repository_id=job.subject_id,
-            evidence_unit_id=scan_result.evidence_unit.id,
-        )
+        extract_and_link_evidence_skills(session, scan_result.evidence_unit)
     except (
         GitHubProviderError,
         CandidateProfileNotFoundError,
         GitHubRepositorySourceNotFoundError,
         GitHubRepositorySnapshotNotFoundError,
         GitHubSnapshotIdentityMismatchError,
-        GitHubEvidenceSourceConsistencyError,
         GitHubPersistedSnapshotValidationError,
         GitHubSnapshotValidationError,
         SQLAlchemyError,

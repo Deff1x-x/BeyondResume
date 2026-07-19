@@ -247,6 +247,7 @@ def test_resume_member_read_uses_plural_path(
             file_size=value.file_size,
             status=value.parse_status,  # type: ignore[arg-type]
             uploaded_at=value.created_at,
+            skills=[],
         ),
     )
 
@@ -255,6 +256,7 @@ def test_resume_member_read_uses_plural_path(
     assert response.status_code == 200
     assert response.json()["id"] == str(resume.id)
     assert response.json()["evidence_id"] is None
+    assert response.json()["skills"] == []
 
 
 def test_resume_upload_requires_bearer_token(client: TestClient) -> None:

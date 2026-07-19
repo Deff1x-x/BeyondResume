@@ -1,8 +1,7 @@
 """Create EvidenceUnit rows from a successfully parsed Resume.
 
-Skill extraction is intentionally out of scope for Resume Import v1 — this
-only attaches the resume to the shared Evidence pipeline so Passport / Roadmap /
-Matching can consume it later via EvidenceSkillLink.
+Skill linking is performed by the shared SkillExtractionService after this
+upsert returns, not inside this module.
 """
 
 from dataclasses import dataclass

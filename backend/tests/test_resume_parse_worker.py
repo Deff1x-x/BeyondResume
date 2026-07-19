@@ -55,14 +55,23 @@ def test_worker_saves_plain_text_and_completes_job(monkeypatch: pytest.MonkeyPat
         job.status = JobStatus.COMPLETED
         return job
 
+    from types import SimpleNamespace
+
+    evidence_unit = SimpleNamespace(id=uuid4())
     evidence_calls: list[Resume] = []
+    extraction_calls: list[object] = []
 
     def generate_evidence(_: Mock, received: Resume) -> object:
         evidence_calls.append(received)
+        return SimpleNamespace(evidence_unit=evidence_unit)
+
+    def extract_skills(_: Mock, unit: object) -> object:
+        extraction_calls.append(unit)
         return object()
 
     monkeypatch.setattr(resume_parsing, "extract_plain_text", extract)
     monkeypatch.setattr(resume_parsing, "generate_resume_evidence", generate_evidence)
+    monkeypatch.setattr(resume_parsing, "extract_and_link_evidence_skills", extract_skills)
     monkeypatch.setattr(resume_parsing, "complete_job", complete)
 
     result = asyncio.run(run_resume_parse_job(session, job.id))
@@ -71,6 +80,7 @@ def test_worker_saves_plain_text_and_completes_job(monkeypatch: pytest.MonkeyPat
     assert resume.parse_status == "parsed"
     assert resume.extracted_text == "Python\nFastAPI"
     assert evidence_calls == [resume]
+    assert extraction_calls == [evidence_unit]
 
 
 def test_worker_marks_failed_when_evidence_generation_errors(
