@@ -316,6 +316,7 @@ export function GitHubSection({ enabled }: Readonly<{ enabled: boolean }>) {
         <CardContent className="p-6">
           <SectionHeader
             title="GitHub"
+            icon="github"
             titleId="github-section-title"
             description="GitHub integration is available only to candidate accounts."
           />
@@ -332,6 +333,7 @@ export function GitHubSection({ enabled }: Readonly<{ enabled: boolean }>) {
       <CardContent className="space-y-6 p-6">
         <SectionHeader
           title="GitHub"
+          icon="github"
           titleId="github-section-title"
           description="Connect a public GitHub repository to analyze it and add detected skills to your profile."
         />

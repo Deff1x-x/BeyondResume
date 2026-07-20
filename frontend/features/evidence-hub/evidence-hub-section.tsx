@@ -65,6 +65,7 @@ export function EvidenceHubSection({ enabled }: Readonly<{ enabled: boolean }>) 
       <CardContent className="space-y-6 p-6">
         <SectionHeader
           title="Evidence"
+          icon="evidence"
           titleId="evidence-hub-section-title"
           description="All confirmations of experience and skills from connected sources."
           action={

@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 
 import { cn } from "@/lib/cn";
+import { Icon, type IconName } from "@/components/ui/icon";
 
 export type SectionHeaderProps = {
   title: string;
@@ -11,6 +12,7 @@ export type SectionHeaderProps = {
   className?: string;
   titleAs?: "h2" | "h3";
   size?: "md" | "lg";
+  icon?: IconName;
 };
 
 export function SectionHeader({
@@ -21,7 +23,8 @@ export function SectionHeader({
   titleId,
   className,
   titleAs = "h2",
-  size = "lg"
+  size = "lg",
+  icon
 }: SectionHeaderProps) {
   const TitleTag = titleAs;
 
@@ -32,7 +35,9 @@ export function SectionHeader({
         className
       )}
     >
-      <div className="min-w-0">
+      <div className="flex min-w-0 gap-3">
+        {icon ? <span className="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/10"><Icon name={icon} className="h-[18px] w-[18px]" /></span> : null}
+        <div className="min-w-0">
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
           <TitleTag
             id={titleId}
@@ -50,6 +55,7 @@ export function SectionHeader({
         {description ? (
           <p className="mt-2 text-sm leading-6 text-secondary">{description}</p>
         ) : null}
+        </div>
       </div>
       {action ? <div className="shrink-0">{action}</div> : null}
     </div>

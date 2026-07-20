@@ -3,6 +3,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 
 import { ApiClientError } from "@/lib/api/error";
+import { Icon } from "@/components/ui/icon";
 import type {
   CandidateProfilePatchRequest,
   CandidateProfileResponse
@@ -58,7 +59,7 @@ const textFields: ReadonlyArray<{
 ];
 
 const inputClassName =
-  "min-h-control w-full rounded-input border border-border bg-surface px-3 text-ink outline-none focus:border-primary focus:ring-2 focus:ring-primary disabled:bg-background";
+  "min-h-control w-full rounded-input border border-border bg-surface/90 px-3 text-ink shadow-sm outline-none transition-all duration-200 hover:border-border-strong focus:border-primary focus:ring-4 focus:ring-primary/15 disabled:bg-background";
 
 function toBooleanInput(value: boolean | null): NullableBooleanInput {
   if (value === null) {
@@ -166,12 +167,10 @@ export function CandidateProfileSection({ enabled }: Readonly<{ enabled: boolean
   if (!enabled) {
     return (
       <section
-        className="rounded-card border border-border bg-surface p-6"
+        className="section-panel"
         aria-labelledby="profile-section-title"
       >
-        <h2 id="profile-section-title" className="text-xl font-semibold text-ink">
-          Candidate Profile
-        </h2>
+        <h2 id="profile-section-title" className="flex items-center gap-3 text-xl font-semibold tracking-tight text-ink"><span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><Icon name="profile" className="h-[18px] w-[18px]" /></span>Candidate Profile</h2>
         <p className="mt-3 text-sm leading-6 text-secondary">
           Candidate profile management is available only to candidate accounts.
         </p>
@@ -182,12 +181,10 @@ export function CandidateProfileSection({ enabled }: Readonly<{ enabled: boolean
   if (profileQuery.isLoading || (profileQuery.data && formValues === null)) {
     return (
       <section
-        className="rounded-card border border-border bg-surface p-6"
+        className="section-panel"
         aria-labelledby="profile-section-title"
       >
-        <h2 id="profile-section-title" className="text-xl font-semibold text-ink">
-          Candidate Profile
-        </h2>
+        <h2 id="profile-section-title" className="flex items-center gap-3 text-xl font-semibold tracking-tight text-ink"><span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><Icon name="profile" className="h-[18px] w-[18px]" /></span>Candidate Profile</h2>
         <p className="mt-4 text-sm text-secondary" role="status">
           Loading profile…
         </p>
@@ -198,12 +195,10 @@ export function CandidateProfileSection({ enabled }: Readonly<{ enabled: boolean
   if (profileQuery.isError || !profileQuery.data || !formValues) {
     return (
       <section
-        className="rounded-card border border-border bg-surface p-6"
+        className="section-panel"
         aria-labelledby="profile-section-title"
       >
-        <h2 id="profile-section-title" className="text-xl font-semibold text-ink">
-          Candidate Profile
-        </h2>
+        <h2 id="profile-section-title" className="flex items-center gap-3 text-xl font-semibold tracking-tight text-ink"><span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><Icon name="profile" className="h-[18px] w-[18px]" /></span>Candidate Profile</h2>
         <p className="mt-4 text-sm text-danger" role="alert">
           {errorMessage(profileQuery.error)}
         </p>
@@ -244,13 +239,11 @@ export function CandidateProfileSection({ enabled }: Readonly<{ enabled: boolean
 
   return (
     <section
-      className="rounded-card border border-border bg-surface p-6"
+      className="section-panel"
       aria-labelledby="profile-section-title"
     >
       <div>
-        <h2 id="profile-section-title" className="text-xl font-semibold text-ink">
-          Candidate Profile
-        </h2>
+        <h2 id="profile-section-title" className="flex items-center gap-3 text-xl font-semibold tracking-tight text-ink"><span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><Icon name="profile" className="h-[18px] w-[18px]" /></span>Candidate Profile</h2>
         <p className="mt-2 text-sm text-secondary">
           Onboarding status:{" "}
           <span className="capitalize">

@@ -6,6 +6,7 @@ import { useState, type FormEvent } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { BrandMark } from "@/components/ui/icon";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { PageContainer } from "@/components/ui/page-container";
@@ -65,6 +66,7 @@ export default function RegisterPage() {
 
   return (
     <PageContainer narrow centered>
+      <div className="mb-8 flex items-center gap-3"><BrandMark /><span className="text-sm font-semibold tracking-wide text-primary">BeyondResume</span></div>
       <PageHeader
         title="Create account"
         description="Register as a candidate or employer to continue."

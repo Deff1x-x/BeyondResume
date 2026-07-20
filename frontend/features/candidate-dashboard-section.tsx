@@ -113,6 +113,7 @@ export function CandidateDashboardSection({ enabled }: Readonly<{ enabled: boole
         <CardContent className="p-6">
           <SectionHeader
             title="Dashboard"
+            icon="dashboard"
             titleId="dashboard-section-title"
             description="The candidate dashboard is available only to candidate accounts."
           />
@@ -126,6 +127,7 @@ export function CandidateDashboardSection({ enabled }: Readonly<{ enabled: boole
       <CardContent className="space-y-6 p-6">
         <SectionHeader
           title="Dashboard"
+          icon="dashboard"
           titleId="dashboard-section-title"
           description="A summary of your GitHub, evidence, skill passport, and roadmap."
         />

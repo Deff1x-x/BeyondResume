@@ -22,13 +22,13 @@ export function PageHeader({
   return (
     <header
       className={cn(
-        "flex flex-col gap-4 border-b border-border pb-6 sm:flex-row sm:items-start sm:justify-between",
+        "flex flex-col gap-4 border-b border-border/80 pb-7 sm:flex-row sm:items-start sm:justify-between",
         className
       )}
     >
       <div className="min-w-0 space-y-2">
         {breadcrumb ? <div className="text-sm text-secondary">{breadcrumb}</div> : null}
-        <h1 id={titleId} className="text-2xl font-semibold tracking-tight text-ink sm:text-3xl">
+        <h1 id={titleId} className="text-3xl font-semibold tracking-[-0.035em] text-ink sm:text-4xl">
           {title}
         </h1>
         {description ? (

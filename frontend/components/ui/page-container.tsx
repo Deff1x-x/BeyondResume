@@ -22,7 +22,7 @@ export function PageContainer({
   return (
     <Tag
       className={cn(
-        narrow ? "mx-auto max-w-md px-6 py-16" : "mx-auto max-w-6xl px-6 py-16 lg:px-8",
+        narrow ? "mx-auto w-full max-w-md px-6 py-12 sm:py-16" : "mx-auto w-full max-w-7xl px-5 py-10 sm:px-6 lg:px-8 lg:py-14",
         centered && "flex min-h-screen flex-col justify-center",
         className
       )}

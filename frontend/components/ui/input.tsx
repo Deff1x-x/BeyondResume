@@ -4,9 +4,9 @@ import { cn } from "@/lib/cn";
 
 /** Shared surface for text inputs, selects, and textareas. */
 export const controlClassName = cn(
-  "w-full rounded-input border border-border bg-surface text-sm text-ink outline-none transition-colors",
+  "w-full rounded-input border border-border bg-surface/90 text-sm text-ink shadow-sm outline-none transition-all duration-200",
   "placeholder:text-muted",
-  "focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2",
+  "hover:border-border-strong focus-visible:border-primary focus-visible:ring-4 focus-visible:ring-focus-ring/15 focus-visible:ring-offset-2",
   "disabled:cursor-not-allowed disabled:bg-background disabled:text-muted"
 );
 

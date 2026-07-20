@@ -684,6 +684,7 @@ export function EmployerSection({ enabled }: Readonly<{ enabled: boolean }>) {
         <CardContent className="p-6">
           <SectionHeader
             title="Employer"
+            icon="employer"
             titleId="employer-section-title"
             description="The employer workspace is available only to employer accounts."
           />
@@ -697,6 +698,7 @@ export function EmployerSection({ enabled }: Readonly<{ enabled: boolean }>) {
       <CardContent className="space-y-8 p-6">
         <SectionHeader
           title="Employer"
+          icon="employer"
           titleId="employer-section-title"
           description="Manage your company profile and job openings."
         />

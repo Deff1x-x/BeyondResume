@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import { Icon } from "@/components/ui/icon";
 import { ApiClientError } from "@/lib/api/error";
 import type { SkillPassportSkill } from "@/lib/api/types/skill-passport";
 import { useSkillPassportQuery } from "@/lib/skill-passport/hooks";
@@ -108,12 +109,10 @@ export function SkillPassportSection({ enabled }: Readonly<{ enabled: boolean }>
   if (!enabled) {
     return (
       <section
-        className="rounded-card border border-border bg-surface p-6 lg:col-span-2"
+        className="section-panel lg:col-span-2"
         aria-labelledby="skill-passport-section-title"
       >
-        <h2 id="skill-passport-section-title" className="text-xl font-semibold text-ink">
-          Skill Passport
-        </h2>
+        <h2 id="skill-passport-section-title" className="flex items-center gap-3 text-xl font-semibold tracking-tight text-ink"><span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><Icon name="passport" className="h-[18px] w-[18px]" /></span>Skill Passport</h2>
         <p className="mt-3 text-sm leading-6 text-secondary">
           The skill passport is available only to candidate accounts.
         </p>
@@ -125,12 +124,10 @@ export function SkillPassportSection({ enabled }: Readonly<{ enabled: boolean }>
 
   return (
     <section
-      className="rounded-card border border-border bg-surface p-6 lg:col-span-2"
+      className="section-panel lg:col-span-2"
       aria-labelledby="skill-passport-section-title"
     >
-      <h2 id="skill-passport-section-title" className="text-xl font-semibold text-ink">
-        Skill Passport
-      </h2>
+      <h2 id="skill-passport-section-title" className="flex items-center gap-3 text-xl font-semibold tracking-tight text-ink"><span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><Icon name="passport" className="h-[18px] w-[18px]" /></span>Skill Passport</h2>
       <p className="mt-2 text-sm text-secondary">
         An aggregated view of your skills based on collected evidence.
       </p>

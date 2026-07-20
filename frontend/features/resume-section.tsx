@@ -175,6 +175,7 @@ export function ResumeSection({ enabled }: Readonly<{ enabled: boolean }>) {
         <CardContent className="p-6">
           <SectionHeader
             title="Resume"
+            icon="resume"
             titleId="resume-section-title"
             description="Resume management is available only to candidate accounts."
           />
@@ -188,6 +189,7 @@ export function ResumeSection({ enabled }: Readonly<{ enabled: boolean }>) {
       <CardContent className="space-y-6 p-6">
         <SectionHeader
           title="Resume"
+          icon="resume"
           titleId="resume-section-title"
           description="Upload a PDF resume to extract text and attach it to your Evidence pipeline. The maximum file size is 8 MiB."
         />
