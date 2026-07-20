@@ -1,4 +1,4 @@
-"""Canonical v2 GitHub snapshot serialization and persisted-payload reading."""
+"""Canonical GitHub snapshot serialization and persisted-payload reading."""
 
 from __future__ import annotations
 
@@ -13,6 +13,8 @@ from app.integrations.github import (
     MAX_FILE_TREE_PATHS,
     MAX_LANGUAGES,
     MAX_README_CHARS,
+    MAX_SOURCE_FILES,
+    MAX_SOURCE_FILE_BYTES,
     GitHubRepositorySnapshot,
 )
 from app.utils.github_manifests import (
@@ -60,6 +62,7 @@ _V1_FIELDS = frozenset(
     }
 )
 _V2_FIELDS = _V1_FIELDS | {"schema_version", "normalized_manifests", "manifest_warnings"}
+_V3_FIELDS = _V2_FIELDS | {"source_files"}
 
 
 def canonicalize_github_repository_snapshot(
@@ -68,7 +71,7 @@ def canonicalize_github_repository_snapshot(
     if snapshot.schema_version != GITHUB_SNAPSHOT_SCHEMA_VERSION:
         raise UnsupportedGitHubSnapshotSchemaError("provider snapshot schema is unsupported")
     _validate_bounds(snapshot)
-    payload = _v2_payload(snapshot)
+    payload = _v3_payload(snapshot)
     canonical_json = json.dumps(
         payload, sort_keys=True, ensure_ascii=False, separators=(",", ":"), allow_nan=False
     )
@@ -82,21 +85,21 @@ def canonicalize_github_repository_snapshot(
 def read_github_repository_snapshot_payload(
     payload: Mapping[str, object],
 ) -> GitHubRepositorySnapshot:
-    """Read a historical v1 or current v2 JSON payload without mutating persistence."""
+    """Read historical snapshot payloads without mutating persistence."""
     if not isinstance(payload, Mapping):
         raise GitHubSnapshotValidationError("persisted snapshot payload must be an object")
     version = payload.get("schema_version", 1)
-    if not isinstance(version, int) or isinstance(version, bool) or version not in {1, 2}:
+    if not isinstance(version, int) or isinstance(version, bool) or version not in {1, 2, 3}:
         raise UnsupportedGitHubSnapshotSchemaError("persisted snapshot schema is unsupported")
-    required_fields = _V2_FIELDS if version == 2 else _V1_FIELDS
+    required_fields = _V3_FIELDS if version == 3 else _V2_FIELDS if version == 2 else _V1_FIELDS
     if set(payload) != required_fields:
         raise GitHubSnapshotValidationError("persisted snapshot fields are invalid")
     try:
         manifest_paths = _string_array(payload, "manifest_paths")
         manifests = (
-            _read_manifests(payload["normalized_manifests"], manifest_paths) if version == 2 else ()
+            _read_manifests(payload["normalized_manifests"], manifest_paths) if version >= 2 else ()
         )
-        warnings = _read_warnings(payload["manifest_warnings"]) if version == 2 else ()
+        warnings = _read_warnings(payload["manifest_warnings"]) if version >= 2 else ()
         result = GitHubRepositorySnapshot(
             canonical_url=_string(payload, "canonical_url"),
             repository_name=_string(payload, "repository_name"),
@@ -113,6 +116,7 @@ def read_github_repository_snapshot_payload(
             schema_version=version,
             normalized_manifests=manifests,
             manifest_warnings=warnings,
+            source_files=_read_source_files(payload["source_files"]) if version == 3 else (),
         )
         _validate_bounds(result)
         return result
@@ -120,7 +124,7 @@ def read_github_repository_snapshot_payload(
         raise GitHubSnapshotValidationError("persisted snapshot payload is invalid") from error
 
 
-def _v2_payload(snapshot: GitHubRepositorySnapshot) -> dict[str, object]:
+def _v3_payload(snapshot: GitHubRepositorySnapshot) -> dict[str, object]:
     manifests = sorted(snapshot.normalized_manifests, key=lambda value: (value.path, value.kind))
     warnings = sorted(
         snapshot.manifest_warnings, key=lambda value: (value.path, value.code, value.detail or "")
@@ -141,6 +145,10 @@ def _v2_payload(snapshot: GitHubRepositorySnapshot) -> dict[str, object]:
         "manifest_paths": sorted(snapshot.manifest_paths),
         "normalized_manifests": [_manifest_payload(value) for value in manifests],
         "manifest_warnings": [_warning_payload(value) for value in warnings],
+        "source_files": [
+            {"path": path, "content": content}
+            for path, content in sorted(snapshot.source_files)
+        ],
     }
 
 
@@ -237,6 +245,23 @@ def _read_warnings(value: object) -> tuple[GitHubManifestWarning, ...]:
     return tuple(result)
 
 
+def _read_source_files(value: object) -> tuple[tuple[str, str], ...]:
+    if not isinstance(value, list) or len(value) > MAX_SOURCE_FILES:
+        raise TypeError
+    files: list[tuple[str, str]] = []
+    for item in value:
+        if not isinstance(item, dict) or set(item) != {"path", "content"}:
+            raise TypeError
+        path = _string(item, "path")
+        content = _string(item, "content")
+        if len(content.encode("utf-8")) > MAX_SOURCE_FILE_BYTES:
+            raise TypeError
+        files.append((path, content))
+    if len({path for path, _ in files}) != len(files):
+        raise TypeError
+    return tuple(files)
+
+
 def _string(payload: Mapping[str, object], key: str) -> str:
     value = payload[key]
     if not isinstance(value, str):
@@ -330,5 +355,7 @@ def _validate_bounds(snapshot: GitHubRepositorySnapshot) -> None:
         or len(snapshot.file_tree) > MAX_FILE_TREE_PATHS
         or len(snapshot.manifest_paths) > MAX_DISCOVERED_MANIFESTS
         or (snapshot.readme_text is not None and len(snapshot.readme_text) > MAX_README_CHARS)
+        or len(snapshot.source_files) > MAX_SOURCE_FILES
+        or any(len(content.encode("utf-8")) > MAX_SOURCE_FILE_BYTES for _, content in snapshot.source_files)
     ):
         raise GitHubSnapshotValidationError("GitHub repository snapshot exceeds persistence bounds")

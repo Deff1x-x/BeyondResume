@@ -124,8 +124,9 @@ def test_canonicalization_is_stable_and_uses_utf8_json() -> None:
         "schema_version",
         "tree_paths",
         "normalized_manifests",
-        "manifest_warnings",
-    }
+            "manifest_warnings",
+            "source_files",
+        }
     with pytest.raises(TypeError):
         first.payload["owner"] = "other-owner"  # type: ignore[index]
 

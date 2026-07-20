@@ -85,35 +85,35 @@ def test_demo_provider_propagates_fatal_invalid_normalized_dependency(tmp_path) 
         )
 
 
-def test_demo_provider_returns_immutable_v2_snapshot_without_raw_contents() -> None:
+def test_demo_provider_returns_immutable_v3_snapshot_without_raw_contents() -> None:
     snapshot = DemoGitHubProvider().get_repository_snapshot(
         parse_github_repository_url("https://github.com/demo-user/demo-api")
     )
 
-    assert snapshot.schema_version == 2
+    assert snapshot.schema_version == 3
     assert snapshot.normalized_manifests[0].path == "pyproject.toml"
     with pytest.raises(FrozenInstanceError):
         snapshot.schema_version = 1  # type: ignore[misc]
     assert "dependencies =" not in canonicalize_github_repository_snapshot(snapshot).canonical_json
 
 
-def test_v1_reader_is_compatible_and_v2_reader_rejects_future_schema() -> None:
+def test_v1_reader_is_compatible_and_v3_reader_rejects_future_schema() -> None:
     snapshot = DemoGitHubProvider().get_repository_snapshot(
         parse_github_repository_url("https://github.com/demo-user/demo-api")
     )
-    v2_payload = json.loads(canonicalize_github_repository_snapshot(snapshot).canonical_json)
+    v3_payload = json.loads(canonicalize_github_repository_snapshot(snapshot).canonical_json)
     v1_payload = {
         key: value
-        for key, value in v2_payload.items()
-        if key not in {"schema_version", "normalized_manifests", "manifest_warnings"}
+        for key, value in v3_payload.items()
+        if key not in {"schema_version", "normalized_manifests", "manifest_warnings", "source_files"}
     }
 
     historical = read_github_repository_snapshot_payload(v1_payload)
     assert historical.schema_version == 1
     assert historical.normalized_manifests == ()
-    v2_payload["schema_version"] = 3
+    v3_payload["schema_version"] = 4
     with pytest.raises(UnsupportedGitHubSnapshotSchemaError):
-        read_github_repository_snapshot_payload(v2_payload)
+        read_github_repository_snapshot_payload(v3_payload)
 
 
 def test_normalization_deduplicates_dependencies_in_deterministic_order() -> None:
@@ -130,7 +130,7 @@ def test_normalization_deduplicates_dependencies_in_deterministic_order() -> Non
     ]
 
 
-def test_canonical_v2_serialization_sorts_checksum_relevant_collections() -> None:
+def test_canonical_v3_serialization_sorts_checksum_relevant_collections() -> None:
     first = DemoGitHubProvider().get_repository_snapshot(
         parse_github_repository_url("https://github.com/demo-user/demo-api")
     )

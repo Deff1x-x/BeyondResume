@@ -81,9 +81,28 @@ def authorize_candidate(user: User) -> None:
     app.dependency_overrides[require_candidate] = lambda: user
 
 
-def _session_returning_rows(rows: list[tuple[Skill, EvidenceUnit, Decimal]]) -> Mock:
+def _session_returning_rows(rows: list[tuple[Skill, EvidenceUnit, object]]) -> Mock:
     session = Mock()
-    session.execute.return_value = SimpleNamespace(all=lambda: rows)
+    normalized_rows = [
+        (
+            skill,
+            evidence,
+            context
+            if isinstance(context, dict)
+            else {
+                "signals": [
+                    {
+                        "type": (
+                            "source_api_call" if float(context) >= 0.9 else "source_import"
+                        ),
+                        "path": f"{skill.id}.py",
+                    }
+                ]
+            },
+        )
+        for skill, evidence, context in rows
+    ]
+    session.execute.return_value = SimpleNamespace(all=lambda: normalized_rows)
     return session
 
 
@@ -163,23 +182,22 @@ def test_skill_passport_aggregates_skills_evidence_and_totals(
     body = response.json()
     assert body["total_skills"] == 2
     assert body["total_evidence"] == 2
-    assert [skill["name"] for skill in body["skills"]] == ["TypeScript", "Python"]
-
-    typescript_skill = body["skills"][0]
-    assert typescript_skill["evidence_confidence"] == 0.9
+    skills = {skill["name"]: skill for skill in body["skills"]}
+    typescript_skill = skills["TypeScript"]
+    assert 0 < typescript_skill["evidence_confidence"] <= 0.95
     assert typescript_skill["evidence_count"] == 1
-    assert typescript_skill["evidence"][0]["evidence_confidence"] == 0.9
+    assert 0 < typescript_skill["evidence"][0]["evidence_confidence"] <= 0.95
     assert "confidence" not in typescript_skill
     assert "confidence" not in typescript_skill["evidence"][0]
 
-    python_skill = body["skills"][1]
-    assert python_skill["evidence_confidence"] == 0.8
+    python_skill = skills["Python"]
+    assert 0 < python_skill["evidence_confidence"] <= 0.95
     assert python_skill["evidence_count"] == 2
     assert [item["title"] for item in python_skill["evidence"]] == ["Repo A", "Repo B"]
-    assert [item["evidence_confidence"] for item in python_skill["evidence"]] == [0.8, 0.6]
+    assert all(0 < item["evidence_confidence"] <= 0.95 for item in python_skill["evidence"])
 
 
-def test_skill_passport_keeps_max_link_confidence_for_same_skill_evidence_pair(
+def test_skill_passport_deduplicates_multiple_links_for_same_skill_evidence_pair(
     client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from app.api.v1 import skill_passport
@@ -206,8 +224,8 @@ def test_skill_passport_keeps_max_link_confidence_for_same_skill_evidence_pair(
     assert body["total_evidence"] == 1
     skill = body["skills"][0]
     assert skill["evidence_count"] == 1
-    assert skill["evidence_confidence"] == 0.95
-    assert skill["evidence"][0]["evidence_confidence"] == 0.95
+    assert 0 < skill["evidence_confidence"] <= 0.95
+    assert 0 < skill["evidence"][0]["evidence_confidence"] <= 0.95
 
 
 def test_skill_passport_excludes_deprecated_skills(

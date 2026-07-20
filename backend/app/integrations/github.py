@@ -18,12 +18,15 @@ from app.utils.github_manifests import (
 )
 
 from app.utils.github_url import GitHubRepositoryURL, is_valid_github_repository_identity
+from app.utils.github_code_usage_rules import is_analyzable_source_path
 
 
 MAX_LANGUAGES: Final = 20
 MAX_FILE_TREE_PATHS: Final = 500
 MAX_README_CHARS: Final = 10_000
-GITHUB_SNAPSHOT_SCHEMA_VERSION: Final = 2
+MAX_SOURCE_FILES: Final = 60
+MAX_SOURCE_FILE_BYTES: Final = 64 * 1024
+GITHUB_SNAPSHOT_SCHEMA_VERSION: Final = 3
 
 
 class GitHubProviderError(Exception):
@@ -67,6 +70,7 @@ class GitHubRepositorySnapshot:
     schema_version: int = GITHUB_SNAPSHOT_SCHEMA_VERSION
     normalized_manifests: tuple[GitHubNormalizedManifest, ...] = ()
     manifest_warnings: tuple[GitHubManifestWarning, ...] = ()
+    source_files: tuple[tuple[str, str], ...] = ()
 
 
 class GitHubProvider(Protocol):
@@ -123,6 +127,15 @@ class LiveGitHubProvider:
         manifests, manifest_warnings = _normalized_manifests(
             {"manifest_contents": contents}, manifest_paths, warnings
         )
+        source_files = tuple(
+            (path, content)
+            for path in sorted(path for path in file_tree if is_analyzable_source_path(path))[
+                :MAX_SOURCE_FILES
+            ]
+            if (content := self._optional_contents(f"{prefix}/contents/{path}?ref={commit_sha}"))
+            is not None
+            and len(content.encode("utf-8")) <= MAX_SOURCE_FILE_BYTES
+        )
         languages = self._object(self._get_json(f"{prefix}/languages"), "languages")
         return GitHubRepositorySnapshot(
             canonical_url=repository.canonical_url,
@@ -138,6 +151,7 @@ class LiveGitHubProvider:
             manifest_paths=manifest_paths,
             normalized_manifests=manifests,
             manifest_warnings=manifest_warnings,
+            source_files=source_files,
             is_demo=False,
             schema_version=GITHUB_SNAPSHOT_SCHEMA_VERSION,
         )
@@ -278,6 +292,7 @@ def _snapshot_from_fixture(
         "readme_text",
         "manifest_paths",
         "manifest_contents",
+        "source_files",
     }
     required_fields = {
         "canonical_url",
@@ -324,6 +339,7 @@ def _snapshot_from_fixture(
     manifest_paths, limit_warnings = limit_discovered_manifest_paths(discovered_manifest_paths)
 
     manifests, warnings = _normalized_manifests(fixture, manifest_paths, limit_warnings)
+    source_files = _source_files(fixture, file_tree)
     return GitHubRepositorySnapshot(
         canonical_url=canonical_url,
         repository_name=repository_name,
@@ -338,6 +354,7 @@ def _snapshot_from_fixture(
         manifest_paths=manifest_paths,
         normalized_manifests=manifests,
         manifest_warnings=warnings,
+        source_files=source_files,
         is_demo=True,
         schema_version=GITHUB_SNAPSHOT_SCHEMA_VERSION,
     )
@@ -389,6 +406,17 @@ def _path_tuple(fixture: dict[str, object], field: str, maximum_size: int) -> tu
     if any(not _is_safe_repository_path(path) for path in paths):
         raise GitHubFixtureError(f"GitHub repository fixture field {field} contains unsafe path")
     return paths
+
+
+def _source_files(fixture: dict[str, object], file_tree: tuple[str, ...]) -> tuple[tuple[str, str], ...]:
+    value = fixture.get("source_files", {})
+    if not isinstance(value, dict) or not all(isinstance(path, str) and isinstance(content, str) for path, content in value.items()):
+        raise GitHubFixtureError("GitHub repository fixture source files are invalid")
+    if len(value) > MAX_SOURCE_FILES or any(path not in file_tree or len(content.encode("utf-8")) > MAX_SOURCE_FILE_BYTES for path, content in value.items()):
+        raise GitHubFixtureError("GitHub repository fixture source files exceed bounds")
+    if any(not is_analyzable_source_path(path) for path in value):
+        raise GitHubFixtureError("GitHub repository fixture source file path is invalid")
+    return tuple(sorted(value.items()))
 
 
 def _is_safe_repository_path(path: str) -> bool:

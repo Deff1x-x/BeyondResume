@@ -1,5 +1,6 @@
 """Skill Passport aggregation over EvidenceSkillLink data."""
 
+from collections.abc import Mapping
 from uuid import UUID
 
 from sqlalchemy import select
@@ -13,6 +14,10 @@ from app.schemas.skill_passport import (
     SkillPassportResponse,
     SkillPassportSkillResponse,
 )
+from app.services.skill_confidence import (
+    SkillEvidenceObservation,
+    calculate_skill_confidence,
+)
 
 
 def empty_passport() -> SkillPassportResponse:
@@ -21,7 +26,7 @@ def empty_passport() -> SkillPassportResponse:
 
 def build_passport(session: Session, candidate_id: UUID) -> SkillPassportResponse:
     rows = session.execute(
-        select(Skill, EvidenceUnit, EvidenceSkillLink.extraction_confidence)
+        select(Skill, EvidenceUnit, EvidenceSkillLink.context)
         .join(EvidenceSkillLink, EvidenceSkillLink.skill_id == Skill.id)
         .join(EvidenceUnit, EvidenceUnit.id == EvidenceSkillLink.evidence_unit_id)
         .where(
@@ -30,26 +35,31 @@ def build_passport(session: Session, candidate_id: UUID) -> SkillPassportRespons
         )
     ).all()
 
-    # Multiple links may connect the same (skill, evidence) pair through
-    # different extraction methods or versions; keep the strongest one.
-    # evidence_confidence is the strength of the Evidence↔Skill link, not
-    # a proficiency / skill-level score.
-    link_confidence: dict[UUID, dict[UUID, float]] = {}
+    observations_by_skill: dict[UUID, dict[UUID, SkillEvidenceObservation]] = {}
     skills_by_id: dict[UUID, Skill] = {}
     evidence_by_id: dict[UUID, EvidenceUnit] = {}
-    for skill, evidence_unit, extraction_confidence in rows:
+    for skill, evidence_unit, context in rows:
         if skill.deprecated:
             continue
         skills_by_id[skill.id] = skill
         evidence_by_id[evidence_unit.id] = evidence_unit
-        per_skill = link_confidence.setdefault(skill.id, {})
-        per_skill[evidence_unit.id] = max(
-            per_skill.get(evidence_unit.id, 0.0), float(extraction_confidence)
+        observations_by_evidence = observations_by_skill.setdefault(skill.id, {})
+        existing_observation = observations_by_evidence.get(evidence_unit.id)
+        observations_by_evidence[evidence_unit.id] = SkillEvidenceObservation(
+            source_type=evidence_unit.source_type,
+            source_reference=evidence_unit.source_reference,
+            quality_flags=evidence_unit.quality_flags,
+            context=_merge_context(
+                existing_observation.context if existing_observation else None,
+                context if isinstance(context, dict) else None,
+            ),
         )
 
     skill_responses: list[SkillPassportSkillResponse] = []
-    for skill_id, per_skill in link_confidence.items():
+    for skill_id, observations_by_evidence in observations_by_skill.items():
         skill = skills_by_id[skill_id]
+        evidence_ids = tuple(observations_by_evidence)
+        confidence = calculate_skill_confidence(tuple(observations_by_evidence.values()))
         evidence_responses = sorted(
             (
                 SkillPassportEvidenceResponse(
@@ -58,9 +68,9 @@ def build_passport(session: Session, candidate_id: UUID) -> SkillPassportRespons
                     description=evidence_by_id[evidence_id].description,
                     source_type=evidence_by_id[evidence_id].source_type,
                     source_reference=evidence_by_id[evidence_id].source_reference,
-                    evidence_confidence=link_score,
+                    evidence_confidence=confidence.evidence_confidences[index],
                 )
-                for evidence_id, link_score in per_skill.items()
+                for index, evidence_id in enumerate(evidence_ids)
             ),
             key=lambda item: (-item.evidence_confidence, item.title or ""),
         )
@@ -69,8 +79,8 @@ def build_passport(session: Session, candidate_id: UUID) -> SkillPassportRespons
                 id=skill.id,
                 name=skill.canonical_name,
                 category=skill.category,
-                evidence_confidence=max(per_skill.values()),
-                evidence_count=len(per_skill),
+                evidence_confidence=confidence.confidence,
+                evidence_count=len(observations_by_evidence),
                 evidence=evidence_responses,
             )
         )
@@ -81,3 +91,21 @@ def build_passport(session: Session, candidate_id: UUID) -> SkillPassportRespons
         total_skills=len(skill_responses),
         total_evidence=len(evidence_by_id),
     )
+
+
+def _merge_context(
+    existing: Mapping[str, object] | None,
+    incoming: Mapping[str, object] | None,
+) -> dict[str, object] | None:
+    """Merge link signals for one Evidence–Skill pair deterministically."""
+    signals: list[object] = []
+    for context in (existing, incoming):
+        if not context:
+            continue
+        value = context.get("signals")
+        if not isinstance(value, list):
+            continue
+        for signal in value:
+            if signal not in signals:
+                signals.append(signal)
+    return {"signals": signals} if signals else None

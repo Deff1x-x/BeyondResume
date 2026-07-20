@@ -20,6 +20,7 @@ def test_live_provider_builds_pipeline_compatible_snapshot_from_mocked_api() -> 
         f"{prefix}/branches/main": {"commit": {"sha": "abc123"}},
         f"{prefix}/git/trees/abc123?recursive=1": {"tree": [{"path": "README.md", "type": "blob"}, {"path": "pyproject.toml", "type": "blob"}, {"path": "app/main.py", "type": "blob"}]},
         f"{prefix}/contents/pyproject.toml?ref=abc123": _content("[project]\ndependencies = []\n"),
+        f"{prefix}/contents/app/main.py?ref=abc123": _content("from fastapi import FastAPI\napp = FastAPI()\n"),
         f"{prefix}/languages": {"Python": 10, "TypeScript": 5},
         f"{prefix}/readme": _content("# BeyondResume\n"),
     }
@@ -34,6 +35,7 @@ def test_live_provider_builds_pipeline_compatible_snapshot_from_mocked_api() -> 
     assert snapshot.manifest_paths == ("pyproject.toml",)
     assert snapshot.readme_text == "# BeyondResume\n"
     assert snapshot.normalized_manifests[0].path == "pyproject.toml"
+    assert snapshot.source_files == (("app/main.py", "from fastapi import FastAPI\napp = FastAPI()\n"),)
 
 
 def test_provider_selection_uses_config(monkeypatch: pytest.MonkeyPatch) -> None:
