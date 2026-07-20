@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -30,6 +31,9 @@ class Settings(BaseSettings):
     jwt_access_ttl_minutes: int = 15
     upload_dir: str = "/app/data/uploads"
     resume_parse_timeout_seconds: int = 20
+    github_provider: Literal["demo", "live"] = "live"
+    github_token: str = ""
+    github_api_timeout_seconds: int = 20
 
 
 settings = Settings()

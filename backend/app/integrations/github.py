@@ -1,7 +1,12 @@
 from dataclasses import dataclass
+import base64
 import json
 from pathlib import Path
-from typing import Final, Protocol
+from typing import Callable, Final, Protocol
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
+
+from app.core.config import settings
 
 from app.utils.github_manifests import (
     GitHubManifestValidationError,
@@ -26,7 +31,15 @@ class GitHubProviderError(Exception):
 
 
 class GitHubRepositoryNotFoundError(GitHubProviderError):
-    """Raised when a requested repository fixture does not exist."""
+    """Raised when a requested repository cannot be found."""
+
+
+class GitHubRateLimitError(GitHubProviderError):
+    """Raised when GitHub rejects a request because the rate limit is exhausted."""
+
+
+class GitHubAuthenticationError(GitHubProviderError):
+    """Raised when GitHub rejects configured credentials."""
 
 
 class GitHubFixtureError(GitHubProviderError):
@@ -63,12 +76,146 @@ class GitHubProvider(Protocol):
 
 
 def get_github_provider() -> "GitHubProvider":
-    """Return the configured snapshot provider.
+    """Return the snapshot provider configured for this process."""
+    if settings.github_provider == "demo":
+        return DemoGitHubProvider()
+    return LiveGitHubProvider(
+        token=settings.github_token or None,
+        timeout_seconds=settings.github_api_timeout_seconds,
+    )
 
-    The demo provider is currently the only implementation; a live GitHub
-    provider plugs in here without changing workers or the HTTP API.
-    """
-    return DemoGitHubProvider()
+
+class LiveGitHubProvider:
+    """Fetch a bounded, pipeline-compatible snapshot from GitHub's public API."""
+
+    api_base_url: Final = "https://api.github.com"
+
+    def __init__(
+        self,
+        *,
+        token: str | None = None,
+        timeout_seconds: int = 20,
+        request_json: Callable[[str], object] | None = None,
+    ) -> None:
+        self._token = token
+        self._timeout_seconds = timeout_seconds
+        self._request_json_override = request_json
+
+    def get_repository_snapshot(self, repository: GitHubRepositoryURL) -> GitHubRepositorySnapshot:
+        if not is_valid_github_repository_identity(repository.owner, repository.repository):
+            raise GitHubRepositoryIdentityError("GitHub repository identity is not normalized")
+        prefix = f"{self.api_base_url}/repos/{repository.owner}/{repository.repository}"
+        metadata = self._object(self._get_json(prefix), "repository metadata")
+        default_branch = self._string(metadata.get("default_branch"), "default_branch")
+        branch = self._object(self._get_json(f"{prefix}/branches/{default_branch}"), "branch")
+        commit = self._object(branch.get("commit"), "branch commit")
+        commit_sha = self._string(commit.get("sha"), "branch commit sha")
+        tree = self._object(self._get_json(f"{prefix}/git/trees/{commit_sha}?recursive=1"), "git tree")
+        file_tree = self._tree_paths(tree)
+        manifest_paths, warnings = limit_discovered_manifest_paths(
+            tuple(path for path in file_tree if _manifest_path(path))
+        )
+        contents = {
+            path: value
+            for path in manifest_paths
+            if (value := self._optional_contents(f"{prefix}/contents/{path}?ref={commit_sha}")) is not None
+        }
+        manifests, manifest_warnings = _normalized_manifests(
+            {"manifest_contents": contents}, manifest_paths, warnings
+        )
+        languages = self._object(self._get_json(f"{prefix}/languages"), "languages")
+        return GitHubRepositorySnapshot(
+            canonical_url=repository.canonical_url,
+            repository_name=repository.repository,
+            owner=repository.owner,
+            description=self._optional_string(metadata.get("description"), "description"),
+            default_branch=default_branch,
+            is_public=not self._boolean(metadata.get("private"), "private"),
+            is_archived=self._boolean(metadata.get("archived"), "archived"),
+            languages=tuple(sorted(key for key in languages if isinstance(key, str)))[:MAX_LANGUAGES],
+            file_tree=file_tree,
+            readme_text=self._optional_contents(f"{prefix}/readme"),
+            manifest_paths=manifest_paths,
+            normalized_manifests=manifests,
+            manifest_warnings=manifest_warnings,
+            is_demo=False,
+            schema_version=GITHUB_SNAPSHOT_SCHEMA_VERSION,
+        )
+
+    def _get_json(self, url: str) -> object:
+        if self._request_json_override is not None:
+            return self._request_json_override(url)
+        headers = {"Accept": "application/vnd.github+json", "User-Agent": "BeyondResume"}
+        if self._token:
+            headers["Authorization"] = f"Bearer {self._token}"
+        try:
+            with urlopen(Request(url, headers=headers), timeout=self._timeout_seconds) as response:
+                return json.loads(response.read().decode("utf-8"))
+        except HTTPError as error:
+            if error.code == 404:
+                raise GitHubRepositoryNotFoundError("GitHub repository was not found") from error
+            if error.code == 401:
+                raise GitHubAuthenticationError("GitHub authentication failed") from error
+            if error.code == 429 or (error.code == 403 and (error.headers.get("X-RateLimit-Remaining") == "0" or error.headers.get("Retry-After"))):
+                raise GitHubRateLimitError("GitHub rate limit is exhausted") from error
+            raise GitHubProviderError(f"GitHub API returned HTTP {error.code}") from error
+        except (URLError, OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+            raise GitHubProviderError("GitHub API request failed") from error
+
+    def _optional_contents(self, url: str) -> str | None:
+        try:
+            payload = self._object(self._get_json(url), "contents")
+        except GitHubRepositoryNotFoundError:
+            return None
+        content, encoding = payload.get("content"), payload.get("encoding")
+        if not isinstance(content, str) or encoding != "base64":
+            return None
+        try:
+            return base64.b64decode(content, validate=False).decode("utf-8")
+        except (ValueError, UnicodeDecodeError):
+            return None
+
+    @staticmethod
+    def _object(value: object, field: str) -> dict[str, object]:
+        if not isinstance(value, dict):
+            raise GitHubProviderError(f"GitHub API {field} response is invalid")
+        return value
+
+    @staticmethod
+    def _string(value: object, field: str) -> str:
+        if not isinstance(value, str) or not value:
+            raise GitHubProviderError(f"GitHub API {field} response is invalid")
+        return value
+
+    @staticmethod
+    def _optional_string(value: object, field: str) -> str | None:
+        if value is None:
+            return None
+        if not isinstance(value, str):
+            raise GitHubProviderError(f"GitHub API {field} response is invalid")
+        return value
+
+    @staticmethod
+    def _boolean(value: object, field: str) -> bool:
+        if not isinstance(value, bool):
+            raise GitHubProviderError(f"GitHub API {field} response is invalid")
+        return value
+
+    @staticmethod
+    def _tree_paths(tree: dict[str, object]) -> tuple[str, ...]:
+        records = tree.get("tree")
+        if not isinstance(records, list):
+            raise GitHubProviderError("GitHub API git tree response is invalid")
+        paths = [record.get("path") for record in records if isinstance(record, dict) and record.get("type") == "blob"]
+        if any(not isinstance(path, str) or not _is_safe_repository_path(path) for path in paths):
+            raise GitHubProviderError("GitHub API git tree contains an invalid path")
+        return tuple(sorted(paths)[:MAX_FILE_TREE_PATHS])
+
+
+def _manifest_path(path: str) -> bool:
+    return path.rsplit("/", 1)[-1] in {
+        "package.json", "pyproject.toml", "requirements.txt", "pom.xml", "go.mod", "Cargo.toml", "composer.json", "Gemfile"
+    } or path.lower().endswith(".csproj")
 
 
 class DemoGitHubProvider:
