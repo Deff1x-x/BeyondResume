@@ -14,7 +14,7 @@ export type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
 
 const variantClass: Record<ButtonVariant, string> = {
   primary:
-    "border border-primary bg-gradient-to-b from-indigo-500 to-primary text-white shadow-sm shadow-primary/25 hover:-translate-y-px hover:from-indigo-400 hover:to-primary hover:shadow-md hover:shadow-primary/30 disabled:border-primary/50 disabled:bg-primary/50",
+    "border border-primary bg-gradient-to-b from-indigo-500 to-primary text-white shadow-sm shadow-primary/25 hover:-translate-y-px hover:from-indigo-400 hover:to-primary hover:shadow-md hover:shadow-primary/30 disabled:border-border disabled:bg-none disabled:bg-surface-subtle disabled:text-muted disabled:shadow-none disabled:hover:translate-y-0",
   secondary:
     "border border-border bg-surface/90 text-ink shadow-sm hover:-translate-y-px hover:border-border-strong hover:bg-surface hover:shadow-md disabled:text-muted",
   ghost:
