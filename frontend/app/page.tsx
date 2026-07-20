@@ -11,7 +11,6 @@ import { EvidenceHubSection } from "@/features/evidence-hub/evidence-hub-section
 import { GitHubSection } from "@/features/github-section";
 import { ResumeSection } from "@/features/resume-section";
 import { RoadmapSection } from "@/features/roadmap-section";
-import { SkillPassportSection } from "@/features/skill-passport-section";
 import { useCurrentUser } from "@/lib/auth/hooks";
 
 export default function HomePage() {
@@ -33,7 +32,6 @@ export default function HomePage() {
           <EvidenceHubSection enabled />
           <ResumeSection enabled />
           <GitHubSection enabled />
-          <SkillPassportSection enabled />
           <RoadmapSection enabled />
         </>}
       </div>

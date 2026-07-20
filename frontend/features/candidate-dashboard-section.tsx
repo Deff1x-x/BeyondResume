@@ -88,8 +88,8 @@ function dashboardCards(data: CandidateDashboardResponse): DashboardCardProps[] 
         data.passport.top_skills.length > 0
           ? `Top skills: ${data.passport.top_skills.join(", ")}`
           : "No confirmed skills yet.",
-      href: "#skill-passport-section-title",
-      actionLabel: "Open passport"
+      href: "/skill-passport",
+      actionLabel: "Open Skill Passport"
     },
     {
       title: "Roadmap",
