@@ -1,0 +1,58 @@
+{
+  "version": "v1",
+  "skills": [
+    {"canonical_name": "Python", "category": "language", "aliases": []},
+    {"canonical_name": "JavaScript", "category": "language", "aliases": ["js"]},
+    {"canonical_name": "TypeScript", "category": "language", "aliases": ["ts"]},
+    {"canonical_name": "Java", "category": "language", "aliases": []},
+    {"canonical_name": "C#", "category": "language", "aliases": ["csharp", "dotnet c#"]},
+    {"canonical_name": "C++", "category": "language", "aliases": ["cpp"]},
+    {"canonical_name": "Go", "category": "language", "aliases": []},
+    {"canonical_name": "Rust", "category": "language", "aliases": []},
+    {"canonical_name": "PHP", "category": "language", "aliases": []},
+    {"canonical_name": "Ruby", "category": "language", "aliases": []},
+    {"canonical_name": "Kotlin", "category": "language", "aliases": []},
+    {"canonical_name": "Swift", "category": "language", "aliases": []},
+    {"canonical_name": "SQL", "category": "language", "aliases": []},
+    {"canonical_name": "HTML", "category": "language", "aliases": []},
+    {"canonical_name": "CSS", "category": "language", "aliases": []},
+
+    {"canonical_name": "React", "category": "frontend", "aliases": []},
+    {"canonical_name": "Next.js", "category": "frontend", "aliases": ["nextjs"]},
+    {"canonical_name": "Vue.js", "category": "frontend", "aliases": ["vuejs"]},
+    {"canonical_name": "Angular", "category": "frontend", "aliases": []},
+    {"canonical_name": "Tailwind CSS", "category": "frontend", "aliases": ["tailwindcss", "tailwind"]},
+
+    {"canonical_name": "FastAPI", "category": "backend", "aliases": []},
+    {"canonical_name": "Django", "category": "backend", "aliases": []},
+    {"canonical_name": "Flask", "category": "backend", "aliases": []},
+    {"canonical_name": "Node.js", "category": "backend", "aliases": ["nodejs", "node"]},
+    {"canonical_name": "Express", "category": "backend", "aliases": []},
+    {"canonical_name": "Spring Boot", "category": "backend", "aliases": []},
+    {"canonical_name": "ASP.NET Core", "category": "backend", "aliases": ["asp net core"]},
+
+    {"canonical_name": "PostgreSQL", "category": "database", "aliases": ["postgres"]},
+    {"canonical_name": "MySQL", "category": "database", "aliases": []},
+    {"canonical_name": "SQLite", "category": "database", "aliases": []},
+    {"canonical_name": "MongoDB", "category": "database", "aliases": []},
+    {"canonical_name": "Redis", "category": "database", "aliases": []},
+
+    {"canonical_name": "Docker", "category": "infrastructure", "aliases": []},
+    {"canonical_name": "Kubernetes", "category": "infrastructure", "aliases": []},
+    {"canonical_name": "Git", "category": "infrastructure", "aliases": []},
+    {"canonical_name": "GitHub Actions", "category": "infrastructure", "aliases": ["github workflows"]},
+    {"canonical_name": "Linux", "category": "infrastructure", "aliases": []},
+    {"canonical_name": "Nginx", "category": "infrastructure", "aliases": []},
+
+    {"canonical_name": "Pytest", "category": "testing", "aliases": []},
+    {"canonical_name": "Jest", "category": "testing", "aliases": []},
+    {"canonical_name": "Playwright", "category": "testing", "aliases": []},
+    {"canonical_name": "Cypress", "category": "testing", "aliases": []},
+
+    {"canonical_name": "Pandas", "category": "data_ai", "aliases": []},
+    {"canonical_name": "NumPy", "category": "data_ai", "aliases": []},
+    {"canonical_name": "scikit-learn", "category": "data_ai", "aliases": ["sklearn"]},
+    {"canonical_name": "TensorFlow", "category": "data_ai", "aliases": []},
+    {"canonical_name": "PyTorch", "category": "data_ai", "aliases": []}
+  ]
+}
