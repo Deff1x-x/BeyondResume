@@ -80,8 +80,28 @@ class Job(Base):
     )
     subject_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
     subject_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
-    job_type: Mapped[JobType] = mapped_column(SqlEnum(JobType, name="job_type"), nullable=False)
-    status: Mapped[JobStatus] = mapped_column(SqlEnum(JobStatus, name="job_status"), nullable=False)
+    job_type: Mapped[JobType] = mapped_column(
+        SqlEnum(
+            JobType,
+            name="job_type",
+            values_callable=lambda enum_cls: [member.value for member in enum_cls],
+            native_enum=True,
+            create_constraint=False,
+            validate_strings=True,
+        ),
+        nullable=False,
+    )
+    status: Mapped[JobStatus] = mapped_column(
+        SqlEnum(
+            JobStatus,
+            name="job_status",
+            values_callable=lambda enum_cls: [member.value for member in enum_cls],
+            native_enum=True,
+            create_constraint=False,
+            validate_strings=True,
+        ),
+        nullable=False,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
