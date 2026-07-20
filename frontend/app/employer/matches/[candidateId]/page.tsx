@@ -21,13 +21,15 @@ function MatchDetailsContent() {
 
   const candidateId = typeof params.candidateId === "string" ? params.candidateId : "";
   const vacancyId = searchParams.get("vacancy_id");
-  const hasToken = typeof window !== "undefined" && getAccessToken() !== null;
 
   useEffect(() => {
-    if (!isLoading && !user && !hasToken) {
+    if (isLoading) {
+      return;
+    }
+    if (!user && getAccessToken() === null) {
       router.replace("/login");
     }
-  }, [hasToken, isLoading, router, user]);
+  }, [isLoading, router, user]);
 
   function onSignOutClick() {
     logout();
