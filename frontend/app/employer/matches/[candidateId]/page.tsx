@@ -4,6 +4,10 @@ import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect } from "react";
 
+import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
+import { PageContainer } from "@/components/ui/page-container";
+import { SkeletonText } from "@/components/ui/skeleton";
 import { CandidateProfileView } from "@/features/match-details/candidate-profile-view";
 import { useCurrentUser, useLogout } from "@/lib/auth/hooks";
 import { getAccessToken } from "@/lib/auth/token";
@@ -32,101 +36,96 @@ function MatchDetailsContent() {
 
   if (isLoading) {
     return (
-      <p className="text-sm text-secondary" role="status">
-        Loading your account…
-      </p>
+      <div role="status" aria-label="Loading account" className="space-y-3">
+        <SkeletonText className="h-4 w-28" />
+        <SkeletonText className="h-8 w-56" />
+      </div>
     );
   }
 
   if (!user) {
     return (
-      <div>
-        <p className="text-sm text-danger" role="alert">
-          {isError
+      <EmptyState
+        role="alert"
+        title={isError ? "Session unavailable" : "Sign in required"}
+        description={
+          isError
             ? "We could not verify your session. Sign in to continue."
-            : "Sign in to view candidate profiles."}
-        </p>
-        <Link
-          href="/login"
-          className="mt-4 inline-flex min-h-control items-center text-sm font-medium text-primary underline-offset-2 hover:underline"
-        >
-          Go to login
-        </Link>
-      </div>
+            : "Sign in to view candidate profiles."
+        }
+        primaryAction={
+          <Link
+            href="/login"
+            className="inline-flex min-h-control items-center rounded-button border border-primary bg-primary px-4 text-sm font-medium text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2"
+          >
+            Go to login
+          </Link>
+        }
+      />
     );
   }
 
   if (user.role !== "employer") {
     return (
-      <div>
-        <p className="text-sm text-secondary" role="status">
-          Candidate profiles are available only to employer accounts.
-        </p>
-        <Link
-          href="/"
-          className="mt-4 inline-flex min-h-control items-center text-sm font-medium text-primary underline-offset-2 hover:underline"
-        >
-          Back to workspace
-        </Link>
-      </div>
+      <EmptyState
+        title="Employer access required"
+        description="Candidate profiles are available only to employer accounts."
+        primaryAction={
+          <Link
+            href="/"
+            className="inline-flex min-h-control items-center rounded-button border border-border bg-surface px-4 text-sm font-medium text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2"
+          >
+            Back to workspace
+          </Link>
+        }
+      />
     );
   }
 
   if (!candidateId || !vacancyId) {
     return (
-      <div>
-        <p className="text-sm text-danger" role="alert">
-          A candidate and vacancy are required to open this profile.
-        </p>
-        <Link
-          href="/"
-          className="mt-4 inline-flex min-h-control items-center text-sm font-medium text-primary underline-offset-2 hover:underline"
-        >
-          Back to employer workspace
-        </Link>
-      </div>
+      <EmptyState
+        role="alert"
+        title="Missing match context"
+        description="A candidate and vacancy are required to open this profile."
+        primaryAction={
+          <Link
+            href="/"
+            className="inline-flex min-h-control items-center rounded-button border border-border bg-surface px-4 text-sm font-medium text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2"
+          >
+            Back to employer workspace
+          </Link>
+        }
+      />
     );
   }
 
   return (
     <>
-      <header className="flex flex-col gap-6 border-b border-border pb-8 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0">
-          <p className="text-sm font-medium text-primary">BeyondResume</p>
-          <p className="mt-2 text-sm text-secondary">Employer · Candidate profile</p>
-        </div>
-        <button
-          type="button"
-          onClick={onSignOutClick}
-          className="min-h-control shrink-0 rounded-button border border-border bg-surface px-6 text-sm font-medium text-ink"
-        >
+      <div className="mb-6 flex justify-end border-b border-border pb-4">
+        <Button type="button" variant="secondary" onClick={onSignOutClick}>
           Logout
-        </button>
-      </header>
-
-      <div className="mt-8">
-        <CandidateProfileView
-          candidateId={candidateId}
-          vacancyId={vacancyId}
-          enabled
-        />
+        </Button>
       </div>
+
+      <CandidateProfileView candidateId={candidateId} vacancyId={vacancyId} enabled />
     </>
   );
 }
 
 export default function EmployerMatchDetailsPage() {
   return (
-    <main className="mx-auto max-w-6xl px-6 py-16 lg:px-8">
+    <PageContainer>
       <Suspense
         fallback={
-          <p className="text-sm text-secondary" role="status">
-            Loading candidate profile…
-          </p>
+          <div role="status" aria-label="Loading candidate profile" className="space-y-3">
+            <SkeletonText className="h-4 w-40" />
+            <SkeletonText className="h-8 w-64" />
+          </div>
         }
       >
         <MatchDetailsContent />
       </Suspense>
-    </main>
+    </PageContainer>
   );
 }

@@ -46,6 +46,8 @@ function statusVariant(status: string): BadgeVariant {
   const normalized = status.trim().toLowerCase();
   if (
     normalized === "completed" ||
+    normalized === "parsed" ||
+    normalized === "analyzed" ||
     normalized === "ownership_confirmed" ||
     normalized === "issuer_verified" ||
     normalized === "source_reachable"
@@ -62,7 +64,9 @@ function statusVariant(status: string): BadgeVariant {
   if (
     normalized === "processing" ||
     normalized === "running" ||
+    normalized === "pending" ||
     normalized === "queued" ||
+    normalized === "uploaded" ||
     normalized === "platform_assessed"
   ) {
     return "warning";

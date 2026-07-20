@@ -3,6 +3,14 @@
 import Link from "next/link";
 import { useState, type FormEvent } from "react";
 
+import { Badge, StatusBadge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Input, controlClassName } from "@/components/ui/input";
+import { SectionHeader } from "@/components/ui/section-header";
+import { SkeletonCard, SkeletonListRow } from "@/components/ui/skeleton";
+import { cn } from "@/lib/cn";
 import { ApiClientError } from "@/lib/api/error";
 import type {
   MatchSkillGroup,
@@ -48,6 +56,16 @@ function statusLabel(status: Vacancy["status"]): string {
     case "closed":
       return "Closed";
   }
+}
+
+function vacancyStatusTone(status: Vacancy["status"]): string {
+  if (status === "open") {
+    return "completed";
+  }
+  if (status === "closed") {
+    return "failed";
+  }
+  return "pending";
 }
 
 function requirementTypeLabel(value: VacancyRequirementType): string {
@@ -101,9 +119,9 @@ function VacancyRequirements({ vacancyId }: Readonly<{ vacancyId: string }>) {
       <p className="text-sm font-medium text-ink">Requirements</p>
 
       {requirementsQuery.isLoading || skillsQuery.isLoading ? (
-        <p className="text-sm text-secondary" role="status">
-          Loading requirements…
-        </p>
+        <div role="status" aria-label="Loading requirements">
+          <SkeletonListRow />
+        </div>
       ) : null}
 
       {requirementsQuery.isError ? (
@@ -123,21 +141,28 @@ function VacancyRequirements({ vacancyId }: Readonly<{ vacancyId: string }>) {
               key={requirement.id}
               className="flex flex-wrap items-center justify-between gap-2 rounded-button border border-border bg-surface px-3 py-2 text-sm"
             >
-              <span className="text-ink">
+              <span className="min-w-0 break-words text-ink">
                 {requirement.skill_name}
                 <span className="ml-2 text-secondary">
-                  {requirementTypeLabel(requirement.requirement_type)} ·{" "}
-                  {requirement.skill_category}
+                  <Badge
+                    variant={requirement.requirement_type === "required" ? "danger" : "accent"}
+                    className="align-middle"
+                  >
+                    {requirementTypeLabel(requirement.requirement_type)}
+                  </Badge>{" "}
+                  · {requirement.skill_category}
                 </span>
               </span>
-              <button
+              <Button
                 type="button"
+                variant="secondary"
+                size="sm"
                 onClick={() => onDelete(requirement)}
-                disabled={deleteRequirement.isPending}
-                className="min-h-control rounded-button border border-border bg-background px-3 text-sm font-medium text-danger disabled:opacity-60"
+                loading={deleteRequirement.isPending}
+                className="text-danger"
               >
                 Remove
-              </button>
+              </Button>
             </li>
           ))}
         </ul>
@@ -158,7 +183,7 @@ function VacancyRequirements({ vacancyId }: Readonly<{ vacancyId: string }>) {
               onChange={(event) => setSkillId(event.target.value)}
               disabled={addRequirement.isPending || availableSkills.length === 0}
               required
-              className="min-h-control w-full rounded-input border border-border bg-surface px-3 text-sm text-ink outline-none focus:border-primary focus:ring-2 focus:ring-primary disabled:bg-background"
+              className={cn(controlClassName, "min-h-control px-3")}
             >
               <option value="">Select a skill</option>
               {availableSkills.map((skill) => (
@@ -180,7 +205,7 @@ function VacancyRequirements({ vacancyId }: Readonly<{ vacancyId: string }>) {
               value={requirementType}
               onChange={(event) => setRequirementType(parseRequirementType(event.target.value))}
               disabled={addRequirement.isPending}
-              className="min-h-control w-full rounded-input border border-border bg-surface px-3 text-sm text-ink outline-none focus:border-primary focus:ring-2 focus:ring-primary disabled:bg-background"
+              className={cn(controlClassName, "min-h-control px-3")}
             >
               <option value="required">Required</option>
               <option value="preferred">Preferred</option>
@@ -207,13 +232,14 @@ function VacancyRequirements({ vacancyId }: Readonly<{ vacancyId: string }>) {
           </p>
         ) : null}
 
-        <button
+        <Button
           type="submit"
-          disabled={!skillId || addRequirement.isPending || availableSkills.length === 0}
-          className="min-h-control rounded-button bg-primary px-4 text-sm font-medium text-white disabled:opacity-60"
+          variant="primary"
+          disabled={!skillId || availableSkills.length === 0}
+          loading={addRequirement.isPending}
         >
-          {addRequirement.isPending ? "Adding…" : "Add requirement"}
-        </button>
+          Add requirement
+        </Button>
       </form>
     </div>
   );
@@ -224,9 +250,9 @@ function VacancyDetail({ vacancyId }: Readonly<{ vacancyId: string }>) {
 
   if (detailQuery.isLoading) {
     return (
-      <p className="mt-3 text-sm text-secondary" role="status">
-        Loading vacancy…
-      </p>
+      <div className="mt-3" role="status" aria-label="Loading vacancy">
+        <SkeletonListRow />
+      </div>
     );
   }
 
@@ -245,9 +271,10 @@ function VacancyDetail({ vacancyId }: Readonly<{ vacancyId: string }>) {
 
   return (
     <div className="mt-3 space-y-2 border-t border-border pt-3 text-sm text-secondary">
-      <p>
-        Status: <span className="font-medium text-ink">{statusLabel(vacancy.status)}</span>
-      </p>
+      <div className="flex flex-wrap items-center gap-2">
+        <span>Status:</span>
+        <StatusBadge status={vacancyStatusTone(vacancy.status)} label={statusLabel(vacancy.status)} />
+      </div>
       <p>
         Created: <span className="font-medium text-ink">{formatDate(vacancy.created_at)}</span>
       </p>
@@ -278,12 +305,12 @@ function MatchCard({
     <li>
       <Link
         href={href}
-        className="block rounded-card border border-border bg-surface p-3 transition-colors hover:border-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+        className="block rounded-card border border-border bg-surface p-3 transition-colors hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2"
         aria-label={`Open profile for ${match.candidate_name}, match score ${match.score}`}
       >
         <div className="flex flex-wrap items-start justify-between gap-2">
-          <p className="text-sm font-medium text-ink">{match.candidate_name}</p>
-          <p className="text-sm font-medium text-ink">Score {match.score}</p>
+          <p className="min-w-0 break-words text-sm font-medium text-ink">{match.candidate_name}</p>
+          <p className="text-sm font-medium tabular-nums text-ink">Score {match.score}</p>
         </div>
         <p className="mt-2 text-sm text-secondary">
           Required — {skillGroupText(match.required, "Missing: none")}
@@ -306,24 +333,23 @@ function VacancyMatches({ vacancyId }: Readonly<{ vacancyId: string }>) {
       <p className="text-sm font-medium text-ink">Matches</p>
 
       {matchesQuery.isLoading ? (
-        <p className="text-sm text-secondary" role="status">
-          Loading matches…
-        </p>
+        <div role="status" aria-label="Loading matches">
+          <SkeletonListRow />
+        </div>
       ) : null}
 
       {matchesQuery.isError ? (
-        <div>
-          <p className="text-sm text-danger" role="alert">
-            {errorMessage(matchesQuery.error)}
-          </p>
-          <button
-            type="button"
-            onClick={() => void matchesQuery.refetch()}
-            className="mt-2 min-h-control rounded-button border border-border bg-background px-3 text-sm font-medium text-ink"
-          >
-            Try again
-          </button>
-        </div>
+        <EmptyState
+          role="alert"
+          title="Could not load matches"
+          description={errorMessage(matchesQuery.error)}
+          primaryAction={
+            <Button type="button" variant="secondary" onClick={() => void matchesQuery.refetch()}>
+              Try again
+            </Button>
+          }
+          className="py-4"
+        />
       ) : null}
 
       {matchesQuery.isSuccess && matches.length === 0 ? (
@@ -345,27 +371,35 @@ function VacancyCard({ vacancy }: Readonly<{ vacancy: Vacancy }>) {
   const [open, setOpen] = useState(false);
 
   return (
-    <li className="rounded-card border border-border bg-background p-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="break-words text-sm font-medium text-ink">{vacancy.title}</p>
-          <p className="mt-1 text-sm text-secondary">
-            {statusLabel(vacancy.status)} · {formatDate(vacancy.created_at)}
-          </p>
-          {vacancy.description ? (
-            <p className="mt-2 line-clamp-2 text-sm text-secondary">{vacancy.description}</p>
-          ) : null}
-        </div>
-        <button
-          type="button"
-          onClick={() => setOpen((value) => !value)}
-          className="min-h-control rounded-button border border-border bg-surface px-4 text-sm font-medium text-ink"
-          aria-expanded={open}
-        >
-          {open ? "Hide" : "Open"}
-        </button>
-      </div>
-      {open ? <VacancyDetail vacancyId={vacancy.id} /> : null}
+    <li>
+      <Card className="bg-background">
+        <CardContent className="p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0 space-y-2">
+              <p className="break-words text-sm font-medium text-ink">{vacancy.title}</p>
+              <div className="flex flex-wrap items-center gap-2">
+                <StatusBadge
+                  status={vacancyStatusTone(vacancy.status)}
+                  label={statusLabel(vacancy.status)}
+                />
+                <span className="text-sm text-secondary">{formatDate(vacancy.created_at)}</span>
+              </div>
+              {vacancy.description ? (
+                <p className="line-clamp-2 text-sm text-secondary">{vacancy.description}</p>
+              ) : null}
+            </div>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => setOpen((value) => !value)}
+              aria-expanded={open}
+            >
+              {open ? "Hide" : "Open"}
+            </Button>
+          </div>
+          {open ? <VacancyDetail vacancyId={vacancy.id} /> : null}
+        </CardContent>
+      </Card>
     </li>
   );
 }
@@ -397,119 +431,122 @@ function CompanyPanel({ enabled }: Readonly<{ enabled: boolean }>) {
 
   if (companyQuery.isLoading) {
     return (
-      <p className="text-sm text-secondary" role="status">
-        Loading company…
-      </p>
+      <div role="status" aria-label="Loading company">
+        <SkeletonCard />
+      </div>
     );
   }
 
   if (companyQuery.isError && !companyMissing) {
     return (
-      <div>
-        <p className="text-sm text-danger" role="alert">
-          {errorMessage(companyQuery.error)}
-        </p>
-        <button
-          type="button"
-          onClick={() => void companyQuery.refetch()}
-          className="mt-3 min-h-control rounded-button border border-border bg-surface px-4 text-sm font-medium text-ink"
-        >
-          Try again
-        </button>
-      </div>
+      <EmptyState
+        role="alert"
+        title="Could not load company"
+        description={errorMessage(companyQuery.error)}
+        primaryAction={
+          <Button type="button" variant="secondary" onClick={() => void companyQuery.refetch()}>
+            Try again
+          </Button>
+        }
+      />
     );
   }
 
   if (companyQuery.data) {
     const company = companyQuery.data;
     return (
-      <div className="rounded-card border border-border bg-background p-4">
-        <p className="text-sm font-medium text-ink">{company.company_name}</p>
-        {company.website ? (
-          <p className="mt-2 break-all text-sm text-secondary">
-            <a
-              href={company.website}
-              target="_blank"
-              rel="noreferrer"
-              className="font-medium text-primary underline-offset-2 hover:underline"
-            >
-              {company.website}
-            </a>
+      <Card className="bg-background">
+        <CardContent className="space-y-2 p-4">
+          <p className="text-sm font-medium text-ink">{company.company_name}</p>
+          {company.website ? (
+            <p className="break-all text-sm text-secondary">
+              <a
+                href={company.website}
+                target="_blank"
+                rel="noreferrer"
+                className="font-medium text-primary underline-offset-2 hover:underline"
+              >
+                {company.website}
+              </a>
+            </p>
+          ) : null}
+          <p className="text-sm leading-6 text-secondary">
+            {company.description?.trim() ? company.description : "No company description."}
           </p>
-        ) : null}
-        <p className="mt-2 text-sm leading-6 text-secondary">
-          {company.description?.trim() ? company.description : "No company description."}
-        </p>
-      </div>
+        </CardContent>
+      </Card>
     );
   }
 
   return (
-    <div className="rounded-card border border-border bg-background p-4">
-      <p className="text-sm font-medium text-ink">Create your company</p>
-      <p className="mt-2 text-sm text-secondary">
-        Register company details before posting vacancies.
-      </p>
-      <form className="mt-4 space-y-4" onSubmit={onCreateCompany}>
-        <div className="space-y-2">
-          <label htmlFor="employer-company-name" className="block text-sm font-medium text-ink">
-            Company name
-          </label>
-          <input
-            id="employer-company-name"
-            value={companyName}
-            onChange={(event) => setCompanyName(event.target.value)}
-            disabled={createCompany.isPending}
-            maxLength={160}
-            required
-            className="min-h-control w-full rounded-input border border-border bg-surface px-3 text-sm text-ink outline-none focus:border-primary focus:ring-2 focus:ring-primary disabled:bg-background"
-          />
-        </div>
-        <div className="space-y-2">
-          <label htmlFor="employer-company-website" className="block text-sm font-medium text-ink">
-            Website
-          </label>
-          <input
-            id="employer-company-website"
-            type="url"
-            value={website}
-            onChange={(event) => setWebsite(event.target.value)}
-            disabled={createCompany.isPending}
-            placeholder="https://example.com"
-            className="min-h-control w-full rounded-input border border-border bg-surface px-3 text-sm text-ink outline-none focus:border-primary focus:ring-2 focus:ring-primary disabled:bg-background"
-          />
-        </div>
-        <div className="space-y-2">
-          <label
-            htmlFor="employer-company-description"
-            className="block text-sm font-medium text-ink"
-          >
-            Description
-          </label>
-          <textarea
-            id="employer-company-description"
-            value={description}
-            onChange={(event) => setDescription(event.target.value)}
-            disabled={createCompany.isPending}
-            rows={3}
-            maxLength={5000}
-            className="w-full rounded-input border border-border bg-surface px-3 py-2 text-sm text-ink outline-none focus:border-primary focus:ring-2 focus:ring-primary disabled:bg-background"
-          />
-        </div>
-        {createCompany.isError ? (
-          <p className="text-sm text-danger" role="alert">
-            {errorMessage(createCompany.error)}
+    <Card className="bg-background">
+      <CardContent className="space-y-4 p-4">
+        <div>
+          <p className="text-sm font-medium text-ink">Create your company</p>
+          <p className="mt-2 text-sm text-secondary">
+            Register company details before posting vacancies.
           </p>
-        ) : null}
-        <button
-          type="submit"
-          disabled={!companyName.trim() || createCompany.isPending}
-          className="min-h-control rounded-button bg-primary px-6 text-sm font-medium text-white disabled:opacity-60"
-        >
-          {createCompany.isPending ? "Creating…" : "Create company"}
-        </button>
-      </form>
-    </div>
+        </div>
+        <form className="space-y-4" onSubmit={onCreateCompany}>
+          <div className="space-y-2">
+            <label htmlFor="employer-company-name" className="block text-sm font-medium text-ink">
+              Company name
+            </label>
+            <Input
+              id="employer-company-name"
+              value={companyName}
+              onChange={(event) => setCompanyName(event.target.value)}
+              disabled={createCompany.isPending}
+              maxLength={160}
+              required
+            />
+          </div>
+          <div className="space-y-2">
+            <label htmlFor="employer-company-website" className="block text-sm font-medium text-ink">
+              Website
+            </label>
+            <Input
+              id="employer-company-website"
+              type="url"
+              value={website}
+              onChange={(event) => setWebsite(event.target.value)}
+              disabled={createCompany.isPending}
+              placeholder="https://example.com"
+            />
+          </div>
+          <div className="space-y-2">
+            <label
+              htmlFor="employer-company-description"
+              className="block text-sm font-medium text-ink"
+            >
+              Description
+            </label>
+            <textarea
+              id="employer-company-description"
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+              disabled={createCompany.isPending}
+              rows={3}
+              maxLength={5000}
+              className={cn(controlClassName, "px-3 py-2")}
+            />
+          </div>
+          {createCompany.isError ? (
+            <p className="text-sm text-danger" role="alert">
+              {errorMessage(createCompany.error)}
+            </p>
+          ) : null}
+          <Button
+            type="submit"
+            variant="primary"
+            disabled={!companyName.trim()}
+            loading={createCompany.isPending}
+          >
+            Create company
+          </Button>
+        </form>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -542,37 +579,37 @@ function VacanciesPanel({ enabled }: Readonly<{ enabled: boolean }>) {
 
   if (!enabled) {
     return (
-      <p className="text-sm text-secondary">
-        Create a company to start posting vacancies.
-      </p>
+      <p className="text-sm text-secondary">Create a company to start posting vacancies.</p>
     );
   }
 
   return (
     <div className="space-y-4">
       {vacanciesQuery.isLoading ? (
-        <p className="text-sm text-secondary" role="status">
-          Loading vacancies…
-        </p>
-      ) : null}
-
-      {vacanciesQuery.isError ? (
-        <div>
-          <p className="text-sm text-danger" role="alert">
-            {errorMessage(vacanciesQuery.error)}
-          </p>
-          <button
-            type="button"
-            onClick={() => void vacanciesQuery.refetch()}
-            className="mt-3 min-h-control rounded-button border border-border bg-surface px-4 text-sm font-medium text-ink"
-          >
-            Try again
-          </button>
+        <div role="status" aria-label="Loading vacancies" className="space-y-3">
+          <SkeletonCard />
         </div>
       ) : null}
 
+      {vacanciesQuery.isError ? (
+        <EmptyState
+          role="alert"
+          title="Could not load vacancies"
+          description={errorMessage(vacanciesQuery.error)}
+          primaryAction={
+            <Button type="button" variant="secondary" onClick={() => void vacanciesQuery.refetch()}>
+              Try again
+            </Button>
+          }
+        />
+      ) : null}
+
       {vacanciesQuery.isSuccess && vacanciesQuery.data.length === 0 ? (
-        <p className="text-sm text-secondary">No vacancies yet. Create your first opening below.</p>
+        <EmptyState
+          title="No vacancies yet"
+          description="Create your first opening below."
+          className="bg-background py-6"
+        />
       ) : null}
 
       {vacanciesQuery.data && vacanciesQuery.data.length > 0 ? (
@@ -583,54 +620,56 @@ function VacanciesPanel({ enabled }: Readonly<{ enabled: boolean }>) {
         </ul>
       ) : null}
 
-      <div className="rounded-card border border-border bg-background p-4">
-        <p className="text-sm font-medium text-ink">Create vacancy</p>
-        <form className="mt-4 space-y-4" onSubmit={onCreateVacancy}>
-          <div className="space-y-2">
-            <label htmlFor="employer-vacancy-title" className="block text-sm font-medium text-ink">
-              Title
-            </label>
-            <input
-              id="employer-vacancy-title"
-              value={title}
-              onChange={(event) => setTitle(event.target.value)}
-              disabled={createVacancy.isPending}
-              maxLength={200}
-              required
-              className="min-h-control w-full rounded-input border border-border bg-surface px-3 text-sm text-ink outline-none focus:border-primary focus:ring-2 focus:ring-primary disabled:bg-background"
-            />
-          </div>
-          <div className="space-y-2">
-            <label
-              htmlFor="employer-vacancy-description"
-              className="block text-sm font-medium text-ink"
+      <Card className="bg-background">
+        <CardContent className="space-y-4 p-4">
+          <p className="text-sm font-medium text-ink">Create vacancy</p>
+          <form className="space-y-4" onSubmit={onCreateVacancy}>
+            <div className="space-y-2">
+              <label htmlFor="employer-vacancy-title" className="block text-sm font-medium text-ink">
+                Title
+              </label>
+              <Input
+                id="employer-vacancy-title"
+                value={title}
+                onChange={(event) => setTitle(event.target.value)}
+                disabled={createVacancy.isPending}
+                maxLength={200}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <label
+                htmlFor="employer-vacancy-description"
+                className="block text-sm font-medium text-ink"
+              >
+                Short description
+              </label>
+              <textarea
+                id="employer-vacancy-description"
+                value={description}
+                onChange={(event) => setDescription(event.target.value)}
+                disabled={createVacancy.isPending}
+                rows={3}
+                maxLength={5000}
+                className={cn(controlClassName, "px-3 py-2")}
+              />
+            </div>
+            {createVacancy.isError ? (
+              <p className="text-sm text-danger" role="alert">
+                {errorMessage(createVacancy.error)}
+              </p>
+            ) : null}
+            <Button
+              type="submit"
+              variant="primary"
+              disabled={!title.trim()}
+              loading={createVacancy.isPending}
             >
-              Short description
-            </label>
-            <textarea
-              id="employer-vacancy-description"
-              value={description}
-              onChange={(event) => setDescription(event.target.value)}
-              disabled={createVacancy.isPending}
-              rows={3}
-              maxLength={5000}
-              className="w-full rounded-input border border-border bg-surface px-3 py-2 text-sm text-ink outline-none focus:border-primary focus:ring-2 focus:ring-primary disabled:bg-background"
-            />
-          </div>
-          {createVacancy.isError ? (
-            <p className="text-sm text-danger" role="alert">
-              {errorMessage(createVacancy.error)}
-            </p>
-          ) : null}
-          <button
-            type="submit"
-            disabled={!title.trim() || createVacancy.isPending}
-            className="min-h-control rounded-button bg-primary px-6 text-sm font-medium text-white disabled:opacity-60"
-          >
-            {createVacancy.isPending ? "Creating…" : "Create vacancy"}
-          </button>
-        </form>
-      </div>
+              Create vacancy
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -641,33 +680,27 @@ export function EmployerSection({ enabled }: Readonly<{ enabled: boolean }>) {
 
   if (!enabled) {
     return (
-      <section
-        className="rounded-card border border-border bg-surface p-6 lg:col-span-2"
-        aria-labelledby="employer-section-title"
-      >
-        <h2 id="employer-section-title" className="text-xl font-semibold text-ink">
-          Employer
-        </h2>
-        <p className="mt-3 text-sm leading-6 text-secondary">
-          The employer workspace is available only to employer accounts.
-        </p>
-      </section>
+      <Card className="lg:col-span-2" aria-labelledby="employer-section-title">
+        <CardContent className="p-6">
+          <SectionHeader
+            title="Employer"
+            titleId="employer-section-title"
+            description="The employer workspace is available only to employer accounts."
+          />
+        </CardContent>
+      </Card>
     );
   }
 
   return (
-    <section
-      className="rounded-card border border-border bg-surface p-6 lg:col-span-2"
-      aria-labelledby="employer-section-title"
-    >
-      <h2 id="employer-section-title" className="text-xl font-semibold text-ink">
-        Employer
-      </h2>
-      <p className="mt-2 text-sm text-secondary">
-        Manage your company profile and job openings.
-      </p>
+    <Card className="lg:col-span-2" aria-labelledby="employer-section-title">
+      <CardContent className="space-y-8 p-6">
+        <SectionHeader
+          title="Employer"
+          titleId="employer-section-title"
+          description="Manage your company profile and job openings."
+        />
 
-      <div className="mt-6 space-y-8">
         <div>
           <h3 className="text-sm font-semibold uppercase tracking-wide text-secondary">
             Company
@@ -683,7 +716,7 @@ export function EmployerSection({ enabled }: Readonly<{ enabled: boolean }>) {
             <VacanciesPanel enabled={hasCompany} />
           </div>
         </div>
-      </div>
-    </section>
+      </CardContent>
+    </Card>
   );
 }

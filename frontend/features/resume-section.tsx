@@ -2,6 +2,12 @@
 
 import { useState, type ChangeEvent, type FormEvent } from "react";
 
+import { Badge, StatusBadge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
+import { SectionHeader } from "@/components/ui/section-header";
+import { SkeletonCard } from "@/components/ui/skeleton";
 import { ApiClientError } from "@/lib/api/error";
 import type { JobPollingResponse } from "@/lib/api/types/jobs";
 import type { ResumeResponse } from "@/lib/api/types/resume";
@@ -56,54 +62,64 @@ function jobFailureMessage(job: JobPollingResponse): string {
   return "Resume processing failed. Upload another file to continue.";
 }
 
+function resumeStatusLabel(status: ResumeResponse["status"]): string {
+  switch (status) {
+    case "uploaded":
+      return "Uploaded";
+    case "parsed":
+      return "Parsed";
+    case "failed":
+      return "Failed";
+    default:
+      return status;
+  }
+}
+
 function CurrentResume({ resume }: Readonly<{ resume: ResumeResponse }>) {
   return (
-    <div className="rounded-card border border-border bg-background p-4">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="min-w-0">
-          <p className="break-words text-sm font-medium text-ink">{resume.original_filename}</p>
-          <p className="mt-1 text-sm text-secondary">
-            {formatFileSize(resume.file_size)} · {resume.mime_type}
-          </p>
-          <p className="mt-1 text-sm text-secondary">
-            Uploaded {formatUploadedAt(resume.uploaded_at)}
-          </p>
-          {resume.parsed_at ? (
+    <Card className="bg-background">
+      <CardContent className="space-y-4 p-4">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0">
+            <p className="break-words text-sm font-medium text-ink">{resume.original_filename}</p>
             <p className="mt-1 text-sm text-secondary">
-              Parsed {formatUploadedAt(resume.parsed_at)}
+              {formatFileSize(resume.file_size)} · {resume.mime_type}
             </p>
-          ) : null}
-          {resume.extracted_text_length != null ? (
             <p className="mt-1 text-sm text-secondary">
-              Extracted text: {resume.extracted_text_length.toLocaleString("en")} characters
+              Uploaded {formatUploadedAt(resume.uploaded_at)}
             </p>
-          ) : null}
-          {resume.evidence_id ? (
-            <p className="mt-1 text-sm text-secondary">
-              Evidence linked · id {resume.evidence_id}
-            </p>
-          ) : null}
+            {resume.parsed_at ? (
+              <p className="mt-1 text-sm text-secondary">
+                Parsed {formatUploadedAt(resume.parsed_at)}
+              </p>
+            ) : null}
+            {resume.extracted_text_length != null ? (
+              <p className="mt-1 text-sm text-secondary">
+                Extracted text: {resume.extracted_text_length.toLocaleString("en")} characters
+              </p>
+            ) : null}
+            {resume.evidence_id ? (
+              <p className="mt-1 text-sm text-secondary">Evidence linked to this document.</p>
+            ) : null}
+          </div>
+          <StatusBadge status={resume.status} label={resumeStatusLabel(resume.status)} />
         </div>
-        <span className="rounded-button border border-border bg-surface px-3 py-2 text-sm text-ink">
-          {resume.status}
-        </span>
-      </div>
-      {resume.skills.length > 0 ? (
-        <div className="mt-4 border-t border-border pt-4">
-          <p className="text-sm font-medium text-ink">Skills</p>
-          <ul className="mt-2 space-y-1">
-            {resume.skills.map((skill) => (
-              <li key={`${skill.name}-${skill.extraction_method}`} className="text-sm text-ink">
-                <span aria-hidden="true" className="mr-2 text-success">
-                  ✓
-                </span>
-                {skill.name}
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
-    </div>
+        {resume.skills.length > 0 ? (
+          <div className="border-t border-border pt-4">
+            <p className="text-sm font-medium text-ink">Skills</p>
+            <ul className="mt-2 flex flex-wrap gap-2" aria-label="Resume skills">
+              {resume.skills.map((skill) => (
+                <li key={`${skill.name}-${skill.extraction_method}`} className="min-w-0 max-w-full">
+                  <Badge variant="success" title={skill.name}>
+                    {skill.name}
+                  </Badge>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -155,177 +171,171 @@ export function ResumeSection({ enabled }: Readonly<{ enabled: boolean }>) {
 
   if (!enabled) {
     return (
-      <section
-        className="rounded-card border border-border bg-surface p-6"
-        aria-labelledby="resume-section-title"
-      >
-        <h2 id="resume-section-title" className="text-xl font-semibold text-ink">
-          Resume
-        </h2>
-        <p className="mt-3 text-sm leading-6 text-secondary">
-          Resume management is available only to candidate accounts.
-        </p>
-      </section>
+      <Card aria-labelledby="resume-section-title">
+        <CardContent className="p-6">
+          <SectionHeader
+            title="Resume"
+            titleId="resume-section-title"
+            description="Resume management is available only to candidate accounts."
+          />
+        </CardContent>
+      </Card>
     );
   }
 
   return (
-    <section
-      className="rounded-card border border-border bg-surface p-6"
-      aria-labelledby="resume-section-title"
-    >
-      <h2 id="resume-section-title" className="text-xl font-semibold text-ink">
-        Resume
-      </h2>
-      <p className="mt-2 text-sm text-secondary">
-        Upload a PDF resume to extract text and attach it to your Evidence pipeline. The maximum
-        file size is 8 MiB.
-      </p>
+    <Card aria-labelledby="resume-section-title">
+      <CardContent className="space-y-6 p-6">
+        <SectionHeader
+          title="Resume"
+          titleId="resume-section-title"
+          description="Upload a PDF resume to extract text and attach it to your Evidence pipeline. The maximum file size is 8 MiB."
+        />
 
-      <div className="mt-6 space-y-6">
-        {currentResumeQuery.isLoading ? (
-          <p className="text-sm text-secondary" role="status">
-            Loading current resume…
-          </p>
-        ) : null}
-
-        {currentResumeQuery.isError && !resumeMissing ? (
-          <div>
-            <p className="text-sm text-danger" role="alert">
-              {errorMessage(currentResumeQuery.error)}
-            </p>
-            <button
-              type="button"
-              onClick={() => void currentResumeQuery.refetch()}
-              className="mt-4 min-h-control rounded-button border border-border bg-surface px-4 text-sm font-medium text-ink"
-            >
-              Try again
-            </button>
-          </div>
-        ) : null}
-
-        {currentResumeQuery.data ? <CurrentResume resume={currentResumeQuery.data} /> : null}
-
-        {resumeMissing && !isProcessing ? (
-          <div className="rounded-card border border-border bg-background p-4">
-            <p className="text-sm font-medium text-ink">No resume uploaded</p>
-            <p className="mt-2 text-sm text-secondary">
-              Choose a PDF file below to create your current resume.
-            </p>
-          </div>
-        ) : null}
-
-        {job ? (
-          <div className="rounded-card border border-border bg-background p-4" aria-live="polite">
-            <p className="text-sm font-medium text-ink">
-              Processing status: <span className="capitalize">{job.status}</span>
-            </p>
-            {isProcessing ? (
-              <p className="mt-2 text-sm text-secondary">
-                Your resume is being processed. This section updates automatically.
-              </p>
-            ) : null}
-            {job.status === "completed" ? (
-              <p className="mt-2 text-sm text-success">
-                Processing completed. Text was extracted and Evidence was created for this
-                document.
-              </p>
-            ) : null}
-            {isTerminalFailure ? (
-              <p className="mt-2 text-sm text-danger" role="alert">
-                {jobFailureMessage(job)}
-              </p>
-            ) : null}
-            {canRetry ? (
-              <div className="mt-4">
-                <button
-                  type="button"
-                  onClick={onRetry}
-                  disabled={retryMutation.isPending}
-                  className="min-h-control rounded-button bg-primary px-4 text-sm font-medium text-white disabled:opacity-60"
-                >
-                  {retryMutation.isPending ? "Retrying…" : "Retry processing"}
-                </button>
-                {retryMutation.isError ? (
-                  <p className="mt-2 text-sm text-danger" role="alert">
-                    {errorMessage(retryMutation.error)}
-                  </p>
-                ) : null}
-              </div>
-            ) : null}
-          </div>
-        ) : null}
-
-        {jobQuery.isError ? (
-          <div>
-            <p className="text-sm text-danger" role="alert">
-              {errorMessage(jobQuery.error)}
-            </p>
-            <button
-              type="button"
-              onClick={() => void jobQuery.refetch()}
-              className="mt-4 min-h-control rounded-button border border-border bg-surface px-4 text-sm font-medium text-ink"
-            >
-              Check status again
-            </button>
-          </div>
-        ) : null}
-
-        {currentResumeQuery.isFetching && currentResumeQuery.data ? (
-          <p className="text-sm text-secondary" role="status">
-            Refreshing current resume…
-          </p>
-        ) : null}
-
-        <form className="space-y-4" onSubmit={onSubmit}>
-          <div className="space-y-2">
-            <label htmlFor="resume-file" className="block text-sm font-medium text-ink">
-              Resume file
-            </label>
-            <input
-              id="resume-file"
-              name="file"
-              type="file"
-              accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-              onChange={onFileChange}
-              disabled={isBusy}
-              className="block min-h-control w-full rounded-input border border-border bg-surface px-3 py-2 text-sm text-ink file:mr-4 file:rounded-button file:border-0 file:bg-primary file:px-4 file:py-2 file:text-sm file:font-medium file:text-white disabled:bg-background"
-            />
-            <p className="text-sm text-secondary" aria-live="polite">
-              {selectedFile ? `Selected file: ${selectedFile.name}` : "No file selected."}
-            </p>
-          </div>
-
-          {uploadMutation.isError ? (
-            <div>
-              <p className="text-sm text-danger" role="alert">
-                {errorMessage(uploadMutation.error)}
-              </p>
-              {uploadMutation.error instanceof ApiClientError &&
-              uploadMutation.error.code === "CANDIDATE_PROFILE_REQUIRED" ? (
-                <a
-                  href="#profile-section-title"
-                  className="mt-2 inline-block text-sm font-medium text-primary underline-offset-2 hover:underline"
-                >
-                  Complete candidate profile
-                </a>
-              ) : null}
+        <div className="space-y-6" aria-live="polite">
+          {currentResumeQuery.isLoading ? (
+            <div role="status" aria-label="Loading current resume">
+              <SkeletonCard />
             </div>
           ) : null}
 
-          <button
-            type="submit"
-            disabled={!selectedFile || isBusy}
-            className="min-h-control rounded-button bg-primary px-6 text-sm font-medium text-white disabled:opacity-60"
-          >
-            {uploadMutation.isPending
-              ? "Uploading…"
-              : isProcessing
-                ? "Processing…"
-                : "Upload resume"}
-          </button>
-        </form>
-      </div>
-    </section>
+          {currentResumeQuery.isError && !resumeMissing ? (
+            <EmptyState
+              role="alert"
+              title="Could not load resume"
+              description={errorMessage(currentResumeQuery.error)}
+              primaryAction={
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => void currentResumeQuery.refetch()}
+                >
+                  Try again
+                </Button>
+              }
+            />
+          ) : null}
+
+          {currentResumeQuery.data ? <CurrentResume resume={currentResumeQuery.data} /> : null}
+
+          {resumeMissing && !isProcessing ? (
+            <EmptyState
+              title="No resume uploaded"
+              description="Choose a PDF file below to create your current resume."
+              className="bg-background"
+            />
+          ) : null}
+
+          {job ? (
+            <Card className="bg-background">
+              <CardContent className="space-y-3 p-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-sm font-medium text-ink">Processing status</p>
+                  <StatusBadge status={job.status} />
+                </div>
+                {isProcessing ? (
+                  <p className="text-sm text-secondary">
+                    Your resume is being processed. This section updates automatically.
+                  </p>
+                ) : null}
+                {job.status === "completed" ? (
+                  <p className="text-sm text-success">
+                    Processing completed. Text was extracted and Evidence was created for this
+                    document.
+                  </p>
+                ) : null}
+                {isTerminalFailure ? (
+                  <p className="text-sm text-danger" role="alert">
+                    {jobFailureMessage(job)}
+                  </p>
+                ) : null}
+                {canRetry ? (
+                  <div>
+                    <Button
+                      type="button"
+                      variant="primary"
+                      onClick={onRetry}
+                      loading={retryMutation.isPending}
+                    >
+                      Retry processing
+                    </Button>
+                    {retryMutation.isError ? (
+                      <p className="mt-2 text-sm text-danger" role="alert">
+                        {errorMessage(retryMutation.error)}
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null}
+              </CardContent>
+            </Card>
+          ) : null}
+
+          {jobQuery.isError ? (
+            <EmptyState
+              role="alert"
+              title="Could not check processing status"
+              description={errorMessage(jobQuery.error)}
+              primaryAction={
+                <Button type="button" variant="secondary" onClick={() => void jobQuery.refetch()}>
+                  Check status again
+                </Button>
+              }
+            />
+          ) : null}
+
+          {currentResumeQuery.isFetching && currentResumeQuery.data ? (
+            <p className="text-sm text-secondary" role="status">
+              Refreshing current resume…
+            </p>
+          ) : null}
+
+          <form className="space-y-4" onSubmit={onSubmit}>
+            <div className="space-y-2">
+              <label htmlFor="resume-file" className="block text-sm font-medium text-ink">
+                Resume file
+              </label>
+              <input
+                id="resume-file"
+                name="file"
+                type="file"
+                accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                onChange={onFileChange}
+                disabled={isBusy}
+                className="block min-h-control w-full rounded-input border border-border bg-surface px-3 py-2 text-sm text-ink file:mr-4 file:rounded-button file:border-0 file:bg-primary file:px-4 file:py-2 file:text-sm file:font-medium file:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 disabled:bg-background"
+              />
+              <p className="text-sm text-secondary" aria-live="polite">
+                {selectedFile ? `Selected file: ${selectedFile.name}` : "No file selected."}
+              </p>
+            </div>
+
+            {uploadMutation.isError ? (
+              <div>
+                <p className="text-sm text-danger" role="alert">
+                  {errorMessage(uploadMutation.error)}
+                </p>
+                {uploadMutation.error instanceof ApiClientError &&
+                uploadMutation.error.code === "CANDIDATE_PROFILE_REQUIRED" ? (
+                  <a
+                    href="#profile-section-title"
+                    className="mt-2 inline-block text-sm font-medium text-primary underline-offset-2 hover:underline"
+                  >
+                    Complete candidate profile
+                  </a>
+                ) : null}
+              </div>
+            ) : null}
+
+            <Button
+              type="submit"
+              variant="primary"
+              disabled={!selectedFile || isBusy}
+              loading={uploadMutation.isPending || isProcessing}
+            >
+              Upload resume
+            </Button>
+          </form>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
