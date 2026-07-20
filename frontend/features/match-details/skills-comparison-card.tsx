@@ -1,56 +1,19 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { SectionHeader } from "@/components/ui/section-header";
 import type { MatchSkillGroup } from "@/lib/api/types/employer";
 
-type SkillsComparisonCardProps = Readonly<{
-  title: string;
-  headingId: string;
-  group: MatchSkillGroup;
-}>;
+type SkillRow = { skill: string; status: "matched" | "partial" | "missing" };
+type SkillsComparisonCardProps = Readonly<{ title: string; headingId: string; required: MatchSkillGroup; partial: MatchSkillGroup; missing: MatchSkillGroup; evidenceCountBySkill: Map<string, number>; selectedSkill: string | null; onSelectSkill: (skill: string) => void }>;
 
-export function SkillsComparisonCard({ title, headingId, group }: SkillsComparisonCardProps) {
-  return (
-    <Card aria-labelledby={headingId}>
-      <CardContent className="space-y-5 p-5 sm:p-6">
-        <SectionHeader title={title} titleId={headingId} size="md" />
-
-        <div className="grid gap-6 sm:grid-cols-2">
-          <SkillList label="Matched" skills={group.matched} tone="matched" />
-          <SkillList label="Missing" skills={group.missing} tone="missing" />
-        </div>
-      </CardContent>
-    </Card>
-  );
+function statusBadge(status: SkillRow["status"]) {
+  if (status === "matched") return <Badge variant="success">Matched</Badge>;
+  if (status === "partial") return <Badge variant="primary">Partially matched</Badge>;
+  return <Badge variant="neutral">Missing</Badge>;
 }
 
-function SkillList({
-  label,
-  skills,
-  tone
-}: Readonly<{
-  label: string;
-  skills: string[];
-  tone: "matched" | "missing";
-}>) {
-  return (
-    <div>
-      <h3 className="flex flex-wrap items-center gap-2 text-sm font-medium text-ink">
-        <Badge variant={tone === "matched" ? "success" : "danger"}>{label}</Badge>
-        <span className="text-secondary">{skills.length}</span>
-      </h3>
-      {skills.length === 0 ? (
-        <p className="mt-2 text-sm text-secondary">None</p>
-      ) : (
-        <ul className="mt-2 space-y-2" aria-label={label}>
-          {skills.map((skill) => (
-            <li key={skill} className="break-words text-sm text-ink">
-              <span className="sr-only">{tone === "matched" ? "Matched: " : "Missing: "}</span>
-              {skill}
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
+export function SkillsComparisonCard({ title, headingId, required, partial, missing, evidenceCountBySkill, selectedSkill, onSelectSkill }: SkillsComparisonCardProps) {
+  const rows: SkillRow[] = [...required.matched.map((skill) => ({ skill, status: "matched" as const })), ...partial.matched.map((skill) => ({ skill, status: "partial" as const })), ...missing.missing.map((skill) => ({ skill, status: "missing" as const }))];
+  return <Card aria-labelledby={headingId}><CardContent className="p-5 sm:p-6"><div><p className="text-sm font-semibold uppercase tracking-[0.14em] text-primary">Match breakdown</p><h2 id={headingId} className="mt-2 text-xl font-semibold tracking-tight text-ink">{title}</h2><p className="mt-2 text-sm leading-6 text-secondary">Required matches, preferred-skill alignment, and gaps reported by the existing match engine.</p></div><div className="mt-5 grid gap-3 sm:grid-cols-3"><GroupSummary label="Matched" count={required.matched.length} variant="success" /><GroupSummary label="Partially matched" count={partial.matched.length} variant="primary" /><GroupSummary label="Missing" count={missing.missing.length} variant="neutral" /></div>{rows.length === 0 ? <p className="mt-6 text-sm text-secondary">This vacancy has no skill comparison data yet.</p> : <div className="mt-6 overflow-x-auto"><table className="w-full min-w-[40rem] border-separate border-spacing-0 text-left text-sm"><thead><tr className="text-secondary"><th scope="col" className="border-b border-border px-3 py-3 font-medium">Required skill</th><th scope="col" className="border-b border-border px-3 py-3 font-medium">Candidate skill</th><th scope="col" className="border-b border-border px-3 py-3 font-medium">Evidence</th><th scope="col" className="border-b border-border px-3 py-3 font-medium">Status</th></tr></thead><tbody>{rows.map((row) => { const evidenceCount = evidenceCountBySkill.get(row.skill) ?? 0; return <tr key={`${row.status}-${row.skill}`} className={selectedSkill === row.skill ? "bg-primary/5" : undefined}><td className="border-b border-border px-3 py-4 font-medium text-ink"><button type="button" className="text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2" onClick={() => onSelectSkill(row.skill)} aria-label={`View evidence for ${row.skill}`}>{row.skill}</button></td><td className="border-b border-border px-3 py-4 text-secondary">{row.status === "missing" ? "—" : row.skill}</td><td className="border-b border-border px-3 py-4 text-secondary">{evidenceCount > 0 ? `${evidenceCount} ${evidenceCount === 1 ? "source" : "sources"}` : "No linked evidence"}</td><td className="border-b border-border px-3 py-4">{statusBadge(row.status)}</td></tr>; })}</tbody></table></div>}</CardContent></Card>;
 }
+
+function GroupSummary({ label, count, variant }: Readonly<{ label: string; count: number; variant: "success" | "primary" | "neutral" }>) { return <div className="rounded-xl border border-border bg-surface/70 p-3"><Badge variant={variant}>{label}</Badge><p className="mt-2 text-xl font-semibold tabular-nums text-ink">{count}</p></div>; }

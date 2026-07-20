@@ -1,4 +1,9 @@
+"use client";
+
+import { useState } from "react";
+
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { SectionHeader } from "@/components/ui/section-header";
@@ -28,6 +33,8 @@ function priorityLabel(priority: MatchDetailsRoadmapItem["priority"]): string {
 }
 
 export function RoadmapCard({ items }: RoadmapCardProps) {
+  const [expanded, setExpanded] = useState(false);
+  const visibleItems = expanded ? items : items.slice(0, 3);
   return (
     <Card aria-labelledby="roadmap-section-title">
       <CardContent className="space-y-5 p-5 sm:p-6">
@@ -45,8 +52,9 @@ export function RoadmapCard({ items }: RoadmapCardProps) {
             className="bg-surface-subtle"
           />
         ) : (
-          <ol className="space-y-4">
-            {items.map((item) => (
+          <>
+          <ol id="roadmap-preview" className="space-y-4">
+            {visibleItems.map((item) => (
               <li key={item.id} className="border-t border-border pt-4 first:border-t-0 first:pt-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge variant={priorityVariant(item.priority)}>
@@ -68,6 +76,8 @@ export function RoadmapCard({ items }: RoadmapCardProps) {
               </li>
             ))}
           </ol>
+          {items.length > 3 ? <Button type="button" variant="secondary" size="sm" onClick={() => setExpanded((value) => !value)} aria-expanded={expanded} aria-controls="roadmap-preview">{expanded ? "Show roadmap preview" : "Open Full Roadmap"}</Button> : null}
+          </>
         )}
       </CardContent>
     </Card>
