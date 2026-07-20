@@ -132,3 +132,25 @@ def test_roadmap_returns_deterministic_recommendations(
     assert docker["priority"] == "high"
     assert docker["missing_skills"] == ["Docker"]
     assert set(docker["related_skills"]) == {"FastAPI", "PostgreSQL"}
+
+
+def test_roadmap_returns_career_recommendations_for_frontend_foundations(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.api.v1 import roadmap
+
+    user = make_user()
+    profile = make_profile(user.id)
+    authorize_candidate(user)
+    monkeypatch.setattr(roadmap, "get_candidate_profile", lambda *_args: profile)
+    monkeypatch.setattr(
+        roadmap,
+        "_build_passport",
+        lambda *_args: _passport("CSS", "HTML", "JavaScript", "TypeScript"),
+    )
+
+    response = client.get("/api/v1/candidate/roadmap")
+
+    assert response.status_code == 200
+    items = response.json()["items"]
+    assert any(item["missing_skills"] == ["React"] for item in items)

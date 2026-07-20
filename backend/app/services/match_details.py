@@ -24,7 +24,7 @@ from app.schemas.employer import (
 from app.schemas.skill_passport import SkillPassportResponse
 from app.services.employer import list_vacancy_requirements
 from app.services.matching import MatchRequirement, match_passport_to_requirements
-from app.services.roadmap import build_roadmap_from_passport
+from app.services.roadmap import build_roadmap_from_match
 from app.services.skill_passport import build_passport
 
 TOP_SKILLS_LIMIT = 6
@@ -54,7 +54,10 @@ def build_match_details(
         for requirement, skill in list_vacancy_requirements(session, vacancy_id)
     ]
     match = match_passport_to_requirements(passport, requirements)
-    roadmap = build_roadmap_from_passport(passport)
+    roadmap = build_roadmap_from_match(
+        required_missing=match.required.missing,
+        preferred_missing=match.preferred.missing,
+    )
 
     name = candidate.display_name.strip() if candidate.display_name else "Unnamed candidate"
     headline = candidate.target_role.strip() if candidate.target_role else None

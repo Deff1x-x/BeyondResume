@@ -6,7 +6,6 @@ import pytest
 from app.models.candidate_profile import CandidateProfile, OnboardingStatus
 from app.models.skill import Skill
 from app.models.vacancy_skill_requirement import VacancySkillRequirement
-from app.schemas.roadmap import RoadmapItemResponse, RoadmapResponse
 from app.schemas.skill_passport import (
     SkillPassportEvidenceResponse,
     SkillPassportResponse,
@@ -113,24 +112,8 @@ def test_build_match_details_aggregates_existing_services(
         "match_passport_to_requirements",
         lambda *_args: MatchResult(
             score=91,
-            required=SkillGroupBreakdown(matched=("Python",), missing=()),
-            preferred=SkillGroupBreakdown(matched=(), missing=("Docker",)),
-        ),
-    )
-    monkeypatch.setattr(
-        match_details,
-        "build_roadmap_from_passport",
-        lambda *_args: RoadmapResponse(
-            items=[
-                RoadmapItemResponse(
-                    id="add-docker",
-                    title="Add Docker evidence",
-                    reason="Required for preferred stack depth",
-                    priority="medium",
-                    missing_skills=["Docker"],
-                    related_skills=["Python"],
-                )
-            ]
+            required=SkillGroupBreakdown(matched=("Python",), missing=("C#",)),
+            preferred=SkillGroupBreakdown(matched=(), missing=()),
         ),
     )
 
@@ -143,12 +126,13 @@ def test_build_match_details_aggregates_existing_services(
     assert result.candidate.avatar is None
     assert result.match.score == 91
     assert result.match.required.matched == ["Python"]
-    assert result.match.preferred.missing == ["Docker"]
+    assert result.match.required.missing == ["C#"]
     assert result.passport.top_skills == ["Python", "FastAPI"]
     assert len(result.evidence) == 1
     assert result.evidence[0].source_type == "resume"
     assert result.evidence[0].skills == ["FastAPI", "Python"]
-    assert result.roadmap[0].id == "add-docker"
+    assert result.roadmap[0].id == "roadmap.vacancy_gap.csharp.v1"
+    assert result.roadmap[0].missing_skills == ["C#"]
 
 
 def test_build_match_details_requires_candidate(monkeypatch: pytest.MonkeyPatch) -> None:
