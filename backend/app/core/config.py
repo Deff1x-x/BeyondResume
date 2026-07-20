@@ -34,6 +34,10 @@ class Settings(BaseSettings):
     github_provider: Literal["demo", "live"] = "live"
     github_token: str = ""
     github_api_timeout_seconds: int = 20
+    llm_provider: Literal["mock", "openai"] = "mock"
+    llm_api_key: str = ""
+    llm_model: str = "gpt-5-mini"
+    llm_timeout_seconds: int = 20
 
 
 settings = Settings()

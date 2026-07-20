@@ -7,6 +7,7 @@ import {
   createEmployerCompany,
   createEmployerVacancy,
   deleteVacancyRequirement,
+  generateMatchExplanation,
   getEmployerCompany,
   getEmployerVacancy,
   getMatchDetails,
@@ -164,6 +165,10 @@ export function matchDetailsQueryKey(candidateId: string, vacancyId: string) {
   return ["employer", "matches", candidateId, vacancyId] as const;
 }
 
+export function matchExplanationQueryKey(candidateId: string, vacancyId: string) {
+  return ["employer", "matches", candidateId, vacancyId, "explanation"] as const;
+}
+
 export function useMatchDetailsQuery(
   candidateId: string | null,
   vacancyId: string | null,
@@ -180,5 +185,25 @@ export function useMatchDetailsQuery(
     enabled: enabled && candidateId !== null && vacancyId !== null,
     staleTime: 30_000,
     gcTime: 300_000
+  });
+}
+
+export function useMatchExplanationQuery(
+  candidateId: string | null,
+  vacancyId: string | null,
+  enabled: boolean
+) {
+  return useQuery({
+    queryKey: matchExplanationQueryKey(candidateId ?? "", vacancyId ?? ""),
+    queryFn: () => {
+      if (candidateId === null || vacancyId === null) {
+        throw new Error("Candidate and vacancy IDs are required");
+      }
+      return generateMatchExplanation(candidateId, vacancyId);
+    },
+    enabled: enabled && candidateId !== null && vacancyId !== null,
+    staleTime: 300_000,
+    gcTime: 600_000,
+    retry: false
   });
 }

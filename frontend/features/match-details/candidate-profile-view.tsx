@@ -10,6 +10,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { SkeletonCard, SkeletonListRow } from "@/components/ui/skeleton";
 import { EvidenceCard } from "@/features/match-details/evidence-card";
+import { AiExplanationCard } from "@/features/match-details/ai-explanation-card";
 import { RoadmapCard } from "@/features/match-details/roadmap-card";
 import { SkillsComparisonCard } from "@/features/match-details/skills-comparison-card";
 import { ApiClientError } from "@/lib/api/error";
@@ -61,5 +62,5 @@ export function CandidateProfileView({ candidateId, vacancyId, enabled }: Candid
   const partialGroup = { matched: details.match.preferred.matched, missing: [] };
   const missingGroup = { matched: [], missing: [...details.match.required.missing, ...details.match.preferred.missing] };
 
-  return <div className="space-y-8"><div className="text-sm">{backLink}</div><MatchHero details={details} /><div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]"><div className="space-y-6"><SkillsComparisonCard title="Skill comparison" headingId="skill-comparison-title" required={details.match.required} partial={partialGroup} missing={missingGroup} evidenceCountBySkill={evidenceCountBySkill} selectedSkill={selectedSkill} onSelectSkill={setSelectedSkill} /><EvidenceCard evidence={details.evidence} selectedSkill={selectedSkill} onClearSkill={() => setSelectedSkill(null)} /></div><aside className="space-y-6"><MatchSummary details={details} /><RoadmapCard items={details.roadmap} /></aside></div></div>;
+  return <div className="space-y-8"><div className="text-sm">{backLink}</div><MatchHero details={details} /><div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]"><div className="space-y-6"><SkillsComparisonCard title="Skill comparison" headingId="skill-comparison-title" required={details.match.required} partial={partialGroup} missing={missingGroup} evidenceCountBySkill={evidenceCountBySkill} selectedSkill={selectedSkill} onSelectSkill={setSelectedSkill} /><EvidenceCard evidence={details.evidence} selectedSkill={selectedSkill} onClearSkill={() => setSelectedSkill(null)} /></div><aside className="space-y-6"><MatchSummary details={details} /><RoadmapCard items={details.roadmap} /><AiExplanationCard candidateId={candidateId} vacancyId={vacancyId} enabled /></aside></div></div>;
 }

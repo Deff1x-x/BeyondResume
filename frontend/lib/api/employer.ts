@@ -2,6 +2,7 @@ import { apiRequest } from "@/lib/api/client";
 import type {
   EmployerCompany,
   EmployerCompanyCreateRequest,
+  AiMatchExplanation,
   MatchDetailsResponse,
   SkillOption,
   Vacancy,
@@ -77,5 +78,16 @@ export function getMatchDetails(
   const params = new URLSearchParams({ vacancy_id: vacancyId });
   return apiRequest<MatchDetailsResponse>(
     `/employer/matches/${candidateId}?${params.toString()}`
+  );
+}
+
+export function generateMatchExplanation(
+  candidateId: string,
+  vacancyId: string
+): Promise<AiMatchExplanation> {
+  const params = new URLSearchParams({ vacancy_id: vacancyId });
+  return apiRequest<AiMatchExplanation>(
+    `/employer/matches/${candidateId}/explanation?${params.toString()}`,
+    { method: "POST" }
   );
 }

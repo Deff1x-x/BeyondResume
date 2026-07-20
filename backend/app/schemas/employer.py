@@ -123,3 +123,10 @@ class MatchDetailsResponse(BaseModel):
     passport: MatchDetailsPassportResponse
     evidence: list[MatchDetailsEvidenceResponse]
     roadmap: list[MatchDetailsRoadmapItemResponse]
+
+
+class AiMatchExplanationResponse(BaseModel):
+    summary: str
+    strengths: list[str]
+    gaps: list[str]
+    next_steps: list[str]

@@ -13,6 +13,7 @@ const employerCompanyQuery = vi.fn();
 const employerVacanciesQuery = vi.fn();
 const employerQueryResults = vi.fn();
 const matchDetailsQuery = vi.fn();
+const matchExplanationQuery = vi.fn();
 
 vi.mock("@/lib/skill-passport/hooks", () => ({
   useSkillPassportQuery: () => passportQuery()
@@ -37,6 +38,7 @@ vi.mock("@/lib/employer/hooks", () => ({
   useEmployerVacanciesQuery: () => employerVacanciesQuery(),
   useEmployerVacancyQuery: () => ({ isLoading: false, isError: false, data: null }),
   useMatchDetailsQuery: () => matchDetailsQuery(),
+  useMatchExplanationQuery: () => matchExplanationQuery(),
   useVacancyMatchesQuery: () => ({ data: { matches: [] }, isLoading: false, isError: false }),
   useVacancyRequirementsQuery: () => ({ data: [], isLoading: false, isError: false }),
   vacancyMatchesQueryKey: (vacancyId: string) => ["matches", vacancyId],
@@ -174,6 +176,7 @@ describe("EmployerSection", () => {
 
 describe("CandidateProfileView", () => {
   it("shows the existing match, evidence detail selection, and roadmap preview", () => {
+    matchExplanationQuery.mockReturnValue({ isLoading: false, isError: true, data: null });
     matchDetailsQuery.mockReturnValue({
       data: {
         candidate: { id: "candidate-private-id", name: "Alex Morgan", headline: "Python Backend Developer", avatar: null },

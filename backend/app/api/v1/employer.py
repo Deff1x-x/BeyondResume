@@ -11,6 +11,7 @@ from app.db.session import get_db
 from app.models.employer_profile import EmployerProfile
 from app.models.user import User
 from app.schemas.employer import (
+    AiMatchExplanationResponse,
     EmployerCompanyCreateRequest,
     EmployerCompanyResponse,
     MatchDetailsResponse,
@@ -23,6 +24,11 @@ from app.schemas.employer import (
     VacancyRequirementResponse,
     VacancyRequirementType,
     VacancyResponse,
+)
+from app.services.ai_match_explanation import (
+    MatchExplanationUnavailableError,
+    build_explanation_input,
+    explain_match,
 )
 from app.services.employer import (
     EmployerCompanyAlreadyExistsError,
@@ -44,6 +50,7 @@ from app.services.match_details import (
     MatchDetailsCandidateNotFoundError,
     build_match_details,
 )
+from app.services.skill_passport import build_passport
 
 router = APIRouter(prefix="/employer", tags=["employer"])
 
@@ -309,3 +316,45 @@ def get_match_details(
         raise api_error(404, "CANDIDATE_NOT_FOUND", "Candidate not found") from None
     except SQLAlchemyError:
         raise api_error(500, "DATABASE_ERROR", "Database operation failed") from None
+
+
+@router.post(
+    "/matches/{candidate_id}/explanation",
+    response_model=AiMatchExplanationResponse,
+)
+def post_match_explanation(
+    candidate_id: UUID,
+    vacancy_id: Annotated[UUID, Query()],
+    current_user: Annotated[User, Depends(require_employer)],
+    session: Annotated[Session, Depends(get_db)],
+) -> AiMatchExplanationResponse:
+    company = _require_owned_vacancy(session, current_user.id, vacancy_id)
+    vacancy = get_vacancy(session, company.id, vacancy_id)
+    if vacancy is None:
+        raise api_error(404, "VACANCY_NOT_FOUND", "Vacancy not found")
+    try:
+        details = build_match_details(session, vacancy_id=vacancy_id, candidate_id=candidate_id)
+    except MatchDetailsCandidateNotFoundError:
+        raise api_error(404, "CANDIDATE_NOT_FOUND", "Candidate not found") from None
+    requirement_rows = list_vacancy_requirements(session, vacancy_id)
+    explanation_input = build_explanation_input(
+        details=details,
+        confirmed_skills=[skill.name for skill in build_passport(session, candidate_id).skills],
+        vacancy_title=vacancy.title,
+        required_skills=[
+            skill.canonical_name
+            for requirement, skill in requirement_rows
+            if requirement.requirement_type == "required"
+        ],
+        preferred_skills=[
+            skill.canonical_name
+            for requirement, skill in requirement_rows
+            if requirement.requirement_type == "preferred"
+        ],
+    )
+    try:
+        return explain_match(explanation_input)
+    except MatchExplanationUnavailableError:
+        raise api_error(
+            503, "AI_EXPLANATION_UNAVAILABLE", "AI explanation is currently unavailable."
+        ) from None

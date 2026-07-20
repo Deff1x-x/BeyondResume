@@ -105,3 +105,10 @@ export type MatchDetailsResponse = {
   evidence: MatchDetailsEvidence[];
   roadmap: MatchDetailsRoadmapItem[];
 };
+
+export type AiMatchExplanation = {
+  summary: string;
+  strengths: string[];
+  gaps: string[];
+  next_steps: string[];
+};
