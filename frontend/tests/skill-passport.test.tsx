@@ -160,7 +160,7 @@ describe("CandidateDashboardSection", () => {
 });
 
 describe("EmployerSection", () => {
-  it("summarizes existing vacancies and candidate matches without new API data", () => {
+  it("shows top matches by vacancy without new API data", () => {
     employerCompanyQuery.mockReturnValue({ data: { company_name: "Beyond", website: null, description: null }, isLoading: false, isError: false });
     employerVacanciesQuery.mockReturnValue({ data: [{ id: "vacancy-1", title: "Frontend Engineer", description: "Build product UI", status: "open", created_at: "2026-07-20T10:00:00Z" }], isLoading: false, isError: false, refetch: vi.fn() });
     employerQueryResults
@@ -168,9 +168,43 @@ describe("EmployerSection", () => {
       .mockReturnValueOnce([{ data: { matches: [{ candidate_id: "candidate-1", candidate_name: "Alex Morgan", score: 82, required: { matched: ["React"], missing: [] }, preferred: { matched: [], missing: [] } }] } }]);
     render(<EmployerSection enabled />);
     expect(screen.getByText("Active vacancies")).toBeInTheDocument();
+    expect(screen.getByText("Top Matches by Vacancy")).toBeInTheDocument();
     expect(screen.getAllByText("82%")).toHaveLength(2);
     expect(screen.getByText("Alex Morgan")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "View all matches for Frontend Engineer" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "+ Create Vacancy" })).toHaveAttribute("href", "#create-vacancy");
+  });
+
+  it("keeps a vacancy visible when it has no candidate matches", () => {
+    employerCompanyQuery.mockReturnValue({ data: { company_name: "Beyond", website: null, description: null }, isLoading: false, isError: false });
+    employerVacanciesQuery.mockReturnValue({ data: [{ id: "vacancy-empty", title: "Backend Engineer", description: null, status: "open", created_at: "2026-07-20T10:00:00Z" }], isLoading: false, isError: false, refetch: vi.fn() });
+    employerQueryResults
+      .mockReturnValueOnce([{ data: [] }])
+      .mockReturnValueOnce([{ data: { matches: [] } }]);
+
+    render(<EmployerSection enabled />);
+
+    expect(screen.getByText("No candidate matches yet.")).toBeInTheDocument();
+    expect(screen.getByText("0 candidates")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "View all matches for Backend Engineer" })).toBeInTheDocument();
+  });
+
+  it("uses the highest existing match as the best candidate for a vacancy", () => {
+    employerCompanyQuery.mockReturnValue({ data: { company_name: "Beyond", website: null, description: null }, isLoading: false, isError: false });
+    employerVacanciesQuery.mockReturnValue({ data: [{ id: "vacancy-top", title: "Platform Engineer", description: null, status: "open", created_at: "2026-07-20T10:00:00Z" }], isLoading: false, isError: false, refetch: vi.fn() });
+    employerQueryResults
+      .mockReturnValueOnce([{ data: [] }])
+      .mockReturnValueOnce([{ data: { matches: [
+        { candidate_id: "candidate-top", candidate_name: "Alan", score: 92, required: { matched: ["Python"], missing: [] }, preferred: { matched: [], missing: [] } },
+        { candidate_id: "candidate-second", candidate_name: "Bea", score: 80, required: { matched: ["Python"], missing: [] }, preferred: { matched: [], missing: [] } }
+      ] } }]);
+
+    render(<EmployerSection enabled />);
+
+    expect(screen.getByText("Alan")).toBeInTheDocument();
+    expect(screen.getByText("2 candidates")).toBeInTheDocument();
+    expect(screen.getByText("92% match")).toBeInTheDocument();
+    expect(screen.queryByText("Bea")).not.toBeInTheDocument();
   });
 });
 

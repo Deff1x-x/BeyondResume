@@ -375,14 +375,20 @@ function VacancyMatches({ vacancyId }: Readonly<{ vacancyId: string }>) {
 function VacancyCard({
   vacancy,
   requirementsCount,
-  matches
-}: Readonly<{ vacancy: Vacancy; requirementsCount: number; matches: VacancyMatch[] }>) {
-  const [open, setOpen] = useState(false);
+  matches,
+  open,
+  onOpenChange
+}: Readonly<{
+  vacancy: Vacancy;
+  requirementsCount: number;
+  matches: VacancyMatch[];
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}>) {
   const topMatch = matches.reduce((highest, match) => Math.max(highest, match.score), 0);
 
   return (
-    <li>
-      <Card className="overflow-hidden bg-background transition duration-200 hover:-translate-y-0.5 hover:shadow-card-hover">
+    <Card className="overflow-hidden bg-background transition duration-200 hover:-translate-y-0.5 hover:shadow-card-hover">
         <CardContent className="p-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0 space-y-2">
@@ -405,18 +411,30 @@ function VacancyCard({
             <div className="p-3"><p className="text-lg font-semibold tabular-nums text-ink">{topMatch}%</p><p className="mt-1 text-xs text-secondary">Top match</p></div>
           </div>
           <div className="mt-5 flex flex-wrap gap-2">
-            <Button type="button" variant="secondary" size="sm" onClick={() => setOpen((value) => !value)} aria-expanded={open} aria-controls={`vacancy-details-${vacancy.id}`}>{open ? "Close" : "Open"}</Button>
-            <Button type="button" variant="secondary" size="sm" onClick={() => setOpen(true)} aria-label={`View matches for ${vacancy.title}`}>View Matches</Button>
-            <Button type="button" variant="ghost" size="sm" onClick={() => setOpen(true)} aria-label={`Edit requirements for ${vacancy.title}`}>Edit requirements</Button>
+            <Button type="button" variant="secondary" size="sm" onClick={() => onOpenChange(!open)} aria-expanded={open} aria-controls={`vacancy-details-${vacancy.id}`}>{open ? "Close" : "Open"}</Button>
+            <Button type="button" variant="secondary" size="sm" onClick={() => onOpenChange(true)} aria-label={`View matches for ${vacancy.title}`}>View Matches</Button>
+            <Button type="button" variant="ghost" size="sm" onClick={() => onOpenChange(true)} aria-label={`Edit requirements for ${vacancy.title}`}>Edit requirements</Button>
           </div>
           {open ? <div id={`vacancy-details-${vacancy.id}`}><VacancyDetail vacancyId={vacancy.id} /></div> : null}
         </CardContent>
-      </Card>
-    </li>
+    </Card>
   );
 }
 
+function TopMatchesByVacancy({
+  vacancies,
+  matchesByVacancy,
+  onViewMatches
+}: Readonly<{
+  vacancies: Vacancy[];
+  matchesByVacancy: VacancyMatch[][];
+  onViewMatches: (vacancyId: string) => void;
+}>) {
+  return <section id="top-matches-by-vacancy" aria-labelledby="top-matches-by-vacancy-title" className="rounded-card border border-border bg-surface/80 p-5 shadow-card"><div className="flex flex-wrap items-end justify-between gap-3"><div><h2 id="top-matches-by-vacancy-title" className="text-xl font-semibold tracking-tight text-ink">Top Matches by Vacancy</h2><p className="mt-1 text-sm text-secondary">See the strongest available candidate for every vacancy in its current order.</p></div><Badge variant="neutral">{vacancies.length} vacancies</Badge></div><ul className="mt-5 grid gap-3 lg:grid-cols-2">{vacancies.map((vacancy, index) => { const matches = matchesByVacancy[index] ?? []; const bestMatch = matches[0]; return <li key={vacancy.id}><Card className="bg-background"><CardContent className="p-4"><p className="font-medium text-ink">{vacancy.title}</p>{bestMatch ? <div className="mt-4 flex items-start justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-wide text-secondary">Best match</p><p className="mt-1 text-sm font-medium text-ink">{bestMatch.candidate_name}</p></div><Badge variant={bestMatch.score >= 75 ? "success" : bestMatch.score >= 50 ? "primary" : "neutral"}>{bestMatch.score}% match</Badge></div> : <p className="mt-4 text-sm text-secondary">No candidate matches yet.</p>}<div className="mt-4 flex items-center justify-between gap-3 border-t border-border pt-4"><span className="text-sm text-secondary">{matches.length} {matches.length === 1 ? "candidate" : "candidates"}</span><Button type="button" variant="secondary" size="sm" onClick={() => onViewMatches(vacancy.id)} aria-label={`View all matches for ${vacancy.title}`}>View all matches →</Button></div></CardContent></Card></li>; })}</ul></section>;
+}
+
 function EmployerDashboard({ enabled }: Readonly<{ enabled: boolean }>) {
+  const [openVacancyId, setOpenVacancyId] = useState<string | null>(null);
   const vacanciesQuery = useEmployerVacanciesQuery(enabled);
   const vacancies = [...(vacanciesQuery.data ?? [])].sort(
     (left, right) => new Date(right.created_at).getTime() - new Date(left.created_at).getTime()
@@ -446,6 +464,13 @@ function EmployerDashboard({ enabled }: Readonly<{ enabled: boolean }>) {
     : null;
   const activeVacancies = vacancies.filter((vacancy) => vacancy.status === "open").length;
 
+  function openMatches(vacancyId: string) {
+    setOpenVacancyId(vacancyId);
+    window.requestAnimationFrame(() => {
+      document.getElementById(`vacancy-card-${vacancyId}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }
+
   if (!enabled) return null;
   if (vacanciesQuery.isLoading) return <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" role="status" aria-label="Loading employer dashboard"><SkeletonCard /><SkeletonCard /><SkeletonCard /><SkeletonCard /></div>;
   if (vacanciesQuery.isError) return <EmptyState role="alert" title="Employer dashboard unavailable" description={errorMessage(vacanciesQuery.error)} primaryAction={<Button variant="secondary" onClick={() => void vacanciesQuery.refetch()}>Try again</Button>} />;
@@ -461,13 +486,13 @@ function EmployerDashboard({ enabled }: Readonly<{ enabled: boolean }>) {
     <div className="rounded-card border border-primary/15 bg-gradient-to-br from-primary/10 via-background to-cyan-50 p-6 shadow-card">
       <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
         <div><p className="text-sm font-semibold uppercase tracking-[0.16em] text-primary">Recruiting overview</p><h2 id="employer-dashboard-title" className="mt-2 text-2xl font-semibold tracking-tight text-ink">Keep your hiring pipeline moving.</h2><p className="mt-2 max-w-2xl text-sm leading-6 text-secondary">See active roles, evidence-based candidate matches, and the next action for every opening.</p></div>
-        <div className="flex flex-wrap gap-2"><a href="#create-vacancy" className="inline-flex min-h-control items-center rounded-button bg-primary px-4 text-sm font-medium text-white shadow-sm shadow-primary/25 transition hover:-translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2">+ Create Vacancy</a><a href="#recent-matches" className="inline-flex min-h-control items-center rounded-button border border-border bg-background px-4 text-sm font-medium text-ink transition hover:bg-surface-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2">Browse Candidates</a><a href="#recent-matches" className="inline-flex min-h-control items-center rounded-button border border-border bg-background px-4 text-sm font-medium text-ink transition hover:bg-surface-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2">View Matches</a></div>
+        <div className="flex flex-wrap gap-2"><a href="#create-vacancy" className="inline-flex min-h-control items-center rounded-button bg-primary px-4 text-sm font-medium text-white shadow-sm shadow-primary/25 transition hover:-translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2">+ Create Vacancy</a><a href="#top-matches-by-vacancy" className="inline-flex min-h-control items-center rounded-button border border-border bg-background px-4 text-sm font-medium text-ink transition hover:bg-surface-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2">Browse Candidates</a><a href="#top-matches-by-vacancy" className="inline-flex min-h-control items-center rounded-button border border-border bg-background px-4 text-sm font-medium text-ink transition hover:bg-surface-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2">View Matches</a></div>
       </div>
       <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{metrics.map(([label, value, detail]) => <Card key={label} className="bg-background/90"><CardContent className="p-4"><p className="text-sm text-secondary">{label}</p><p className="mt-2 text-xl font-semibold tracking-tight text-ink">{value}</p><p className="mt-1 text-xs leading-5 text-muted">{detail}</p></CardContent></Card>)}</div>
     </div>
 
-    {vacancies.length === 0 ? <EmptyState icon={<Icon name="employer" className="h-8 w-8" />} title="Create your first vacancy" description="Add an opening and its requirements to start discovering candidates through verified skills and evidence." primaryAction={<a href="#create-vacancy" className="inline-flex min-h-control items-center rounded-button bg-primary px-4 text-sm font-medium text-white shadow-sm shadow-primary/25 transition hover:-translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2">Create your first vacancy</a>} className="py-12" /> : <><section aria-labelledby="vacancies-title"><div className="flex flex-wrap items-end justify-between gap-3"><div><h2 id="vacancies-title" className="text-xl font-semibold tracking-tight text-ink">Your vacancies</h2><p className="mt-1 text-sm text-secondary">Prioritize roles with requirements and candidate matches.</p></div><Badge variant="primary">{vacancies.length} total</Badge></div><ul className="mt-4 grid gap-4 xl:grid-cols-2">{vacancies.map((vacancy, index) => <VacancyCard key={vacancy.id} vacancy={vacancy} requirementsCount={requirementQueries[index]?.data?.length ?? 0} matches={matchQueries[index]?.data?.matches ?? []} />)}</ul></section>
-      <section id="recent-matches" aria-labelledby="recent-matches-title" className="rounded-card border border-border bg-surface/80 p-5 shadow-card"><div className="flex flex-wrap items-end justify-between gap-3"><div><h2 id="recent-matches-title" className="text-xl font-semibold tracking-tight text-ink">Recent candidate matches</h2><p className="mt-1 text-sm text-secondary">Top available matches for your most recently created vacancies.</p></div><Badge variant="neutral">{allMatches.length} available</Badge></div>{allMatches.length === 0 ? <p className="mt-5 text-sm text-secondary">Add skill requirements to a vacancy to generate candidate matches.</p> : <ul className="mt-5 grid gap-3 lg:grid-cols-2">{allMatches.slice(0, 4).map(({ vacancy, match }) => <li key={`${vacancy.id}-${match.candidate_id}`}><Link href={`/employer/matches/${match.candidate_id}?vacancy_id=${encodeURIComponent(vacancy.id)}`} className="block rounded-xl border border-border bg-background p-4 transition hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2" aria-label={`Open ${match.candidate_name} for ${vacancy.title}`}><div className="flex items-start justify-between gap-3"><div><p className="font-medium text-ink">{match.candidate_name}</p><p className="mt-1 text-sm text-secondary">{vacancy.title}</p></div><Badge variant={match.score >= 75 ? "success" : match.score >= 50 ? "primary" : "neutral"}>{match.score}% match</Badge></div><p className="mt-3 text-sm font-medium text-primary">View match details →</p></Link></li>)}</ul>}</section></>}
+    {vacancies.length === 0 ? <EmptyState icon={<Icon name="employer" className="h-8 w-8" />} title="Create your first vacancy" description="Add an opening and its requirements to start discovering candidates through verified skills and evidence." primaryAction={<a href="#create-vacancy" className="inline-flex min-h-control items-center rounded-button bg-primary px-4 text-sm font-medium text-white shadow-sm shadow-primary/25 transition hover:-translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2">Create your first vacancy</a>} className="py-12" /> : <><section aria-labelledby="vacancies-title"><div className="flex flex-wrap items-end justify-between gap-3"><div><h2 id="vacancies-title" className="text-xl font-semibold tracking-tight text-ink">Your vacancies</h2><p className="mt-1 text-sm text-secondary">Prioritize roles with requirements and candidate matches.</p></div><Badge variant="primary">{vacancies.length} total</Badge></div><ul className="mt-4 grid gap-4 xl:grid-cols-2">{vacancies.map((vacancy, index) => <li id={`vacancy-card-${vacancy.id}`} key={vacancy.id}><VacancyCard vacancy={vacancy} requirementsCount={requirementQueries[index]?.data?.length ?? 0} matches={matchQueries[index]?.data?.matches ?? []} open={openVacancyId === vacancy.id} onOpenChange={(open) => setOpenVacancyId(open ? vacancy.id : null)} /></li>)}</ul></section>
+      <TopMatchesByVacancy vacancies={vacancies} matchesByVacancy={matchQueries.map((query) => query.data?.matches ?? [])} onViewMatches={openMatches} /></>}
   </section>;
 }
 
