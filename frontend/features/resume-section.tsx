@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ChangeEvent, type FormEvent } from "react";
+import { useRef, useState, type ChangeEvent, type FormEvent } from "react";
 
 import { Badge, StatusBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,18 @@ import {
 
 function errorMessage(error: unknown): string {
   if (error instanceof ApiClientError) {
+    if (error.code === "DATABASE_ERROR" || error.code === "RESUME_STORAGE_ERROR") {
+      return "Resume could not be saved. Please try again.";
+    }
+    if (error.code === "UNSUPPORTED_RESUME_TYPE") {
+      return "Only PDF files are supported.";
+    }
+    if (error.code === "INVALID_RESUME_PDF") {
+      return "The PDF could not be read.";
+    }
+    if (error.code === "EMPTY_RESUME_FILE") {
+      return "Resume file is empty.";
+    }
     return error.message;
   }
 
@@ -118,6 +130,9 @@ function CurrentResume({ resume }: Readonly<{ resume: ResumeResponse }>) {
             </ul>
           </div>
         ) : null}
+        <p className="text-sm leading-6 text-secondary">
+          Your resume is used alongside GitHub and project evidence. It is not treated as verified proof on its own.
+        </p>
       </CardContent>
     </Card>
   );
@@ -126,6 +141,7 @@ function CurrentResume({ resume }: Readonly<{ resume: ResumeResponse }>) {
 export function ResumeSection({ enabled }: Readonly<{ enabled: boolean }>) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const currentResumeQuery = useCurrentResumeQuery(enabled);
   const uploadMutation = useUploadResumeMutation();
   const retryMutation = useRetryResumeMutation();
@@ -153,6 +169,10 @@ export function ResumeSection({ enabled }: Readonly<{ enabled: boolean }>) {
     uploadMutation.mutate(selectedFile, {
       onSuccess: (response) => {
         setActiveJobId(response.job_id);
+        setSelectedFile(null);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = "";
+        }
       }
     });
   }
@@ -191,7 +211,7 @@ export function ResumeSection({ enabled }: Readonly<{ enabled: boolean }>) {
           title="Resume"
           icon="resume"
           titleId="resume-section-title"
-          description="Upload a PDF resume to extract text and attach it to your Evidence pipeline. The maximum file size is 8 MiB."
+          description="Add your resume as one source of evidence. BeyondResume compares stated skills with verified evidence from GitHub and projects."
         />
 
         <div className="space-y-6" aria-live="polite">
@@ -222,8 +242,8 @@ export function ResumeSection({ enabled }: Readonly<{ enabled: boolean }>) {
 
           {resumeMissing && !isProcessing ? (
             <EmptyState
-              title="No resume uploaded"
-              description="Choose a PDF file below to create your current resume."
+              title="No resume evidence added yet"
+              description="Upload a PDF to compare your stated experience with verified project evidence."
               className="bg-background"
             />
           ) : null}
@@ -242,8 +262,7 @@ export function ResumeSection({ enabled }: Readonly<{ enabled: boolean }>) {
                 ) : null}
                 {job.status === "completed" ? (
                   <p className="text-sm text-success">
-                    Processing completed. Text was extracted and Evidence was created for this
-                    document.
+                    Resume evidence added. Text was extracted and evidence was created for this document.
                   </p>
                 ) : null}
                 {isTerminalFailure ? (
@@ -297,14 +316,19 @@ export function ResumeSection({ enabled }: Readonly<{ enabled: boolean }>) {
                 Resume file
               </label>
               <input
+                ref={fileInputRef}
                 id="resume-file"
                 name="file"
                 type="file"
-                accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                accept=".pdf,application/pdf"
                 onChange={onFileChange}
                 disabled={isBusy}
+                aria-describedby="resume-file-help"
                 className="block min-h-control w-full rounded-input border border-border bg-surface px-3 py-2 text-sm text-ink file:mr-4 file:rounded-button file:border-0 file:bg-primary file:px-4 file:py-2 file:text-sm file:font-medium file:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 disabled:bg-background"
               />
+              <p id="resume-file-help" className="text-sm text-secondary">
+                PDF only · Maximum file size: 8 MiB
+              </p>
               <p className="text-sm text-secondary" aria-live="polite">
                 {selectedFile ? `Selected file: ${selectedFile.name}` : "No file selected."}
               </p>
@@ -333,7 +357,7 @@ export function ResumeSection({ enabled }: Readonly<{ enabled: boolean }>) {
               disabled={!selectedFile || isBusy}
               loading={uploadMutation.isPending || isProcessing}
             >
-              Upload resume
+              {currentResumeQuery.data ? "Replace resume" : "Add resume evidence"}
             </Button>
           </form>
         </div>

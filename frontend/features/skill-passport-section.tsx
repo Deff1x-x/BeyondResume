@@ -136,7 +136,23 @@ function SkillCard({ skill }: Readonly<{ skill: SkillPassportSkill }>) {
         </div>
       </div>
 
-      <p className="mt-4 text-sm leading-6 text-secondary">{confirmationCopy(skill)}.</p>
+      {skill.github_repositories.length === 0 ? <p className="mt-4 text-sm leading-6 text-secondary">{confirmationCopy(skill)}.</p> : null}
+      {skill.github_repositories.length > 0 ? (
+        <div className="mt-3 text-sm text-secondary">
+          <p>Confirmed by GitHub</p>
+          <p className="mt-1 font-medium text-ink">
+            {skill.github_repositories.length === 1 ? "Repository:" : "Repositories:"}
+          </p>
+          {skill.github_repositories.map((repository) => (
+            <p key={repository.repository_url} className="mt-1 break-words">
+              {repository.repository_name} · {repository.repository_confidence}% repository confidence · {repository.evidence_count} evidence
+            </p>
+          ))}
+          <p className="mt-2 text-xs">
+            Calculated from evidence in this repository only. Repository scores do not add up to the overall confidence.
+          </p>
+        </div>
+      ) : null}
       <div className="mt-4 flex flex-wrap gap-2">
         {sources.map((source) => <Badge key={source} variant="neutral">{sourceTypeLabel(source)}</Badge>)}
       </div>

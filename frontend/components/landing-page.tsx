@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { BrandMark, Icon } from "@/components/ui/icon";
+import { BrandMark } from "@/components/ui/icon";
 import { Reveal } from "@/components/reveal";
 
 const candidateBenefits = [

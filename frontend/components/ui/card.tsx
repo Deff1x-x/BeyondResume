@@ -10,7 +10,27 @@ export function Card({
   return (
     <div
       className={cn(
-        "rounded-card border border-border bg-surface/90 text-ink shadow-card backdrop-blur-sm transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-card-hover",
+        "rounded-card border border-border bg-surface text-ink shadow-card",
+        className
+      )}
+      {...props}
+    >
+      {children}
+    </div>
+  );
+}
+
+/** Use only for cards that are links or have a primary interactive affordance. */
+export function InteractiveCard({
+  className,
+  children,
+  ...props
+}: HTMLAttributes<HTMLDivElement> & { children: ReactNode }) {
+  return (
+    <div
+      className={cn(
+        "rounded-card border border-border bg-surface text-ink shadow-card transition duration-200 hover:-translate-y-px hover:border-border-strong hover:shadow-card-hover",
+        "focus-within:ring-2 focus-within:ring-focus-ring focus-within:ring-offset-2",
         className
       )}
       {...props}

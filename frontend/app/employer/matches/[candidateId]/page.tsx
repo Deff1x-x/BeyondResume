@@ -4,19 +4,17 @@ import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect } from "react";
 
-import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
-import { PageContainer } from "@/components/ui/page-container";
 import { SkeletonText } from "@/components/ui/skeleton";
+import { WorkspaceShell } from "@/components/workspace-shell";
 import { CandidateProfileView } from "@/features/match-details/candidate-profile-view";
-import { useCurrentUser, useLogout } from "@/lib/auth/hooks";
+import { useCurrentUser } from "@/lib/auth/hooks";
 import { getAccessToken } from "@/lib/auth/token";
 
 function MatchDetailsContent() {
   const router = useRouter();
   const params = useParams<{ candidateId: string }>();
   const searchParams = useSearchParams();
-  const logout = useLogout();
   const { data: user, isLoading, isError } = useCurrentUser();
 
   const candidateId = typeof params.candidateId === "string" ? params.candidateId : "";
@@ -30,11 +28,6 @@ function MatchDetailsContent() {
       router.replace("/login");
     }
   }, [isLoading, router, user]);
-
-  function onSignOutClick() {
-    logout();
-    router.push("/login");
-  }
 
   if (isLoading) {
     return (
@@ -102,22 +95,12 @@ function MatchDetailsContent() {
     );
   }
 
-  return (
-    <>
-      <div className="mb-6 flex justify-end border-b border-border pb-4">
-        <Button type="button" variant="secondary" onClick={onSignOutClick}>
-          Logout
-        </Button>
-      </div>
-
-      <CandidateProfileView candidateId={candidateId} vacancyId={vacancyId} enabled />
-    </>
-  );
+  return <CandidateProfileView candidateId={candidateId} vacancyId={vacancyId} enabled />;
 }
 
 export default function EmployerMatchDetailsPage() {
   return (
-    <PageContainer>
+    <WorkspaceShell role="employer">
       <Suspense
         fallback={
           <div role="status" aria-label="Loading candidate profile" className="space-y-3">
@@ -128,6 +111,6 @@ export default function EmployerMatchDetailsPage() {
       >
         <MatchDetailsContent />
       </Suspense>
-    </PageContainer>
+    </WorkspaceShell>
   );
 }

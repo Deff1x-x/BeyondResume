@@ -14,6 +14,7 @@ const employerVacanciesQuery = vi.fn();
 const employerQueryResults = vi.fn();
 const matchDetailsQuery = vi.fn();
 const matchExplanationQuery = vi.fn();
+const hiringIntelligenceQuery = vi.fn();
 
 vi.mock("@/lib/skill-passport/hooks", () => ({
   useSkillPassportQuery: () => passportQuery()
@@ -45,6 +46,10 @@ vi.mock("@/lib/employer/hooks", () => ({
   vacancyRequirementsQueryKey: (vacancyId: string) => ["requirements", vacancyId]
 }));
 
+vi.mock("@/lib/ai-hiring-intelligence/hooks", () => ({
+  useAiHiringIntelligenceQuery: () => hiringIntelligenceQuery()
+}));
+
 const passport: SkillPassportResponse = {
   total_skills: 3,
   total_evidence: 3,
@@ -72,6 +77,20 @@ const passport: SkillPassportResponse = {
           source_reference: "profile.pdf",
           evidence_confidence: 1
         }
+      ],
+      github_repositories: [
+        {
+          repository_name: "example/project",
+          repository_url: "https://github.com/example/project",
+          evidence_count: 1,
+          repository_confidence: 61
+        },
+        {
+          repository_name: "example/service",
+          repository_url: "https://github.com/example/service",
+          evidence_count: 1,
+          repository_confidence: 22
+        }
       ]
     },
     {
@@ -80,7 +99,15 @@ const passport: SkillPassportResponse = {
       category: "frontend",
       evidence_confidence: 0.8,
       evidence_count: 1,
-      evidence: [{ id: "github-react", title: "Repository", description: null, source_type: "github_repository", source_reference: "https://github.com/example/project", evidence_confidence: 0.8 }]
+      evidence: [{ id: "github-react", title: "Repository", description: null, source_type: "github_repository", source_reference: "https://github.com/example/project", evidence_confidence: 0.8 }],
+      github_repositories: [
+        {
+          repository_name: "example/project",
+          repository_url: "https://github.com/example/project",
+          evidence_count: 1,
+          repository_confidence: 55
+        }
+      ]
     },
     {
       id: "internal-skill-resume",
@@ -88,7 +115,8 @@ const passport: SkillPassportResponse = {
       category: "backend",
       evidence_confidence: 0.5,
       evidence_count: 1,
-      evidence: [{ id: "resume-only", title: "Résumé", description: null, source_type: "resume", source_reference: "profile.pdf", evidence_confidence: 0.5 }]
+      evidence: [{ id: "resume-only", title: "Résumé", description: null, source_type: "resume", source_reference: "profile.pdf", evidence_confidence: 0.5 }],
+      github_repositories: []
     }
   ]
 };
@@ -110,6 +138,16 @@ describe("SkillPassportWorkspace", () => {
     expect(screen.getByText("2 evidence units")).toBeInTheDocument();
     expect(document.body.textContent).not.toContain("internal-evidence-id");
     expect(document.body.textContent).not.toContain("internal-skill-python");
+  });
+
+  it("shows independent GitHub repository confidences without treating them as the overall score", () => {
+    readyPassport();
+    render(<SkillPassportWorkspace />);
+
+    expect(screen.getAllByText("Confirmed by GitHub")).toHaveLength(2);
+    expect(screen.getByText("example/project · 61% repository confidence · 1 evidence")).toBeInTheDocument();
+    expect(screen.getByText("example/service · 22% repository confidence · 1 evidence")).toBeInTheDocument();
+    expect(screen.getAllByText("Calculated from evidence in this repository only. Repository scores do not add up to the overall confidence.")).toHaveLength(2);
   });
 
   it("filters GitHub skills and hides résumé-only skills", () => {
@@ -211,6 +249,7 @@ describe("EmployerSection", () => {
 describe("CandidateProfileView", () => {
   it("shows the existing match, evidence detail selection, and roadmap preview", () => {
     matchExplanationQuery.mockReturnValue({ isLoading: false, isError: true, data: null });
+    hiringIntelligenceQuery.mockReturnValue({ isLoading: false, isError: true, data: null });
     matchDetailsQuery.mockReturnValue({
       data: {
         candidate: { id: "candidate-private-id", name: "Alex Morgan", headline: "Python Backend Developer", avatar: null },

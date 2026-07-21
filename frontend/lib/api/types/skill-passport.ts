@@ -14,6 +14,7 @@ export type SkillPassportSkill = {
   evidence_confidence: number;
   evidence_count: number;
   evidence: SkillPassportEvidence[];
+  github_repositories: { repository_name: string; repository_url: string; evidence_count: number; repository_confidence: number }[];
 };
 
 export type SkillPassportResponse = {

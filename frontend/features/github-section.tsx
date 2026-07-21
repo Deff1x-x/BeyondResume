@@ -326,7 +326,7 @@ export function GitHubSection({ enabled }: Readonly<{ enabled: boolean }>) {
   }
 
   const repositories = repositoriesQuery.data ?? [];
-  const showConnectForm = repositoriesQuery.isSuccess && repositories.length === 0;
+  const showConnectForm = repositoriesQuery.isSuccess;
 
   return (
     <Card className="lg:col-span-2" aria-labelledby="github-section-title">
@@ -431,8 +431,7 @@ export function GitHubSection({ enabled }: Readonly<{ enabled: boolean }>) {
 
           {repositoriesQuery.isSuccess && repositories.length > 0 ? (
             <p className="text-sm text-secondary">
-              One repository can be connected per profile. Delete the current repository to
-              connect a different one.
+              Connect additional public repositories to aggregate evidence across your work.
             </p>
           ) : null}
         </div>

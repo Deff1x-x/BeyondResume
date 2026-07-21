@@ -21,7 +21,7 @@ export function SkeletonCard({ className }: SkeletonProps) {
   return (
     <div
       className={cn(
-        "rounded-card border border-border bg-background p-4",
+        "rounded-card border border-border bg-surface p-5",
         className
       )}
       aria-hidden="true"

@@ -52,12 +52,8 @@
   }
 
   .section-panel {
-    @apply rounded-card border border-border bg-surface/90 p-6 backdrop-blur-sm transition duration-200 ease-out hover:-translate-y-0.5;
+    @apply rounded-card border border-border bg-surface/90 p-6 backdrop-blur-sm;
     box-shadow: var(--shadow-card);
-  }
-
-  .section-panel:hover {
-    box-shadow: var(--shadow-card-hover);
   }
 
   .reveal {
