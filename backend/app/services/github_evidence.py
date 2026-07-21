@@ -33,7 +33,7 @@ class GitHubEvidenceGenerationResult:
 
 
 def generate_github_repository_evidence(
-    session: Session, candidate_id: UUID
+    session: Session, candidate_id: UUID, repository_id: UUID | None = None
 ) -> GitHubEvidenceGenerationResult:
     candidate = session.execute(
         select(CandidateProfile).where(CandidateProfile.id == candidate_id)
@@ -42,7 +42,10 @@ def generate_github_repository_evidence(
         raise CandidateProfileNotFoundError
 
     repository = session.execute(
-        select(GitHubRepository).where(GitHubRepository.candidate_id == candidate_id)
+        select(GitHubRepository).where(
+            GitHubRepository.candidate_id == candidate_id,
+            *((GitHubRepository.id == repository_id,) if repository_id is not None else ()),
+        )
     ).scalar_one_or_none()
     if repository is None:
         raise GitHubRepositorySourceNotFoundError

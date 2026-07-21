@@ -9,8 +9,10 @@ from sqlalchemy.orm import Session
 from app.models.evidence_skill_link import EvidenceSkillLink
 from app.models.evidence_unit import EvidenceUnit
 from app.models.skill import Skill
+from app.models.github_repository import GitHubRepository
 from app.schemas.skill_passport import (
     SkillPassportEvidenceResponse,
+    SkillPassportGitHubRepositoryResponse,
     SkillPassportResponse,
     SkillPassportSkillResponse,
 )
@@ -34,6 +36,13 @@ def build_passport(session: Session, candidate_id: UUID) -> SkillPassportRespons
             Skill.deprecated.is_(False),
         )
     ).all()
+    repository_result = session.execute(
+        select(GitHubRepository).where(GitHubRepository.candidate_id == candidate_id)
+    )
+    repositories_by_url = {
+        repository.repository_url: repository
+        for repository in (repository_result.scalars() if hasattr(repository_result, "scalars") else ())
+    }
 
     observations_by_skill: dict[UUID, dict[UUID, SkillEvidenceObservation]] = {}
     skills_by_id: dict[UUID, Skill] = {}
@@ -82,6 +91,9 @@ def build_passport(session: Session, candidate_id: UUID) -> SkillPassportRespons
                 evidence_confidence=confidence.confidence,
                 evidence_count=len(observations_by_evidence),
                 evidence=evidence_responses,
+                github_repositories=_github_breakdown(
+                    observations_by_evidence, evidence_by_id, repositories_by_url
+                ),
             )
         )
 
@@ -91,6 +103,30 @@ def build_passport(session: Session, candidate_id: UUID) -> SkillPassportRespons
         total_skills=len(skill_responses),
         total_evidence=len(evidence_by_id),
     )
+
+
+def _github_breakdown(
+    observations: Mapping[UUID, SkillEvidenceObservation],
+    evidence_by_id: Mapping[UUID, EvidenceUnit],
+    repositories_by_url: Mapping[str, GitHubRepository],
+) -> list[SkillPassportGitHubRepositoryResponse]:
+    groups: dict[str, list[SkillEvidenceObservation]] = {}
+    for evidence_id, observation in observations.items():
+        if evidence_by_id[evidence_id].source_type == "github_repository" and observation.source_reference in repositories_by_url:
+            groups.setdefault(observation.source_reference, []).append(observation)
+    result = []
+    for url, values in groups.items():
+        repository = repositories_by_url[url]
+        result.append(
+            SkillPassportGitHubRepositoryResponse(
+                repository_name=repository.repository_url.removeprefix("https://github.com/"),
+                repository_url=url,
+                evidence_count=len(values),
+                repository_confidence=round(calculate_skill_confidence(values).confidence * 100),
+            )
+        )
+    result.sort(key=lambda value: (-value.evidence_count, value.repository_name))
+    return result
 
 
 def _merge_context(

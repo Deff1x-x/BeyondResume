@@ -34,17 +34,20 @@ class GitHubRepositoryScanResult:
 
 
 def run_github_repository_scan(
-    session: Session, candidate_id: UUID, provider: GitHubProvider
+    session: Session, candidate_id: UUID, provider: GitHubProvider, repository_id: UUID | None = None
 ) -> GitHubRepositoryScanResult:
-    provider_snapshot = fetch_github_repository_snapshot(session, candidate_id, provider)
+    provider_snapshot = fetch_github_repository_snapshot(session, candidate_id, provider, repository_id)
     repository = session.execute(
-        select(GitHubRepository).where(GitHubRepository.candidate_id == candidate_id)
+        select(GitHubRepository).where(
+            GitHubRepository.candidate_id == candidate_id,
+            *( (GitHubRepository.id == repository_id,) if repository_id is not None else () ),
+        )
     ).scalar_one_or_none()
     if repository is None:
         raise GitHubRepositorySourceNotFoundError
 
     persistence_result = persist_github_repository_snapshot(session, repository, provider_snapshot)
-    evidence_result = generate_github_repository_evidence(session, candidate_id)
+    evidence_result = generate_github_repository_evidence(session, candidate_id, repository.id)
     return _result(repository, persistence_result, evidence_result)
 
 

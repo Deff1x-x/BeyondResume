@@ -26,26 +26,26 @@ class GitHubSourceAdapter:
     def __init__(self, provider: GitHubProvider) -> None:
         self._provider = provider
 
-    def fetch(self, session: Session, candidate_id: UUID) -> GitHubRepositorySnapshot:
-        return fetch_github_repository_snapshot(session, candidate_id, self._provider)
+    def fetch(self, session: Session, candidate_id: UUID, repository_id: UUID) -> GitHubRepositorySnapshot:
+        return fetch_github_repository_snapshot(session, candidate_id, self._provider, repository_id)
 
     def normalize(self, snapshot: GitHubRepositorySnapshot) -> GitHubRepositorySnapshot:
         return snapshot
 
     def persist_snapshot(
-        self, session: Session, candidate_id: UUID, snapshot: GitHubRepositorySnapshot
+        self, session: Session, candidate_id: UUID, repository_id: UUID, snapshot: GitHubRepositorySnapshot
     ) -> GitHubRepositorySnapshotPersistenceResult:
         repository = session.execute(
-            select(GitHubRepository).where(GitHubRepository.candidate_id == candidate_id)
+            select(GitHubRepository).where(GitHubRepository.candidate_id == candidate_id, GitHubRepository.id == repository_id)
         ).scalar_one_or_none()
         if repository is None:
             raise GitHubRepositorySourceNotFoundError
         return persist_github_repository_snapshot(session, repository, snapshot)
 
     def generate_evidence(
-        self, session: Session, candidate_id: UUID
+        self, session: Session, candidate_id: UUID, repository_id: UUID
     ) -> GitHubEvidenceGenerationResult:
-        return generate_github_repository_evidence(session, candidate_id)
+        return generate_github_repository_evidence(session, candidate_id, repository_id)
 
-    def run_scan(self, session: Session, candidate_id: UUID) -> GitHubRepositoryScanResult:
-        return run_github_repository_scan(session, candidate_id, self._provider)
+    def run_scan(self, session: Session, candidate_id: UUID, repository_id: UUID) -> GitHubRepositoryScanResult:
+        return run_github_repository_scan(session, candidate_id, self._provider, repository_id)

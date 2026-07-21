@@ -106,10 +106,10 @@ def _diversity(observations: Sequence[SkillEvidenceObservation]) -> float:
 
 def _coverage(observations: Sequence[SkillEvidenceObservation]) -> float:
     paths = {
-        path
+        (observation.source_reference, path)
         for observation in observations
         for path in _signal_paths(observation)
-        if path
+        if path and observation.source_reference
     }
     return min(log1p(len(paths)) / log1p(COVERAGE_SATURATION_PATHS), 1.0) if paths else 0.0
 

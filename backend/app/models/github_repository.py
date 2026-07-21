@@ -14,7 +14,9 @@ if TYPE_CHECKING:
 
 class GitHubRepository(TimestampMixin, Base):
     __tablename__ = "github_repositories"
-    __table_args__ = (UniqueConstraint("candidate_id", name="uq_github_repositories_candidate_id"),)
+    __table_args__ = (
+        UniqueConstraint("candidate_id", "repository_url", name="uq_github_repositories_candidate_url"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     candidate_id: Mapped[uuid.UUID] = mapped_column(
@@ -22,7 +24,7 @@ class GitHubRepository(TimestampMixin, Base):
     )
     repository_url: Mapped[str] = mapped_column(String(2048), nullable=False)
 
-    candidate_profile: Mapped["CandidateProfile"] = relationship(back_populates="github_repository")
+    candidate_profile: Mapped["CandidateProfile"] = relationship(back_populates="github_repositories")
     snapshot: Mapped["GitHubRepositorySnapshot | None"] = relationship(
         back_populates="repository", uselist=False
     )

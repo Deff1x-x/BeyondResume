@@ -51,9 +51,7 @@ class CandidateProfile(TimestampMixin, Base):
 
     user: Mapped["User"] = relationship(back_populates="candidate_profile")
     resumes: Mapped[list["Resume"]] = relationship(back_populates="candidate_profile")
-    github_repository: Mapped["GitHubRepository | None"] = relationship(
-        back_populates="candidate_profile", uselist=False
-    )
+    github_repositories: Mapped[list["GitHubRepository"]] = relationship(back_populates="candidate_profile")
     evidence_units: Mapped[list["EvidenceUnit"]] = relationship(back_populates="candidate_profile")
     evidence_skill_links: Mapped[list["EvidenceSkillLink"]] = relationship(
         back_populates="candidate_profile"

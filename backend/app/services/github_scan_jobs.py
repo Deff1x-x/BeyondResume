@@ -1,5 +1,6 @@
 """Background execution of github_scan Jobs on the shared Job engine."""
 
+import logging
 from uuid import UUID
 
 from sqlalchemy.exc import SQLAlchemyError
@@ -7,7 +8,9 @@ from sqlalchemy.orm import Session
 
 from app.db.session import SessionLocal
 from app.integrations.github import (
+    GitHubAuthenticationError,
     GitHubProviderError,
+    GitHubRateLimitError,
     GitHubRepositoryNotFoundError,
     get_github_provider,
 )
@@ -19,6 +22,7 @@ from app.services.github_scan import (
     GitHubRepositorySourceNotFoundError,
     GitHubSnapshotIdentityMismatchError,
 )
+from app.services.github_skill_reextraction import reextract_github_evidence_skills
 from app.services.jobs import (
     JobTransitionError,
     claim_job,
@@ -32,6 +36,7 @@ from app.utils.github_evidence import GitHubPersistedSnapshotValidationError
 from app.utils.github_snapshot import GitHubSnapshotValidationError
 
 GITHUB_SCAN_SUBJECT_TYPE = "github_repository"
+logger = logging.getLogger(__name__)
 
 
 def request_github_scan(
@@ -50,6 +55,10 @@ def request_github_scan(
 def _failure_details(error: BaseException) -> tuple[str, str]:
     if isinstance(error, GitHubRepositoryNotFoundError):
         return "GITHUB_REPOSITORY_UNAVAILABLE", "Repository data is not available for analysis"
+    if isinstance(error, GitHubAuthenticationError):
+        return "GITHUB_AUTHENTICATION_ERROR", "GitHub repository data could not be fetched"
+    if isinstance(error, GitHubRateLimitError):
+        return "GITHUB_RATE_LIMIT", "GitHub repository data could not be fetched"
     if isinstance(error, GitHubProviderError):
         return "GITHUB_PROVIDER_ERROR", "GitHub repository data could not be fetched"
     if isinstance(error, SQLAlchemyError):
@@ -68,8 +77,16 @@ def run_github_scan_job(session: Session, job_id: UUID) -> Job:
         raise JobTransitionError("Job is not a github scan job")
 
     try:
-        scan_result = run_github_repository_scan(session, job.candidate_id, get_github_provider())
+        scan_result = run_github_repository_scan(
+            session, job.candidate_id, get_github_provider(), job.subject_id
+        )
         extract_and_link_evidence_skills(session, scan_result.evidence_unit)
+        reextract_github_evidence_skills(
+            session,
+            candidate_id=job.candidate_id,
+            github_repository_id=scan_result.repository.id,
+            evidence_unit_id=scan_result.evidence_unit.id,
+        )
     except (
         GitHubProviderError,
         CandidateProfileNotFoundError,
@@ -80,9 +97,14 @@ def run_github_scan_job(session: Session, job_id: UUID) -> Job:
         GitHubSnapshotValidationError,
         SQLAlchemyError,
     ) as error:
+        logger.exception("GitHub scan job %s failed", job_id)
         session.rollback()
         code, message = _failure_details(error)
         return fail_running_job(session, job, code, message)
+    except Exception:
+        logger.exception("GitHub scan job %s failed unexpectedly", job_id)
+        session.rollback()
+        return fail_running_job(session, job, "GITHUB_ANALYSIS_ERROR", "GitHub repository analysis failed")
 
     return complete_running_job(session, job)
 

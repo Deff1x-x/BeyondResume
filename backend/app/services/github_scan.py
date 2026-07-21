@@ -23,7 +23,7 @@ class GitHubSnapshotIdentityMismatchError(Exception):
 
 
 def fetch_github_repository_snapshot(
-    session: Session, candidate_id: UUID, provider: GitHubProvider
+    session: Session, candidate_id: UUID, provider: GitHubProvider, repository_id: UUID | None = None
 ) -> GitHubRepositorySnapshot:
     candidate = session.execute(
         select(CandidateProfile).where(CandidateProfile.id == candidate_id)
@@ -32,7 +32,10 @@ def fetch_github_repository_snapshot(
         raise CandidateProfileNotFoundError
 
     repository = session.execute(
-        select(GitHubRepository).where(GitHubRepository.candidate_id == candidate_id)
+        select(GitHubRepository).where(
+            GitHubRepository.candidate_id == candidate_id,
+            *( (GitHubRepository.id == repository_id,) if repository_id is not None else () ),
+        )
     ).scalar_one_or_none()
     if repository is None:
         raise GitHubRepositorySourceNotFoundError

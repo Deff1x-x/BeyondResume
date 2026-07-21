@@ -14,6 +14,7 @@ from app.db.session import get_db
 from app.main import app
 from app.models.candidate_profile import CandidateProfile, OnboardingStatus
 from app.models.evidence_unit import EvidenceUnit
+from app.models.github_repository import GitHubRepository
 from app.models.skill import Skill
 from app.models.user import User
 
@@ -81,7 +82,10 @@ def authorize_candidate(user: User) -> None:
     app.dependency_overrides[require_candidate] = lambda: user
 
 
-def _session_returning_rows(rows: list[tuple[Skill, EvidenceUnit, object]]) -> Mock:
+def _session_returning_rows(
+    rows: list[tuple[Skill, EvidenceUnit, object]],
+    repositories: list[GitHubRepository] | None = None,
+) -> Mock:
     session = Mock()
     normalized_rows = [
         (
@@ -102,7 +106,10 @@ def _session_returning_rows(rows: list[tuple[Skill, EvidenceUnit, object]]) -> M
         )
         for skill, evidence, context in rows
     ]
-    session.execute.return_value = SimpleNamespace(all=lambda: normalized_rows)
+    session.execute.side_effect = (
+        SimpleNamespace(all=lambda: normalized_rows),
+        SimpleNamespace(scalars=lambda: iter(repositories or [])),
+    )
     return session
 
 
@@ -195,6 +202,67 @@ def test_skill_passport_aggregates_skills_evidence_and_totals(
     assert python_skill["evidence_count"] == 2
     assert [item["title"] for item in python_skill["evidence"]] == ["Repo A", "Repo B"]
     assert all(0 < item["evidence_confidence"] <= 0.95 for item in python_skill["evidence"])
+
+
+def test_skill_passport_returns_repository_only_confidence_breakdown(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.api.v1 import skill_passport
+
+    user = make_user()
+    profile = make_profile(user.id)
+    react = make_skill(name="React", category="frontend")
+    repository_a_url = "https://github.com/demo/frontend"
+    repository_b_url = "https://github.com/demo/config"
+    repository_a = GitHubRepository(id=uuid4(), candidate_id=profile.id, repository_url=repository_a_url)
+    repository_b = GitHubRepository(id=uuid4(), candidate_id=profile.id, repository_url=repository_b_url)
+    evidence_a = make_evidence(
+        candidate_id=profile.id,
+        title="Frontend source",
+        source_reference=repository_a_url,
+    )
+    evidence_b = make_evidence(
+        candidate_id=profile.id,
+        title="Package manifest",
+        source_reference=repository_b_url,
+    )
+    rows = [
+        (
+            react,
+            evidence_a,
+            {
+                "signals": [
+                    {"type": "source_import", "path": "src/App.tsx"},
+                    {"type": "source_function_usage", "path": "src/components/App.tsx"},
+                    {"type": "test_usage", "path": "tests/App.test.tsx"},
+                ]
+            },
+        ),
+        (
+            react,
+            evidence_b,
+            {"signals": [{"type": "dependency_manifest", "manifest": "package.json"}]},
+        ),
+    ]
+
+    authorize_candidate(user)
+    monkeypatch.setattr(skill_passport, "get_candidate_profile", lambda *_args: profile)
+    app.dependency_overrides[get_db] = lambda: _session_returning_rows(
+        rows, [repository_a, repository_b]
+    )
+
+    response = client.get("/api/v1/candidate/skill-passport")
+
+    assert response.status_code == 200
+    skill = response.json()["skills"][0]
+    repositories = {item["repository_name"]: item for item in skill["github_repositories"]}
+    assert set(repositories) == {"demo/frontend", "demo/config"}
+    assert all(isinstance(item["repository_confidence"], int) for item in repositories.values())
+    assert all(0 <= item["repository_confidence"] <= 95 for item in repositories.values())
+    assert repositories["demo/frontend"]["repository_confidence"] > repositories["demo/config"]["repository_confidence"]
+    assert skill["evidence_confidence"] != sum(
+        item["repository_confidence"] for item in repositories.values()
+    ) / 100
 
 
 def test_skill_passport_deduplicates_multiple_links_for_same_skill_evidence_pair(

@@ -1,9 +1,13 @@
 from dataclasses import dataclass
 import base64
+from io import BytesIO
 import json
+import logging
 from pathlib import Path
+import tarfile
 from typing import Callable, Final, Protocol
 from urllib.error import HTTPError, URLError
+from urllib.parse import quote, urlsplit
 from urllib.request import Request, urlopen
 
 from app.core.config import settings
@@ -18,15 +22,20 @@ from app.utils.github_manifests import (
 )
 
 from app.utils.github_url import GitHubRepositoryURL, is_valid_github_repository_identity
-from app.utils.github_code_usage_rules import is_analyzable_source_path
+from app.utils.github_code_usage_rules import CONFIG_FILENAMES, is_analyzable_source_path, is_test_path
 
 
 MAX_LANGUAGES: Final = 20
 MAX_FILE_TREE_PATHS: Final = 500
 MAX_README_CHARS: Final = 10_000
 MAX_SOURCE_FILES: Final = 60
+MAX_ANONYMOUS_SOURCE_FILES: Final = 20
+MAX_MANIFEST_CONTENT_FILES: Final = 10
+SOURCE_REQUEST_RESERVE: Final = 1
 MAX_SOURCE_FILE_BYTES: Final = 64 * 1024
+MAX_ARCHIVE_BYTES: Final = 25 * 1024 * 1024
 GITHUB_SNAPSHOT_SCHEMA_VERSION: Final = 3
+logger = logging.getLogger(__name__)
 
 
 class GitHubProviderError(Exception):
@@ -100,10 +109,15 @@ class LiveGitHubProvider:
         token: str | None = None,
         timeout_seconds: int = 20,
         request_json: Callable[[str], object] | None = None,
+        request_bytes: Callable[[str], bytes] | None = None,
     ) -> None:
         self._token = token
         self._timeout_seconds = timeout_seconds
         self._request_json_override = request_json
+        self._request_bytes_override = request_bytes
+        self._content_cache: dict[str, str | None] = {}
+        self._rate_limit_remaining: int | None = None
+        self._source_rate_limited = False
 
     def get_repository_snapshot(self, repository: GitHubRepositoryURL) -> GitHubRepositorySnapshot:
         if not is_valid_github_repository_identity(repository.owner, repository.repository):
@@ -119,24 +133,17 @@ class LiveGitHubProvider:
         manifest_paths, warnings = limit_discovered_manifest_paths(
             tuple(path for path in file_tree if _manifest_path(path))
         )
-        contents = {
-            path: value
-            for path in manifest_paths
-            if (value := self._optional_contents(f"{prefix}/contents/{path}?ref={commit_sha}")) is not None
-        }
+        source_paths = _prioritize_source_paths(file_tree)[:MAX_SOURCE_FILES]
+        archive_contents = self._archive_contents(
+            prefix, commit_sha, {*manifest_paths, *source_paths, *_readme_paths(file_tree)}
+        )
+        contents = {path: archive_contents[path] for path in manifest_paths if path in archive_contents}
         manifests, manifest_warnings = _normalized_manifests(
             {"manifest_contents": contents}, manifest_paths, warnings
         )
-        source_files = tuple(
-            (path, content)
-            for path in sorted(path for path in file_tree if is_analyzable_source_path(path))[
-                :MAX_SOURCE_FILES
-            ]
-            if (content := self._optional_contents(f"{prefix}/contents/{path}?ref={commit_sha}"))
-            is not None
-            and len(content.encode("utf-8")) <= MAX_SOURCE_FILE_BYTES
-        )
         languages = self._object(self._get_json(f"{prefix}/languages"), "languages")
+        readme_text = next((archive_contents[path] for path in _readme_paths(file_tree) if path in archive_contents), None)
+        source_files = tuple((path, archive_contents[path]) for path in source_paths if path in archive_contents)
         return GitHubRepositorySnapshot(
             canonical_url=repository.canonical_url,
             repository_name=repository.repository,
@@ -147,7 +154,7 @@ class LiveGitHubProvider:
             is_archived=self._boolean(metadata.get("archived"), "archived"),
             languages=tuple(sorted(key for key in languages if isinstance(key, str)))[:MAX_LANGUAGES],
             file_tree=file_tree,
-            readme_text=self._optional_contents(f"{prefix}/readme"),
+            readme_text=readme_text,
             manifest_paths=manifest_paths,
             normalized_manifests=manifests,
             manifest_warnings=manifest_warnings,
@@ -164,8 +171,13 @@ class LiveGitHubProvider:
             headers["Authorization"] = f"Bearer {self._token}"
         try:
             with urlopen(Request(url, headers=headers), timeout=self._timeout_seconds) as response:
-                return json.loads(response.read().decode("utf-8"))
+                payload = json.loads(response.read().decode("utf-8"))
+                _log_github_request(url, response.status, response.headers, None)
+                self._record_rate_limit(response.headers)
+                return payload
         except HTTPError as error:
+            _log_github_request(url, error.code, error.headers, error)
+            self._record_rate_limit(error.headers)
             if error.code == 404:
                 raise GitHubRepositoryNotFoundError("GitHub repository was not found") from error
             if error.code == 401:
@@ -174,7 +186,96 @@ class LiveGitHubProvider:
                 raise GitHubRateLimitError("GitHub rate limit is exhausted") from error
             raise GitHubProviderError(f"GitHub API returned HTTP {error.code}") from error
         except (URLError, OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+            _log_github_request(url, None, None, error)
             raise GitHubProviderError("GitHub API request failed") from error
+
+    def _contents_for_path(self, prefix: str, path: str, commit_sha: str) -> str | None:
+        if path in self._content_cache:
+            return self._content_cache[path]
+        encoded_path = quote(path, safe="/")
+        encoded_ref = quote(commit_sha, safe="")
+        content = self._optional_contents(f"{prefix}/contents/{encoded_path}?ref={encoded_ref}")
+        self._content_cache[path] = content
+        return content
+
+    def _archive_contents(self, prefix: str, commit_sha: str, paths: set[str]) -> dict[str, str]:
+        archive_url = f"{prefix}/tarball/{quote(commit_sha, safe='')}"
+        archive = self._get_bytes(archive_url)
+        result: dict[str, str] = {}
+        try:
+            with tarfile.open(fileobj=BytesIO(archive), mode="r:gz") as tar:
+                for member in tar:
+                    if not member.isfile() or member.size > MAX_SOURCE_FILE_BYTES:
+                        continue
+                    path = member.name.split("/", 1)[-1] if "/" in member.name else ""
+                    if path not in paths:
+                        continue
+                    handle = tar.extractfile(member)
+                    if handle is None:
+                        continue
+                    try:
+                        result[path] = handle.read().decode("utf-8")
+                    except UnicodeDecodeError:
+                        continue
+        except (tarfile.TarError, OSError) as error:
+            raise GitHubProviderError("GitHub archive is invalid") from error
+        return result
+
+    def _get_bytes(self, url: str) -> bytes:
+        if self._request_bytes_override is not None:
+            return self._request_bytes_override(url)
+        headers = {"Accept": "application/vnd.github+json", "User-Agent": "BeyondResume"}
+        if self._token:
+            headers["Authorization"] = f"Bearer {self._token}"
+        try:
+            with urlopen(Request(url, headers=headers), timeout=self._timeout_seconds) as response:
+                chunks: list[bytes] = []
+                size = 0
+                while chunk := response.read(64 * 1024):
+                    size += len(chunk)
+                    if size > MAX_ARCHIVE_BYTES:
+                        raise GitHubProviderError("GitHub archive exceeds size limit")
+                    chunks.append(chunk)
+                _log_github_request(url, response.status, response.headers, None)
+                return b"".join(chunks)
+        except HTTPError as error:
+            _log_github_request(url, error.code, error.headers, error)
+            raise GitHubProviderError(f"GitHub archive request returned HTTP {error.code}") from error
+        except (URLError, OSError) as error:
+            _log_github_request(url, None, None, error)
+            raise GitHubProviderError("GitHub archive request failed") from error
+
+    def _source_files(
+        self, prefix: str, file_tree: tuple[str, ...], commit_sha: str
+    ) -> tuple[tuple[str, str], ...]:
+        files: list[tuple[str, str]] = []
+        for path in _prioritize_source_paths(file_tree)[: self._source_request_budget()]:
+            try:
+                content = self._contents_for_path(prefix, path, commit_sha)
+            except GitHubRateLimitError:
+                self._source_rate_limited = True
+                logger.warning("github_source_scan_degraded", extra={"reason": "rate_limit"})
+                break
+            if content is not None and len(content.encode("utf-8")) <= MAX_SOURCE_FILE_BYTES:
+                files.append((path, content))
+        return tuple(files)
+
+    def _source_request_budget(self) -> int:
+        if self._token:
+            return MAX_SOURCE_FILES
+        if self._rate_limit_remaining is None:
+            return MAX_ANONYMOUS_SOURCE_FILES
+        return min(
+            MAX_ANONYMOUS_SOURCE_FILES,
+            max(self._rate_limit_remaining - SOURCE_REQUEST_RESERVE, 0),
+        )
+
+    def _record_rate_limit(self, headers: object) -> None:
+        value = getattr(headers, "get", lambda _name: None)("X-RateLimit-Remaining")
+        try:
+            self._rate_limit_remaining = int(value) if value is not None else None
+        except (TypeError, ValueError):
+            self._rate_limit_remaining = None
 
     def _optional_contents(self, url: str) -> str | None:
         try:
@@ -224,6 +325,72 @@ class LiveGitHubProvider:
         if any(not isinstance(path, str) or not _is_safe_repository_path(path) for path in paths):
             raise GitHubProviderError("GitHub API git tree contains an invalid path")
         return tuple(sorted(paths)[:MAX_FILE_TREE_PATHS])
+
+
+def _log_github_request(
+    url: str,
+    status: int | None,
+    headers: object,
+    error: BaseException | None,
+) -> None:
+    """Log request diagnostics without exposing credentials or file contents."""
+    parts = urlsplit(url).path.strip("/").split("/")
+    owner = parts[1] if len(parts) >= 3 and parts[0] == "repos" else None
+    repository = parts[2] if len(parts) >= 3 and parts[0] == "repos" else None
+    category = "/".join(parts[3:4]) or "repository"
+    get_header = getattr(headers, "get", lambda _name: None)
+    logger.info(
+        "github_api_request",
+        extra={
+            "operation": "get_repository_snapshot",
+            "owner": owner,
+            "repository": repository,
+            "endpoint_category": category,
+            "response_status": status,
+            "rate_limit_limit": get_header("X-RateLimit-Limit"),
+            "rate_limit_remaining": get_header("X-RateLimit-Remaining"),
+            "rate_limit_reset": get_header("X-RateLimit-Reset"),
+            "rate_limit_resource": get_header("X-RateLimit-Resource"),
+            "exception_class": type(error).__name__ if error is not None else None,
+        },
+    )
+
+
+def _prioritize_manifest_paths(paths: tuple[str, ...]) -> tuple[str, ...]:
+    return tuple(sorted(paths, key=lambda path: (path.count("/"), path)))
+
+
+def _prioritize_source_paths(paths: tuple[str, ...]) -> tuple[str, ...]:
+    return tuple(
+        sorted(
+            (
+                path
+                for path in paths
+                if is_analyzable_source_path(path) and not _manifest_path(path)
+            ),
+            key=lambda path: (_source_path_priority(path), path),
+        )
+    )
+
+
+def _readme_paths(paths: tuple[str, ...]) -> tuple[str, ...]:
+    return tuple(sorted(path for path in paths if path.rsplit("/", 1)[-1].lower().startswith("readme")))
+
+
+def _source_path_priority(path: str) -> int:
+    lower_path = path.lower()
+    name = lower_path.rsplit("/", 1)[-1]
+    if (
+        lower_path.startswith(".github/workflows/")
+        or name in CONFIG_FILENAMES
+        or is_test_path(path)
+    ):
+        return 0
+    if lower_path.startswith(("src/", "app/", "backend/", "frontend/", "server/", "client/", "packages/")):
+        return 1
+    if name in {"main.py", "main.ts", "main.tsx", "app.py", "app.ts", "app.tsx", "index.js", "index.ts", "index.tsx"}:
+        return 2
+    return 3
 
 
 def _manifest_path(path: str) -> bool:

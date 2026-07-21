@@ -12,6 +12,13 @@ class SkillPassportEvidenceResponse(BaseModel):
     evidence_confidence: float
 
 
+class SkillPassportGitHubRepositoryResponse(BaseModel):
+    repository_name: str
+    repository_url: str
+    evidence_count: int
+    repository_confidence: int
+
+
 class SkillPassportSkillResponse(BaseModel):
     id: UUID
     name: str
@@ -19,6 +26,7 @@ class SkillPassportSkillResponse(BaseModel):
     evidence_confidence: float
     evidence_count: int
     evidence: list[SkillPassportEvidenceResponse]
+    github_repositories: list[SkillPassportGitHubRepositoryResponse] = []
 
 
 class SkillPassportResponse(BaseModel):

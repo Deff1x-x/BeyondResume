@@ -10,10 +10,7 @@ from app.models.candidate_profile import CandidateProfile, OnboardingStatus
 from app.models.evidence_unit import EvidenceUnit
 from app.models.github_repository import GitHubRepository
 from app.services.candidate import CandidateProfileNotFoundError
-from app.services.github_repository import (
-    GitHubRepositoryConflictError,
-    connect_github_repository,
-)
+from app.services.github_repository import connect_github_repository
 from app.utils.github_url import GitHubRepositoryUrlError
 
 
@@ -77,22 +74,22 @@ def test_connect_is_idempotent_for_same_canonical_url() -> None:
     session.commit.assert_not_called()
 
 
-def test_connect_rejects_different_repository_without_mutating_existing_record() -> None:
+def test_connect_allows_a_distinct_repository_without_mutating_existing_record() -> None:
     candidate = make_candidate()
     existing_repository = GitHubRepository(
         candidate_id=candidate.id,
         repository_url="https://github.com/demo-user/existing-repository",
     )
-    session = make_session(candidate, existing_repository)
+    session = make_session(candidate, None)
 
-    with pytest.raises(GitHubRepositoryConflictError):
-        connect_github_repository(
-            session, candidate.id, "https://github.com/demo-user/other-repository"
-        )
+    repository = connect_github_repository(
+        session, candidate.id, "https://github.com/demo-user/other-repository"
+    )
 
     assert existing_repository.repository_url == "https://github.com/demo-user/existing-repository"
-    session.add.assert_not_called()
-    session.flush.assert_not_called()
+    assert repository.repository_url == "https://github.com/demo-user/other-repository"
+    session.add.assert_called_once_with(repository)
+    session.flush.assert_called_once()
     session.commit.assert_not_called()
 
 
@@ -140,10 +137,10 @@ def test_connect_propagates_failed_unique_flush_to_external_transaction_boundary
     session.commit.assert_not_called()
 
 
-def test_repository_model_retains_database_unique_constraint_per_candidate() -> None:
+def test_repository_model_has_database_unique_constraint_per_candidate_and_url() -> None:
     assert any(
         isinstance(constraint, UniqueConstraint)
-        and tuple(column.name for column in constraint.columns) == ("candidate_id",)
+        and tuple(column.name for column in constraint.columns) == ("candidate_id", "repository_url")
         for constraint in GitHubRepository.__table__.constraints
     )
 

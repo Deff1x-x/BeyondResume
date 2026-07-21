@@ -27,12 +27,13 @@ def connect_github_repository(
         raise CandidateProfileNotFoundError
 
     existing_repository = session.execute(
-        select(GitHubRepository).where(GitHubRepository.candidate_id == candidate_id)
+        select(GitHubRepository).where(
+            GitHubRepository.candidate_id == candidate_id,
+            GitHubRepository.repository_url == normalized_url.canonical_url,
+        )
     ).scalar_one_or_none()
     if existing_repository is not None:
-        if existing_repository.repository_url == normalized_url.canonical_url:
-            return existing_repository
-        raise GitHubRepositoryConflictError
+        return existing_repository
 
     repository = GitHubRepository(
         candidate_id=candidate_id,

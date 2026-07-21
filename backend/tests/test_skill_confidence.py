@@ -62,6 +62,19 @@ def test_cross_repository_confirmation_is_bounded_and_non_linear() -> None:
     assert three - two <= two - one
 
 
+def test_repository_only_calculation_has_no_cross_repository_bonus() -> None:
+    first = observation({"type": "source_import", "path": "src/App.tsx"})
+    second = observation(
+        {"type": "source_import", "path": "src/App.tsx"},
+        repository="https://github.com/demo/other",
+    )
+
+    repository_only = calculate_skill_confidence((first,)).confidence
+    overall = calculate_skill_confidence((first, second)).confidence
+
+    assert repository_only < overall
+
+
 def test_project_coverage_has_diminishing_returns() -> None:
     one_path = calculate_skill_confidence(
         tuple(

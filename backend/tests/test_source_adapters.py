@@ -71,9 +71,10 @@ def test_github_adapter_delegates_orchestration(monkeypatch: pytest.MonkeyPatch)
     adapter = GitHubSourceAdapter(provider)
     session = Mock()
     candidate_id = uuid4()
+    repository_id = uuid4()
     result = Mock(spec=GitHubRepositoryScanResult)
     run_scan = Mock(return_value=result)
     monkeypatch.setattr("app.services.github_source_adapter.run_github_repository_scan", run_scan)
 
-    assert adapter.run_scan(session, candidate_id) is result
-    run_scan.assert_called_once_with(session, candidate_id, provider)
+    assert adapter.run_scan(session, candidate_id, repository_id) is result
+    run_scan.assert_called_once_with(session, candidate_id, provider, repository_id)
