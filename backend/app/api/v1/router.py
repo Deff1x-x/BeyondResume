@@ -2,7 +2,6 @@ from fastapi import APIRouter
 
 from app.api.v1 import (
     auth,
-    ai_hiring_intelligence,
     candidate,
     dashboard,
     employer,
@@ -17,7 +16,6 @@ from app.api.v1 import (
 
 router = APIRouter(prefix="/api/v1")
 router.include_router(auth.router)
-router.include_router(ai_hiring_intelligence.router)
 router.include_router(candidate.router)
 router.include_router(dashboard.router)
 router.include_router(evidence.router)

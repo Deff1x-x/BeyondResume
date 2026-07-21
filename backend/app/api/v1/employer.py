@@ -30,6 +30,12 @@ from app.services.ai_match_explanation import (
     build_explanation_input,
     explain_match,
 )
+from app.services.ai_hiring_intelligence import (
+    HiringIntelligenceUnavailableError,
+    build_hiring_context,
+    get_hiring_intelligence,
+)
+from app.schemas.ai_hiring_intelligence import AiHiringIntelligenceResponse
 from app.services.employer import (
     EmployerCompanyAlreadyExistsError,
     SkillNotAvailableError,
@@ -316,6 +322,34 @@ def get_match_details(
         raise api_error(404, "CANDIDATE_NOT_FOUND", "Candidate not found") from None
     except SQLAlchemyError:
         raise api_error(500, "DATABASE_ERROR", "Database operation failed") from None
+
+
+@router.get(
+    "/matches/{candidate_id}/ai-hiring-intelligence",
+    response_model=AiHiringIntelligenceResponse,
+)
+def get_ai_hiring_intelligence(
+    candidate_id: UUID,
+    vacancy_id: Annotated[UUID, Query()],
+    current_user: Annotated[User, Depends(require_employer)],
+    session: Annotated[Session, Depends(get_db)],
+) -> AiHiringIntelligenceResponse:
+    """Employer-only interpretation of the candidate's existing evidence."""
+    _require_owned_vacancy(session, current_user.id, vacancy_id)
+    try:
+        build_match_details(session, vacancy_id=vacancy_id, candidate_id=candidate_id)
+    except MatchDetailsCandidateNotFoundError:
+        raise api_error(404, "CANDIDATE_NOT_FOUND", "Candidate not found") from None
+    context = build_hiring_context(
+        candidate_name=None,
+        passport=build_passport(session, candidate_id),
+    )
+    try:
+        return get_hiring_intelligence(context)
+    except HiringIntelligenceUnavailableError:
+        raise api_error(
+            503, "AI_HIRING_INTELLIGENCE_UNAVAILABLE", "AI analysis is temporarily unavailable."
+        ) from None
 
 
 @router.post(

@@ -6,14 +6,17 @@ from collections import OrderedDict
 from dataclasses import dataclass
 from hashlib import sha256
 import json
+import logging
 from threading import Lock
 from time import monotonic
 
 from app.core.config import settings
+from app.integrations.ai_hiring_intelligence import get_hiring_intelligence_provider
 from app.prompts.ai_hiring_intelligence import PROMPT_VERSION, SYSTEM_RULES
 from app.schemas.ai_hiring_intelligence import AiHiringIntelligenceResponse
 from app.schemas.skill_passport import SkillPassportResponse
-from app.services.ai_match_explanation import get_llm_provider
+
+logger = logging.getLogger(__name__)
 
 
 class HiringIntelligenceUnavailableError(Exception):
@@ -118,17 +121,36 @@ def get_hiring_intelligence(context: CandidateHiringContext) -> AiHiringIntellig
         "prompt_version": PROMPT_VERSION,
         "service_version": SERVICE_VERSION,
         "response_schema_version": RESPONSE_SCHEMA_VERSION,
-        "model": settings.llm_model,
+        "model": settings.openai_model,
     }
     key = sha256(json.dumps(cache_material, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
     cached = _cache.get(key)
     if cached is not None:
         return cached
     try:
-        content = _mock_response(context) if settings.llm_provider == "mock" else get_llm_provider().generate(build_hiring_prompt(context))
-        result = AiHiringIntelligenceResponse.model_validate(_parse_json_object(content))
+        provider = get_hiring_intelligence_provider()
+    except Exception as error:
+        _log_failure(error, "before_openai_request")
+        raise HiringIntelligenceUnavailableError from error
+    try:
+        content = provider.generate(build_hiring_prompt(context))
+    except Exception as error:
+        _log_failure(error, "during_openai_request")
+        raise HiringIntelligenceUnavailableError from error
+    try:
+        payload = _parse_json_object(content)
+    except Exception as error:
+        _log_failure(error, "during_json_parsing")
+        raise HiringIntelligenceUnavailableError from error
+    try:
+        result = AiHiringIntelligenceResponse.model_validate(payload)
+    except Exception as error:
+        _log_failure(error, "during_dto_validation")
+        raise HiringIntelligenceUnavailableError from error
+    try:
         _validate_semantics(result, context)
     except Exception as error:
+        _log_failure(error, "during_semantic_validation")
         raise HiringIntelligenceUnavailableError from error
     _cache.put(key, result)
     return result
@@ -154,19 +176,26 @@ def _validate_semantics(response: AiHiringIntelligenceResponse, context: Candida
         seen.add(identity)
 
 
-def _mock_response(context: CandidateHiringContext) -> str:
-    eligible = [item for item in context.skills if item["confidence"] >= 50]
-    recommendation = "recommended" if eligible else "insufficient_evidence"
-    return json.dumps({
-        "verdict": {
-            "technical_interview_recommendation": recommendation,
-            "confidence": min(95, max((item["confidence"] for item in eligible), default=0)),
-            "summary": "This assessment interprets the supplied technical evidence only.",
-            "strengths": [f"{item['name']} has supporting evidence." for item in eligible[:3]],
-            "concerns": [] if eligible else ["No skill has sufficient verified evidence for interview questions."],
+def _log_failure(error: Exception, stage: str) -> None:
+    logger.error(
+        "AI Hiring Intelligence generation failed",
+        extra={
+            "failure_stage": stage,
+            "exception_type": type(error).__name__,
+            "exception_message": _safe_error_message(error),
+            "http_status": getattr(error, "status_code", None),
+            "openai_error_code": getattr(error, "code", None),
         },
-        "interview_questions": [
-            {"skill": item["name"], "difficulty": "medium", "question": f"Explain a technical decision you made using {item['name']}.", "reason": "The Skill Passport contains sufficient supporting evidence."}
-            for item in eligible[:5]
-        ],
-    })
+    )
+
+
+def _safe_error_message(error: Exception) -> str:
+    """Keep diagnostics useful without logging model output embedded in errors."""
+    if error.__class__.__name__ == "ValidationError" and hasattr(error, "errors"):
+        return "; ".join(
+            f"{'.'.join(map(str, item.get('loc', ())))}: {item.get('type', 'validation_error')}"
+            for item in error.errors()[:10]
+        )
+    if isinstance(error, json.JSONDecodeError):
+        return error.msg
+    return str(error)[:500]

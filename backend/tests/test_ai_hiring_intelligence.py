@@ -35,8 +35,7 @@ def test_valid_response_cache_and_semantic_validation(monkeypatch: pytest.Monkey
     service._cache.clear()
     context = build_hiring_context(candidate_name=None, passport=passport(("Python", 0.8)))
     provider = type("Provider", (), {"calls": 0, "generate": lambda self, _prompt: setattr(self, "calls", self.calls + 1) or json.dumps({"verdict": {"technical_interview_recommendation": "recommended", "confidence": 80, "summary": "Evidence supports a technical interview.", "strengths": ["Python evidence"], "concerns": []}, "interview_questions": [{"skill": "Python", "difficulty": "medium", "question": "Explain Python typing.", "reason": "Confirmed evidence."}]})})()
-    monkeypatch.setattr(service.settings, "llm_provider", "openai")
-    monkeypatch.setattr(service, "get_llm_provider", lambda: provider)
+    monkeypatch.setattr(service, "get_hiring_intelligence_provider", lambda: provider)
     assert get_hiring_intelligence(context).verdict.confidence == 80
     assert get_hiring_intelligence(context).verdict.confidence == 80
     assert provider.calls == 1
@@ -46,12 +45,23 @@ def test_valid_response_cache_and_semantic_validation(monkeypatch: pytest.Monkey
         get_hiring_intelligence(context)
 
 
+def test_cache_uses_the_actual_openai_model(monkeypatch: pytest.MonkeyPatch) -> None:
+    service._cache.clear()
+    context = build_hiring_context(candidate_name=None, passport=passport(("Python", 0.8)))
+    provider = type("Provider", (), {"calls": 0, "generate": lambda self, _prompt: setattr(self, "calls", self.calls + 1) or json.dumps({"verdict": {"technical_interview_recommendation": "recommended", "confidence": 80, "summary": "Evidence supports a technical interview.", "strengths": [], "concerns": []}, "interview_questions": []})})()
+    monkeypatch.setattr(service, "get_hiring_intelligence_provider", lambda: provider)
+    monkeypatch.setattr(service.settings, "openai_model", "model-a")
+    get_hiring_intelligence(context)
+    monkeypatch.setattr(service.settings, "openai_model", "model-b")
+    get_hiring_intelligence(context)
+    assert provider.calls == 2
+
+
 @pytest.mark.parametrize("content", ["not json", "```json\n{\"verdict\": {}}\n```", ""])
 def test_invalid_provider_content_is_not_cached(monkeypatch: pytest.MonkeyPatch, content: str) -> None:
     service._cache.clear()
     context = build_hiring_context(candidate_name=None, passport=passport(("Python", 0.8)))
-    monkeypatch.setattr(service.settings, "llm_provider", "openai")
-    monkeypatch.setattr(service, "get_llm_provider", lambda: type("P", (), {"generate": lambda *_: content})())
+    monkeypatch.setattr(service, "get_hiring_intelligence_provider", lambda: type("P", (), {"generate": lambda *_: content})())
     with pytest.raises(HiringIntelligenceUnavailableError):
         get_hiring_intelligence(context)
     assert not service._cache.items
