@@ -51,22 +51,13 @@ def authorize_candidate(user: User) -> None:
     app.dependency_overrides[require_candidate] = lambda: user
 
 
-@pytest.mark.parametrize(
-    ("filename", "mime_type"),
-    [
-        ("resume.pdf", "application/pdf"),
-        ("CV.DOCX", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
-    ],
-)
 def test_resume_upload_success_contract(
-    client: TestClient, monkeypatch: pytest.MonkeyPatch, filename: str, mime_type: str
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from app.api.v1 import resume
 
     authorize_candidate(make_user())
     uploaded = make_resume()
-    uploaded.original_filename = filename
-    uploaded.mime_type = mime_type
 
     job = Job(
         id=uuid4(),
@@ -86,7 +77,7 @@ def test_resume_upload_success_contract(
 
     monkeypatch.setattr(resume, "run_resume_parse_job_task", run_worker)
     response = client.post(
-        "/api/v1/candidate/resumes", files={"file": (filename, b"content", mime_type)}
+        "/api/v1/candidate/resumes", files={"file": ("resume.pdf", b"content", "application/pdf")}
     )
 
     assert response.status_code == 202
@@ -117,10 +108,10 @@ def test_resume_upload_profile_required(
 @pytest.mark.parametrize(
     "error_name, status_code, code",
     [
-        ("UnsupportedResumeTypeError", 415, "UNSUPPORTED_RESUME_TYPE"),
+        ("UnsupportedResumeTypeError", 400, "UNSUPPORTED_RESUME_TYPE"),
         ("ResumeFileTooLargeError", 413, "RESUME_FILE_TOO_LARGE"),
-        ("EmptyResumeFileError", 422, "VALIDATION_ERROR"),
-        ("InvalidResumeContentError", 422, "VALIDATION_ERROR"),
+        ("EmptyResumeFileError", 400, "EMPTY_RESUME_FILE"),
+        ("InvalidResumeContentError", 400, "INVALID_RESUME_PDF"),
     ],
 )
 def test_resume_upload_error_mapping(
@@ -152,11 +143,6 @@ def test_resume_upload_error_mapping(
     ("filename", "mime_type", "content"),
     [
         ("resume.pdf", "application/pdf", b"not a PDF"),
-        (
-            "resume.docx",
-            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            b"not a DOCX archive",
-        ),
     ],
 )
 def test_resume_upload_rejects_malformed_content_without_persistence_or_scheduling(
@@ -192,10 +178,10 @@ def test_resume_upload_rejects_malformed_content_without_persistence_or_scheduli
         "/api/v1/candidate/resumes", files={"file": (filename, content, mime_type)}
     )
 
-    assert response.status_code == 422
+    assert response.status_code == 400
     body = response.json()
-    assert body["error"]["code"] == "VALIDATION_ERROR"
-    assert body["error"]["message"] == "Validation error"
+    assert body["error"]["code"] == "INVALID_RESUME_PDF"
+    assert body["error"]["message"] == "The PDF could not be read"
     assert body["error"]["details"] == [{"field": "file", "issue": "corrupted_file"}]
     assert "BadZipFile" not in str(body)
     assert "InvalidResumeContentError" not in str(body)

@@ -3,6 +3,7 @@ from collections.abc import AsyncIterable
 from dataclasses import dataclass
 from hashlib import sha256
 from io import BytesIO
+import logging
 from pathlib import Path
 from typing import Literal, cast
 from zipfile import BadZipFile, ZipFile
@@ -21,12 +22,11 @@ from app.models.skill import Skill
 from app.schemas.resume import ResumeEvidenceSkillResponse, ResumeResponse
 from app.services.resume_evidence import get_resume_evidence
 
+logger = logging.getLogger(__name__)
+
 MAX_RESUME_BYTES = 8 * 1024 * 1024
 CHUNK_SIZE = 64 * 1024
-ALLOWED_RESUME_TYPES = {
-    ".pdf": "application/pdf",
-    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-}
+ALLOWED_RESUME_TYPES = {".pdf": "application/pdf"}
 
 
 class CandidateProfileRequiredError(Exception):
@@ -183,12 +183,24 @@ async def upload_resume(
             .values(is_current=False)
         )
         session.add(resume)
+        # Job has an explicit FK to Resume but no ORM relationship. Flush the
+        # resume first so PostgreSQL can satisfy jobs.resume_id on commit.
+        session.flush()
         job = Job(resume_id=resume.id, job_type=JobType.RESUME_PARSE, status=JobStatus.PENDING)
         session.add(job)
         session.commit()
     except SQLAlchemyError:
         session.rollback()
         _remove_file(destination)
+        logger.exception(
+            "Resume upload persistence failed",
+            extra={
+                "candidate_id": str(profile.id),
+                "resume_filename": original_filename,
+                "file_size": len(content),
+                "stage": "resume_upload_persistence",
+            },
+        )
         raise
     session.refresh(resume)
     return ResumeUploadResult(resume=resume, job=job)

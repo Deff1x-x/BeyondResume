@@ -1,4 +1,5 @@
 from collections.abc import AsyncIterator
+import logging
 from typing import Annotated, Literal, cast
 from uuid import UUID
 
@@ -39,6 +40,7 @@ from app.services.resume_jobs import (
 from app.services.resume_parsing import run_resume_parse_job_task
 
 router = APIRouter(prefix="/candidate", tags=["candidate"])
+logger = logging.getLogger(__name__)
 
 
 async def _upload_file_chunks(file: UploadFile) -> AsyncIterator[bytes]:
@@ -88,9 +90,9 @@ async def create_resume(
         ) from None
     except UnsupportedResumeTypeError:
         raise api_error(
-            415,
+            400,
             "UNSUPPORTED_RESUME_TYPE",
-            "Only PDF and DOCX resume files are supported",
+            "Only PDF files are supported",
             details=[{"field": "file", "issue": "unsupported_type"}],
         ) from None
     except ResumeFileTooLargeError:
@@ -102,16 +104,16 @@ async def create_resume(
         ) from None
     except EmptyResumeFileError:
         raise api_error(
-            422,
-            "VALIDATION_ERROR",
-            "Validation error",
+            400,
+            "EMPTY_RESUME_FILE",
+            "Resume file is empty",
             details=[{"field": "file", "issue": "empty_file"}],
         ) from None
     except InvalidResumeContentError:
         raise api_error(
-            422,
-            "VALIDATION_ERROR",
-            "Validation error",
+            400,
+            "INVALID_RESUME_PDF",
+            "The PDF could not be read",
             details=[{"field": "file", "issue": "corrupted_file"}],
         ) from None
     except MissingResumeFilenameError:
@@ -131,7 +133,16 @@ async def create_resume(
     except ResumeStorageError:
         raise api_error(500, "RESUME_STORAGE_ERROR", "Failed to store resume file") from None
     except SQLAlchemyError:
-        raise api_error(500, "DATABASE_ERROR", "Database operation failed") from None
+        session.rollback()
+        logger.exception(
+            "Resume upload database operation failed",
+            extra={
+                "candidate_user_id": str(current_user.id),
+                "resume_filename": file.filename,
+                "stage": "resume_upload_endpoint",
+            },
+        )
+        raise api_error(500, "DATABASE_ERROR", "Resume could not be saved. Please try again.") from None
     background_tasks.add_task(run_resume_parse_job_task, upload_result.job.id)
     return ResumeUploadAcceptedResponse(
         resume_id=upload_result.resume.id,
