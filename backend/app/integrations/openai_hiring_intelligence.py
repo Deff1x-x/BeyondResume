@@ -60,7 +60,9 @@ class OpenAIHiringIntelligenceProvider:
                     "openai_error_code": getattr(error, "code", None),
                 },
             )
-            raise OpenAIHiringIntelligenceProviderError("OpenAI request failed") from error
+            raise OpenAIHiringIntelligenceProviderError(
+                f"OpenAI request failed ({type(error).__name__})"
+            ) from error
         logger.info(
             "AI Hiring Intelligence provider completed",
             extra={"provider": self.provider_name, "model": self.model, "latency_ms": round((monotonic() - started) * 1000), "success": True},

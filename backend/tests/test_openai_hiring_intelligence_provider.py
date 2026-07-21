@@ -41,5 +41,8 @@ def test_openai_provider_wraps_sdk_failure(monkeypatch: pytest.MonkeyPatch) -> N
     )
     monkeypatch.setattr(provider_module.settings, "openai_api_key", "test-key")
     monkeypatch.setitem(sys.modules, "openai", SimpleNamespace(OpenAI=lambda **_kwargs: client))
-    with pytest.raises(provider_module.OpenAIHiringIntelligenceProviderError):
+    with pytest.raises(
+        provider_module.OpenAIHiringIntelligenceProviderError,
+        match=r"OpenAI request failed \(TimeoutError\)",
+    ):
         provider_module.OpenAIHiringIntelligenceProvider().generate("prompt")

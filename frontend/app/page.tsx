@@ -26,8 +26,8 @@ export default function HomePage() {
     <WorkspaceShell role={user.role} email={user.email}>
       <PageHeader
         eyebrow={user.role === "employer" ? "Recruiting workspace" : "Candidate workspace"}
-        title={user.role === "employer" ? "Employer workspace" : "Your next steps"}
-        description={user.role === "employer" ? "Manage vacancies and review evidence-based candidate matches." : "Turn your existing evidence into a clearer, more actionable professional profile."}
+        title={user.role === "employer" ? "Employer dashboard" : "Your next steps"}
+        description={user.role === "employer" ? "Focus on vacancy setup, candidate matches, and the next recruiting action." : "Turn your existing evidence into a clearer, more actionable professional profile."}
       />
       {user.role === "employer" ? <div className="mt-8 grid gap-6 lg:grid-cols-2"><EmployerSection enabled /></div> : <>
         <div className="mt-8"><CandidateOverviewSection enabled /></div>

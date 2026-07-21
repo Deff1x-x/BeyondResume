@@ -1,4 +1,5 @@
 import type { ReactNode, SVGProps } from "react";
+import Image from "next/image";
 
 import { cn } from "@/lib/cn";
 
@@ -22,5 +23,9 @@ export function Icon({ name, className, ...props }: IconProps) {
 }
 
 export function BrandMark({ className }: { className?: string }) {
-  return <span className={cn("inline-flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 via-primary to-cyan-500 text-white shadow-lg shadow-primary/25", className)} aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5"><path d="M6 4h7a5 5 0 0 1 0 10H6Z" /><path d="M6 14h8a3 3 0 0 1 0 6H6Z" /></svg></span>;
+  return (
+    <span className={cn("inline-flex h-10 w-10 shrink-0 items-center justify-center", className)} aria-hidden="true">
+      <Image src="/brand/beyondresume-logo.jpg" alt="" width={798} height={705} className="h-full w-full object-contain" priority />
+    </span>
+  );
 }

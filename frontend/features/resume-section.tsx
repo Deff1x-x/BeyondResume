@@ -120,8 +120,8 @@ function CurrentResume({ resume }: Readonly<{ resume: ResumeResponse }>) {
           <div className="border-t border-border pt-4">
             <p className="text-sm font-medium text-ink">Skills</p>
             <ul className="mt-2 flex flex-wrap gap-2" aria-label="Resume skills">
-              {resume.skills.map((skill) => (
-                <li key={`${skill.name}-${skill.extraction_method}`} className="min-w-0 max-w-full">
+              {resume.skills.map((skill, index) => (
+                <li key={`${skill.name}-${skill.extraction_method}-${index}`} className="min-w-0 max-w-full">
                   <Badge variant="success" title={skill.name}>
                     {skill.name}
                   </Badge>

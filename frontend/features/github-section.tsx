@@ -147,8 +147,8 @@ function RepositoryDetails({ repositoryId }: Readonly<{ repositoryId: string }>)
           </p>
         ) : (
           <ul className="mt-2 flex flex-wrap gap-2">
-            {detail.skills.map((skill) => (
-              <li key={`${skill.name}-${skill.category}`} className="min-w-0 max-w-full">
+            {detail.skills.map((skill, index) => (
+              <li key={`${skill.name}-${skill.category}-${index}`} className="min-w-0 max-w-full">
                 <Badge variant="neutral" title={`${skill.name} · ${skill.category}`}>
                   {skill.name}
                   <span className="ml-1.5 text-secondary">{skill.category}</span>

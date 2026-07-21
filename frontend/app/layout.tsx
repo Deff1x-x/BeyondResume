@@ -14,7 +14,11 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "BeyondResume"
+  title: "BeyondResume",
+  icons: {
+    icon: [{ url: "/brand/beyondresume-logo.jpg", type: "image/jpeg" }],
+    apple: [{ url: "/brand/beyondresume-logo.jpg", type: "image/jpeg" }]
+  }
 };
 
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {

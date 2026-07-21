@@ -17,6 +17,7 @@ from app.schemas.employer import (
     MatchDetailsEvidenceResponse,
     MatchDetailsMatchResponse,
     MatchDetailsPassportResponse,
+    MatchDetailsPassportSkillResponse,
     MatchDetailsResponse,
     MatchDetailsRoadmapItemResponse,
     MatchSkillGroupResponse,
@@ -81,7 +82,8 @@ def build_match_details(
             ),
         ),
         passport=MatchDetailsPassportResponse(
-            top_skills=[skill.name for skill in passport.skills[:TOP_SKILLS_LIMIT]]
+            top_skills=[skill.name for skill in passport.skills[:TOP_SKILLS_LIMIT]],
+            skills=_employer_safe_passport_skills(passport),
         ),
         evidence=_evidence_from_passport(passport),
         roadmap=[
@@ -96,6 +98,21 @@ def build_match_details(
             for item in roadmap.items
         ],
     )
+
+
+def _employer_safe_passport_skills(
+    passport: SkillPassportResponse,
+) -> list[MatchDetailsPassportSkillResponse]:
+    """Project existing passport results without candidate-private evidence details."""
+    return [
+        MatchDetailsPassportSkillResponse(
+            name=skill.name,
+            evidence_confidence=skill.evidence_confidence,
+            evidence_count=skill.evidence_count,
+            source_types=sorted({evidence.source_type for evidence in skill.evidence}),
+        )
+        for skill in passport.skills
+    ]
 
 
 def _evidence_from_passport(

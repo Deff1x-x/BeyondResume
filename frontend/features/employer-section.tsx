@@ -10,13 +10,11 @@ import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Icon } from "@/components/ui/icon";
 import { Input, controlClassName } from "@/components/ui/input";
-import { SectionHeader } from "@/components/ui/section-header";
 import { SkeletonCard, SkeletonListRow } from "@/components/ui/skeleton";
 import { cn } from "@/lib/cn";
 import { ApiClientError } from "@/lib/api/error";
 import { listVacancyMatches, listVacancyRequirements } from "@/lib/api/employer";
 import type {
-  MatchSkillGroup,
   Vacancy,
   VacancyMatch,
   VacancyRequirement,
@@ -73,10 +71,6 @@ function vacancyStatusTone(status: Vacancy["status"]): string {
   return "pending";
 }
 
-function requirementTypeLabel(value: VacancyRequirementType): string {
-  return value === "required" ? "Required" : "Preferred";
-}
-
 function parseRequirementType(value: string): VacancyRequirementType {
   return value === "preferred" ? "preferred" : "required";
 }
@@ -118,13 +112,52 @@ function VacancyRequirements({ vacancyId }: Readonly<{ vacancyId: string }>) {
   const availableSkills = (skillsQuery.data ?? []).filter(
     (skill) => !linkedSkillIds.has(skill.id)
   );
+  const requiredRequirements = (requirementsQuery.data ?? []).filter(
+    (requirement) => requirement.requirement_type === "required"
+  );
+  const preferredRequirements = (requirementsQuery.data ?? []).filter(
+    (requirement) => requirement.requirement_type === "preferred"
+  );
+
+  function requirementList(
+    title: string,
+    requirements: VacancyRequirement[],
+    tone: "danger" | "accent"
+  ) {
+    return (
+      <section aria-label={title}>
+        <div className="flex items-center justify-between gap-3">
+          <h4 className="text-sm font-medium text-ink">{title}</h4>
+          <Badge variant={tone}>{requirements.length}</Badge>
+        </div>
+        {requirements.length > 0 ? (
+          <ul className="mt-3 flex flex-wrap gap-2">
+            {requirements.map((requirement) => (
+              <li key={requirement.id} className="inline-flex max-w-full items-center gap-2 rounded-full border border-border bg-background px-3 py-1.5 text-sm text-ink">
+                <span className="truncate">{requirement.skill_name}</span>
+                <span className="text-xs text-secondary">{requirement.skill_category}</span>
+                <Button type="button" variant="ghost" size="sm" onClick={() => onDelete(requirement)} loading={deleteRequirement.isPending} className="-mr-2 min-h-7 px-2 text-danger" aria-label={`Remove ${requirement.skill_name}`}>Remove</Button>
+              </li>
+            ))}
+          </ul>
+        ) : <p className="mt-2 text-sm text-secondary">No {title.toLowerCase()} configured.</p>}
+      </section>
+    );
+  }
 
   return (
-    <div className="mt-4 space-y-3 border-t border-border pt-3">
-      <p className="text-sm font-medium text-ink">Requirements</p>
+    <section id={`vacancy-requirements-${vacancyId}`} aria-labelledby={`vacancy-requirements-title-${vacancyId}`} className="space-y-5 border-t border-border pt-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">Vacancy setup</p>
+          <h3 id={`vacancy-requirements-title-${vacancyId}`} className="mt-1 text-lg font-semibold tracking-tight text-ink">Requirements</h3>
+          <p className="mt-1 text-sm leading-6 text-secondary">Required and preferred skills guide the existing candidate match results.</p>
+        </div>
+        <Badge variant="neutral">{(requirementsQuery.data ?? []).length} configured</Badge>
+      </div>
 
       {requirementsQuery.isLoading || skillsQuery.isLoading ? (
-        <div role="status" aria-label="Loading requirements">
+        <div role="status" aria-label="Loading vacancy requirements">
           <SkeletonListRow />
         </div>
       ) : null}
@@ -136,44 +169,21 @@ function VacancyRequirements({ vacancyId }: Readonly<{ vacancyId: string }>) {
       ) : null}
 
       {requirementsQuery.isSuccess && requirementsQuery.data.length === 0 ? (
-        <p className="text-sm text-secondary">No skill requirements yet.</p>
+        <EmptyState title="Requirements are not configured" description="Add the skills needed for this vacancy before relying on candidate match results." className="py-6 text-left" />
       ) : null}
 
       {requirementsQuery.data && requirementsQuery.data.length > 0 ? (
-        <ul className="space-y-2">
-          {requirementsQuery.data.map((requirement) => (
-            <li
-              key={requirement.id}
-              className="flex flex-wrap items-center justify-between gap-2 rounded-button border border-border bg-surface px-3 py-2 text-sm"
-            >
-              <span className="min-w-0 break-words text-ink">
-                {requirement.skill_name}
-                <span className="ml-2 text-secondary">
-                  <Badge
-                    variant={requirement.requirement_type === "required" ? "danger" : "accent"}
-                    className="align-middle"
-                  >
-                    {requirementTypeLabel(requirement.requirement_type)}
-                  </Badge>{" "}
-                  · {requirement.skill_category}
-                </span>
-              </span>
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                onClick={() => onDelete(requirement)}
-                loading={deleteRequirement.isPending}
-                className="text-danger"
-              >
-                Remove
-              </Button>
-            </li>
-          ))}
-        </ul>
+        <div className="grid gap-5 sm:grid-cols-2">
+          {requirementList("Required skills", requiredRequirements, "danger")}
+          {requirementList("Preferred skills", preferredRequirements, "accent")}
+        </div>
       ) : null}
 
-      <form className="space-y-3" onSubmit={onAdd}>
+      <form className="space-y-3 rounded-xl border border-border bg-surface-subtle/60 p-4" onSubmit={onAdd}>
+        <div>
+          <h4 className="text-sm font-medium text-ink">Add a requirement</h4>
+          <p className="mt-1 text-sm text-secondary">Use the existing skills catalog for this vacancy.</p>
+        </div>
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-2">
             <label
@@ -246,7 +256,7 @@ function VacancyRequirements({ vacancyId }: Readonly<{ vacancyId: string }>) {
           Add requirement
         </Button>
       </form>
-    </div>
+    </section>
   );
 }
 
@@ -255,9 +265,7 @@ function VacancyDetail({ vacancyId }: Readonly<{ vacancyId: string }>) {
 
   if (detailQuery.isLoading) {
     return (
-      <div className="mt-3" role="status" aria-label="Loading vacancy">
-        <SkeletonListRow />
-      </div>
+      <div className="mt-5 space-y-3 border-t border-border pt-5" role="status" aria-label="Loading vacancy workspace"><SkeletonListRow /><SkeletonCard className="min-h-48" /></div>
     );
   }
 
@@ -275,29 +283,15 @@ function VacancyDetail({ vacancyId }: Readonly<{ vacancyId: string }>) {
   }
 
   return (
-    <div className="mt-3 space-y-2 border-t border-border pt-3 text-sm text-secondary">
-      <div className="flex flex-wrap items-center gap-2">
-        <span>Status:</span>
-        <StatusBadge status={vacancyStatusTone(vacancy.status)} label={statusLabel(vacancy.status)} />
-      </div>
-      <p>
-        Created: <span className="font-medium text-ink">{formatDate(vacancy.created_at)}</span>
-      </p>
-      <p className="leading-6">
-        {vacancy.description?.trim() ? vacancy.description : "No description provided."}
-      </p>
+    <section id={`vacancy-details-${vacancyId}`} aria-labelledby={`vacancy-context-title-${vacancyId}`} className="mt-5 space-y-7 border-t border-border pt-5">
+      <header className="flex flex-col gap-4 rounded-xl border border-border bg-surface-subtle/60 p-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0"><p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">Vacancy workspace</p><h3 id={`vacancy-context-title-${vacancyId}`} className="mt-1 break-words text-xl font-semibold tracking-tight text-ink">{vacancy.title}</h3><p className="mt-2 max-w-2xl text-sm leading-6 text-secondary">{vacancy.description?.trim() ? vacancy.description : "No description provided."}</p></div>
+        <div className="flex shrink-0 flex-wrap items-center gap-2"><StatusBadge status={vacancyStatusTone(vacancy.status)} label={statusLabel(vacancy.status)} /><span className="text-sm text-secondary">Created {formatDate(vacancy.created_at)}</span></div>
+      </header>
       <VacancyRequirements vacancyId={vacancyId} />
       <VacancyMatches vacancyId={vacancyId} />
-    </div>
+    </section>
   );
-}
-
-function skillGroupText(group: MatchSkillGroup, emptyLabel: string): string {
-  const matched =
-    group.matched.length > 0 ? `Matched: ${group.matched.join(", ")}` : "Matched: none";
-  const missing =
-    group.missing.length > 0 ? `Missing: ${group.missing.join(", ")}` : emptyLabel;
-  return `${matched}. ${missing}`;
 }
 
 function MatchCard({
@@ -305,26 +299,21 @@ function MatchCard({
   vacancyId
 }: Readonly<{ match: VacancyMatch; vacancyId: string }>) {
   const href = `/employer/matches/${match.candidate_id}?vacancy_id=${encodeURIComponent(vacancyId)}`;
+  const requiredTotal = match.required.matched.length + match.required.missing.length;
+  const preferredTotal = match.preferred.matched.length + match.preferred.missing.length;
 
   return (
-    <li>
-      <Link
-        href={href}
-        className="block rounded-card border border-border bg-surface p-3 transition-colors hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2"
-        aria-label={`Open profile for ${match.candidate_name}, match score ${match.score}`}
-      >
-        <div className="flex flex-wrap items-start justify-between gap-2">
-          <p className="min-w-0 break-words text-sm font-medium text-ink">{match.candidate_name}</p>
-          <p className="text-sm font-medium tabular-nums text-ink">Score {match.score}</p>
-        </div>
-        <p className="mt-2 text-sm text-secondary">
-          Required — {skillGroupText(match.required, "Missing: none")}
-        </p>
-        <p className="mt-1 text-sm text-secondary">
-          Preferred — {skillGroupText(match.preferred, "Missing: none")}
-        </p>
-        <p className="mt-3 text-sm font-medium text-primary">View profile →</p>
-      </Link>
+    <li className="rounded-xl border border-border bg-background p-4">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0"><p className="break-words text-base font-semibold text-ink">{match.candidate_name}</p><p className="mt-1 text-sm text-secondary">Candidate match for this vacancy</p></div>
+        <div className="shrink-0 text-left sm:text-right"><p className="text-xl font-semibold tabular-nums text-ink">{match.score}%</p><p className="text-xs font-medium uppercase tracking-wide text-secondary">Vacancy match</p></div>
+      </div>
+      <div className="mt-4 h-2 overflow-hidden rounded-full bg-surface-subtle" role="progressbar" aria-label={`${match.candidate_name} vacancy match`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={match.score}><div className="h-full rounded-full bg-primary transition-[width] duration-200" style={{ width: `${match.score}%` }} /></div>
+      <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
+        <div className="rounded-lg bg-surface-subtle/70 p-3"><dt className="text-secondary">Required skills</dt><dd className="mt-1 font-medium text-ink">{match.required.matched.length} matched{requiredTotal > 0 ? ` of ${requiredTotal}` : ""}</dd>{match.required.missing.length > 0 ? <p className="mt-1 text-xs leading-5 text-secondary">{match.required.missing.length} missing</p> : null}</div>
+        <div className="rounded-lg bg-surface-subtle/70 p-3"><dt className="text-secondary">Preferred skills</dt><dd className="mt-1 font-medium text-ink">{match.preferred.matched.length} matched{preferredTotal > 0 ? ` of ${preferredTotal}` : ""}</dd>{match.preferred.missing.length > 0 ? <p className="mt-1 text-xs leading-5 text-secondary">{match.preferred.missing.length} missing</p> : null}</div>
+      </dl>
+      <div className="mt-4 border-t border-border pt-4"><Link href={href} className="inline-flex min-h-control items-center rounded-button bg-primary px-4 text-sm font-medium text-white shadow-sm shadow-primary/25 transition hover:-translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2" aria-label={`Review candidate ${match.candidate_name}`}>Review candidate</Link></div>
     </li>
   );
 }
@@ -334,11 +323,11 @@ function VacancyMatches({ vacancyId }: Readonly<{ vacancyId: string }>) {
   const matches = matchesQuery.data?.matches ?? [];
 
   return (
-    <div className="mt-4 space-y-3 border-t border-border pt-3">
-      <p className="text-sm font-medium text-ink">Matches</p>
+    <section id={`vacancy-matches-${vacancyId}`} aria-labelledby={`vacancy-matches-title-${vacancyId}`} className="space-y-5 border-t border-border pt-5">
+      <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">Candidate review</p><h3 id={`vacancy-matches-title-${vacancyId}`} className="mt-1 text-lg font-semibold tracking-tight text-ink">Candidate matches</h3><p className="mt-1 text-sm leading-6 text-secondary">Results are shown in the existing match order for this vacancy.</p></div>{matchesQuery.data ? <Badge variant="neutral">{matches.length} {matches.length === 1 ? "candidate" : "candidates"}</Badge> : null}</div>
 
       {matchesQuery.isLoading ? (
-        <div role="status" aria-label="Loading matches">
+        <div role="status" aria-label="Loading candidate matches">
           <SkeletonListRow />
         </div>
       ) : null}
@@ -358,17 +347,17 @@ function VacancyMatches({ vacancyId }: Readonly<{ vacancyId: string }>) {
       ) : null}
 
       {matchesQuery.isSuccess && matches.length === 0 ? (
-        <p className="text-sm text-secondary">No candidates available to match yet.</p>
+        <EmptyState title="No candidate matches yet" description="No candidates currently match this vacancy." className="py-6" />
       ) : null}
 
       {matches.length > 0 ? (
-        <ul className="space-y-2">
+        <ul className="space-y-3">
           {matches.map((match) => (
             <MatchCard key={match.candidate_id} match={match} vacancyId={vacancyId} />
           ))}
         </ul>
       ) : null}
-    </div>
+    </section>
   );
 }
 
@@ -376,19 +365,19 @@ function VacancyCard({
   vacancy,
   requirementsCount,
   matches,
-  open,
-  onOpenChange
+  selected,
+  onSelect
 }: Readonly<{
   vacancy: Vacancy;
   requirementsCount: number;
   matches: VacancyMatch[];
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
+  selected: boolean;
+  onSelect: () => void;
 }>) {
   const topMatch = matches.reduce((highest, match) => Math.max(highest, match.score), 0);
 
   return (
-    <Card className="overflow-hidden bg-background transition duration-200 hover:-translate-y-0.5 hover:shadow-card-hover">
+    <Card className={cn("overflow-hidden bg-background", selected && "border-primary/40 ring-1 ring-primary/15")}>
         <CardContent className="p-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0 space-y-2">
@@ -401,23 +390,38 @@ function VacancyCard({
                 <span className="text-sm text-secondary">Created {formatDate(vacancy.created_at)}</span>
               </div>
               {vacancy.description ? (
-                <p className="line-clamp-2 text-sm text-secondary">{vacancy.description}</p>
+                <p className="line-clamp-2 text-sm leading-6 text-secondary">{vacancy.description}</p>
               ) : null}
             </div>
           </div>
-          <div className="mt-5 grid grid-cols-3 divide-x divide-border rounded-xl border border-border bg-surface/70 text-center">
-            <div className="p-3"><p className="text-lg font-semibold tabular-nums text-ink">{requirementsCount}</p><p className="mt-1 text-xs text-secondary">Requirements</p></div>
-            <div className="p-3"><p className="text-lg font-semibold tabular-nums text-ink">{matches.length}</p><p className="mt-1 text-xs text-secondary">Matched</p></div>
-            <div className="p-3"><p className="text-lg font-semibold tabular-nums text-ink">{topMatch}%</p><p className="mt-1 text-xs text-secondary">Top match</p></div>
-          </div>
+          <dl className="mt-5 grid grid-cols-3 divide-x divide-border rounded-xl border border-border bg-surface-subtle/70 text-center">
+            <div className="p-3"><dt className="text-xs text-secondary">Requirements</dt><dd className="mt-1 text-lg font-semibold tabular-nums text-ink">{requirementsCount}</dd></div>
+            <div className="p-3"><dt className="text-xs text-secondary">Matches</dt><dd className="mt-1 text-lg font-semibold tabular-nums text-ink">{matches.length}</dd></div>
+            <div className="p-3"><dt className="text-xs text-secondary">Top match</dt><dd className="mt-1 text-lg font-semibold tabular-nums text-ink">{topMatch}%</dd></div>
+          </dl>
           <div className="mt-5 flex flex-wrap gap-2">
-            <Button type="button" variant="secondary" size="sm" onClick={() => onOpenChange(!open)} aria-expanded={open} aria-controls={`vacancy-details-${vacancy.id}`}>{open ? "Close" : "Open"}</Button>
-            <Button type="button" variant="secondary" size="sm" onClick={() => onOpenChange(true)} aria-label={`View matches for ${vacancy.title}`}>View Matches</Button>
-            <Button type="button" variant="ghost" size="sm" onClick={() => onOpenChange(true)} aria-label={`Edit requirements for ${vacancy.title}`}>Edit requirements</Button>
+            <Button type="button" variant={selected ? "secondary" : "primary"} size="sm" onClick={onSelect} aria-pressed={selected} aria-controls={`selected-vacancy-workspace-${vacancy.id}`}>{selected ? "Selected vacancy" : "Manage vacancy"}</Button>
           </div>
-          {open ? <div id={`vacancy-details-${vacancy.id}`}><VacancyDetail vacancyId={vacancy.id} /></div> : null}
         </CardContent>
     </Card>
+  );
+}
+
+function SelectedVacancyWorkspace({
+  vacancy,
+  onClose
+}: Readonly<{
+  vacancy: Vacancy;
+  onClose: () => void;
+}>) {
+  return (
+    <section id={`selected-vacancy-workspace-${vacancy.id}`} aria-labelledby={`selected-vacancy-title-${vacancy.id}`} className="mt-8 rounded-card border border-primary/20 bg-surface p-5 shadow-card sm:p-6">
+      <div className="flex flex-col gap-4 border-b border-border pb-5 sm:flex-row sm:items-start sm:justify-between">
+        <div><p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">Selected vacancy workspace</p><h3 id={`selected-vacancy-title-${vacancy.id}`} className="mt-1 break-words text-2xl font-semibold tracking-tight text-ink">{vacancy.title}</h3><p className="mt-2 text-sm leading-6 text-secondary">Configure requirements and review the candidate matches returned for this vacancy.</p></div>
+        <Button type="button" variant="secondary" size="sm" onClick={onClose}>Close workspace</Button>
+      </div>
+      <VacancyDetail vacancyId={vacancy.id} />
+    </section>
   );
 }
 
@@ -430,11 +434,51 @@ function TopMatchesByVacancy({
   matchesByVacancy: VacancyMatch[][];
   onViewMatches: (vacancyId: string) => void;
 }>) {
-  return <section id="top-matches-by-vacancy" aria-labelledby="top-matches-by-vacancy-title" className="rounded-card border border-border bg-surface/80 p-5 shadow-card"><div className="flex flex-wrap items-end justify-between gap-3"><div><h2 id="top-matches-by-vacancy-title" className="text-xl font-semibold tracking-tight text-ink">Top Matches by Vacancy</h2><p className="mt-1 text-sm text-secondary">See the strongest available candidate for every vacancy in its current order.</p></div><Badge variant="neutral">{vacancies.length} vacancies</Badge></div><ul className="mt-5 grid gap-3 lg:grid-cols-2">{vacancies.map((vacancy, index) => { const matches = matchesByVacancy[index] ?? []; const bestMatch = matches[0]; return <li key={vacancy.id}><Card className="bg-background"><CardContent className="p-4"><p className="font-medium text-ink">{vacancy.title}</p>{bestMatch ? <div className="mt-4 flex items-start justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-wide text-secondary">Best match</p><p className="mt-1 text-sm font-medium text-ink">{bestMatch.candidate_name}</p></div><Badge variant={bestMatch.score >= 75 ? "success" : bestMatch.score >= 50 ? "primary" : "neutral"}>{bestMatch.score}% match</Badge></div> : <p className="mt-4 text-sm text-secondary">No candidate matches yet.</p>}<div className="mt-4 flex items-center justify-between gap-3 border-t border-border pt-4"><span className="text-sm text-secondary">{matches.length} {matches.length === 1 ? "candidate" : "candidates"}</span><Button type="button" variant="secondary" size="sm" onClick={() => onViewMatches(vacancy.id)} aria-label={`View all matches for ${vacancy.title}`}>View all matches →</Button></div></CardContent></Card></li>; })}</ul></section>;
+  return (
+    <section id="top-matches-by-vacancy" aria-labelledby="top-matches-by-vacancy-title">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">Candidate review</p>
+          <h2 id="top-matches-by-vacancy-title" className="mt-1 text-2xl font-semibold tracking-tight text-ink">Candidate matches</h2>
+          <p className="mt-2 text-sm leading-6 text-secondary">Review the strongest available candidate for each vacancy in its existing order.</p>
+        </div>
+        <Badge variant="neutral">{vacancies.length} vacancies</Badge>
+      </div>
+      <ul className="mt-5 grid gap-4 lg:grid-cols-2">
+        {vacancies.map((vacancy, index) => {
+          const matches = matchesByVacancy[index] ?? [];
+          const bestMatch = matches[0];
+
+          return (
+            <li key={vacancy.id}>
+              <Card className="h-full bg-background">
+                <CardContent className="p-5">
+                  <p className="font-medium text-ink">{vacancy.title}</p>
+                  {bestMatch ? (
+                    <div className="mt-4 flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-wide text-secondary">Best available match</p>
+                        <p className="mt-1 text-sm font-medium text-ink">{bestMatch.candidate_name}</p>
+                      </div>
+                      <Badge variant={bestMatch.score >= 75 ? "success" : bestMatch.score >= 50 ? "primary" : "neutral"}>{bestMatch.score}% match</Badge>
+                    </div>
+                  ) : <p className="mt-4 text-sm text-secondary">No candidate matches yet.</p>}
+                  <div className="mt-5 flex items-center justify-between gap-3 border-t border-border pt-4">
+                    <span className="text-sm text-secondary">{matches.length} {matches.length === 1 ? "candidate" : "candidates"}</span>
+                    <Button type="button" variant="secondary" size="sm" onClick={() => onViewMatches(vacancy.id)} aria-label={`Manage ${vacancy.title}`}>Manage vacancy</Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
 }
 
 function EmployerDashboard({ enabled }: Readonly<{ enabled: boolean }>) {
-  const [openVacancyId, setOpenVacancyId] = useState<string | null>(null);
+  const [selectedVacancyId, setSelectedVacancyId] = useState<string | null>(null);
   const vacanciesQuery = useEmployerVacanciesQuery(enabled);
   const vacancies = [...(vacanciesQuery.data ?? [])].sort(
     (left, right) => new Date(right.created_at).getTime() - new Date(left.created_at).getTime()
@@ -455,19 +499,12 @@ function EmployerDashboard({ enabled }: Readonly<{ enabled: boolean }>) {
       staleTime: 30_000
     }))
   });
-  const allMatches = vacancies.flatMap((vacancy, index) =>
-    (matchQueries[index]?.data?.matches ?? []).map((match) => ({ vacancy, match }))
-  );
-  const candidateCount = new Set(allMatches.map(({ match }) => match.candidate_id)).size;
-  const averageMatch = allMatches.length > 0
-    ? Math.round(allMatches.reduce((total, { match }) => total + match.score, 0) / allMatches.length)
-    : null;
   const activeVacancies = vacancies.filter((vacancy) => vacancy.status === "open").length;
 
   function openMatches(vacancyId: string) {
-    setOpenVacancyId(vacancyId);
+    setSelectedVacancyId(vacancyId);
     window.requestAnimationFrame(() => {
-      document.getElementById(`vacancy-card-${vacancyId}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+      document.getElementById(`selected-vacancy-workspace-${vacancyId}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
   }
 
@@ -475,25 +512,67 @@ function EmployerDashboard({ enabled }: Readonly<{ enabled: boolean }>) {
   if (vacanciesQuery.isLoading) return <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" role="status" aria-label="Loading employer dashboard"><SkeletonCard /><SkeletonCard /><SkeletonCard /><SkeletonCard /></div>;
   if (vacanciesQuery.isError) return <EmptyState role="alert" title="Employer dashboard unavailable" description={errorMessage(vacanciesQuery.error)} primaryAction={<Button variant="secondary" onClick={() => void vacanciesQuery.refetch()}>Try again</Button>} />;
 
-  const metrics = [
-    ["Active vacancies", activeVacancies, "Open roles ready for matching"],
-    ["Candidates matched", candidateCount, "Unique candidates across vacancies"],
-    ["Average match", averageMatch === null ? "—" : `${averageMatch}%`, averageMatch === null ? "Matches appear after requirements are added" : "Across available candidate matches"],
-    ["Recent activity", vacancies[0] ? formatDate(vacancies[0].created_at) : "No activity", vacancies[0] ? `Latest vacancy: ${vacancies[0].title}` : "Create a vacancy to begin"]
-  ];
+  const attentionItems = vacancies.flatMap((vacancy, index) => {
+    const requirements = requirementQueries[index]?.data;
+    const matches = matchQueries[index]?.data?.matches;
+    const items: Array<{ id: string; title: string; description: string; action: string }> = [];
 
-  return <section id="employer-overview" aria-labelledby="employer-dashboard-title" className="space-y-8">
-    <div className="rounded-card border border-primary/15 bg-gradient-to-br from-primary/10 via-background to-cyan-50 p-6 shadow-card">
-      <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
-        <div><p className="text-sm font-semibold uppercase tracking-[0.16em] text-primary">Recruiting overview</p><h2 id="employer-dashboard-title" className="mt-2 text-2xl font-semibold tracking-tight text-ink">Keep your hiring pipeline moving.</h2><p className="mt-2 max-w-2xl text-sm leading-6 text-secondary">See active roles, evidence-based candidate matches, and the next action for every opening.</p></div>
-        <div className="flex flex-wrap gap-2"><a href="#create-vacancy" className="inline-flex min-h-control items-center rounded-button bg-primary px-4 text-sm font-medium text-white shadow-sm shadow-primary/25 transition hover:-translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2">+ Create Vacancy</a><a href="#top-matches-by-vacancy" className="inline-flex min-h-control items-center rounded-button border border-border bg-background px-4 text-sm font-medium text-ink transition hover:bg-surface-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2">View Matches</a></div>
+    if (requirements?.length === 0) {
+      items.push({ id: `${vacancy.id}-requirements`, title: `${vacancy.title} needs requirements`, description: "Add the skills used to evaluate candidate matches.", action: "Add requirements" });
+    }
+    if (matches?.length === 0) {
+      items.push({ id: `${vacancy.id}-matches`, title: `${vacancy.title} has no matches yet`, description: "Matches appear when candidate evidence is available.", action: "Review vacancy" });
+    }
+
+    return items.map((item) => ({ ...item, vacancyId: vacancy.id }));
+  });
+  const selectedVacancy = vacancies.find((vacancy) => vacancy.id === selectedVacancyId) ?? null;
+
+  return (
+    <section id="employer-overview" className="space-y-12">
+      <section aria-labelledby="employer-dashboard-title" className="rounded-card border border-primary/15 bg-primary/[0.04] p-5 shadow-card sm:p-6">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">Today’s hiring workspace</p>
+            <h2 id="employer-dashboard-title" className="mt-2 text-2xl font-semibold tracking-tight text-ink">What needs your attention?</h2>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-secondary">Review current vacancy setup and available candidate matches using the existing hiring data.</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <a href="#create-vacancy" className="inline-flex min-h-control items-center rounded-button bg-primary px-4 text-sm font-medium text-white shadow-sm shadow-primary/25 transition hover:-translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2">Create vacancy</a>
+            <a href="#top-matches-by-vacancy" className="inline-flex min-h-control items-center rounded-button border border-border bg-background px-4 text-sm font-medium text-ink transition hover:bg-surface-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2">Review matches</a>
+          </div>
+        </div>
+        <div className="mt-6 border-t border-primary/10 pt-5">
+          <div className="flex flex-wrap items-center justify-between gap-3"><h3 className="text-base font-semibold text-ink">Needs attention</h3><Badge variant={attentionItems.length > 0 ? "primary" : "success"}>{attentionItems.length > 0 ? `${attentionItems.length} items` : "Up to date"}</Badge></div>
+          {attentionItems.length > 0 ? (
+            <ul className="mt-4 grid gap-3 lg:grid-cols-2">
+              {attentionItems.map((item) => (
+                <li key={item.id} className="flex flex-col justify-between gap-4 rounded-xl border border-border bg-background p-4 sm:flex-row sm:items-center">
+                  <div><p className="text-sm font-medium text-ink">{item.title}</p><p className="mt-1 text-sm leading-5 text-secondary">{item.description}</p></div>
+                  <Button type="button" variant="secondary" size="sm" onClick={() => openMatches(item.vacancyId)}>{item.action}</Button>
+                </li>
+              ))}
+            </ul>
+          ) : <p className="mt-3 text-sm leading-6 text-secondary">No current vacancy setup needs attention.</p>}
+        </div>
+      </section>
+
+      <div id="employer-vacancies">
+        {vacancies.length === 0 ? (
+          <EmptyState icon={<Icon name="employer" className="h-8 w-8" />} title="Create your first vacancy" description="Add an opening and its requirements to start discovering candidates through verified skills and evidence." primaryAction={<a href="#create-vacancy" className="inline-flex min-h-control items-center rounded-button bg-primary px-4 text-sm font-medium text-white shadow-sm shadow-primary/25 transition hover:-translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2">Create your first vacancy</a>} className="py-12" />
+        ) : (
+          <>
+            <section aria-labelledby="vacancies-title">
+              <div className="flex flex-wrap items-end justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">Hiring pipeline</p><h2 id="vacancies-title" className="mt-1 text-2xl font-semibold tracking-tight text-ink">Active vacancies</h2><p className="mt-2 text-sm leading-6 text-secondary">Review vacancy status, requirements, and current candidate matches.</p></div><Badge variant="primary">{activeVacancies} open</Badge></div>
+              <ul className="mt-5 grid items-start gap-4 xl:grid-cols-2">{vacancies.map((vacancy, index) => <li id={`vacancy-card-${vacancy.id}`} key={vacancy.id}><VacancyCard vacancy={vacancy} requirementsCount={requirementQueries[index]?.data?.length ?? 0} matches={matchQueries[index]?.data?.matches ?? []} selected={selectedVacancyId === vacancy.id} onSelect={() => openMatches(vacancy.id)} /></li>)}</ul>
+              {selectedVacancy ? <SelectedVacancyWorkspace vacancy={selectedVacancy} onClose={() => setSelectedVacancyId(null)} /> : null}
+            </section>
+            <TopMatchesByVacancy vacancies={vacancies} matchesByVacancy={matchQueries.map((query) => query.data?.matches ?? [])} onViewMatches={openMatches} />
+          </>
+        )}
       </div>
-      <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{metrics.map(([label, value, detail]) => <Card key={label} className="bg-background/90"><CardContent className="p-4"><p className="text-sm text-secondary">{label}</p><p className="mt-2 text-xl font-semibold tracking-tight text-ink">{value}</p><p className="mt-1 text-xs leading-5 text-muted">{detail}</p></CardContent></Card>)}</div>
-    </div>
-
-    <div id="employer-vacancies">{vacancies.length === 0 ? <EmptyState icon={<Icon name="employer" className="h-8 w-8" />} title="Create your first vacancy" description="Add an opening and its requirements to start discovering candidates through verified skills and evidence." primaryAction={<a href="#create-vacancy" className="inline-flex min-h-control items-center rounded-button bg-primary px-4 text-sm font-medium text-white shadow-sm shadow-primary/25 transition hover:-translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2">Create your first vacancy</a>} className="py-12" /> : <><section aria-labelledby="vacancies-title"><div className="flex flex-wrap items-end justify-between gap-3"><div><h2 id="vacancies-title" className="text-xl font-semibold tracking-tight text-ink">Your vacancies</h2><p className="mt-1 text-sm text-secondary">Prioritize roles with requirements and candidate matches.</p></div><Badge variant="primary">{vacancies.length} total</Badge></div><ul className="mt-4 grid gap-4 xl:grid-cols-2">{vacancies.map((vacancy, index) => <li id={`vacancy-card-${vacancy.id}`} key={vacancy.id}><VacancyCard vacancy={vacancy} requirementsCount={requirementQueries[index]?.data?.length ?? 0} matches={matchQueries[index]?.data?.matches ?? []} open={openVacancyId === vacancy.id} onOpenChange={(open) => setOpenVacancyId(open ? vacancy.id : null)} /></li>)}</ul></section>
-      <TopMatchesByVacancy vacancies={vacancies} matchesByVacancy={matchQueries.map((query) => query.data?.matches ?? [])} onViewMatches={openMatches} /></>}</div>
-  </section>;
+    </section>
+  );
 }
 
 function CompanyPanel({ enabled }: Readonly<{ enabled: boolean }>) {
@@ -733,50 +812,46 @@ function VacanciesPanel({ enabled }: Readonly<{ enabled: boolean }>) {
 export function EmployerSection({ enabled }: Readonly<{ enabled: boolean }>) {
   const companyQuery = useEmployerCompanyQuery(enabled);
   const hasCompany = Boolean(companyQuery.data);
+  const companyMissing =
+    companyQuery.isError &&
+    companyQuery.error instanceof ApiClientError &&
+    companyQuery.error.status === 404;
 
   if (!enabled) {
     return (
       <Card className="lg:col-span-2" aria-labelledby="employer-section-title">
         <CardContent className="p-6">
-          <SectionHeader
-            title="Employer"
-            icon="employer"
-            titleId="employer-section-title"
-            description="The employer workspace is available only to employer accounts."
-          />
+          <div className="flex gap-3">
+            <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/10" aria-hidden="true"><Icon name="employer" className="h-[18px] w-[18px]" /></span>
+            <div><h2 id="employer-section-title" className="text-xl font-semibold text-ink">Employer</h2><p className="mt-2 text-sm leading-6 text-secondary">The employer workspace is available only to employer accounts.</p></div>
+          </div>
         </CardContent>
       </Card>
     );
   }
 
   return (
-    <Card className="lg:col-span-2" aria-labelledby="employer-section-title">
-      <CardContent className="space-y-8 p-6">
-        <SectionHeader
-          title="Employer"
-          icon="employer"
-          titleId="employer-section-title"
-          description="Manage your company profile and job openings."
-        />
+    <section className="space-y-12 lg:col-span-2" aria-labelledby="employer-section-title">
+      <h2 id="employer-section-title" className="sr-only">Employer dashboard</h2>
 
-        <EmployerDashboard enabled={hasCompany} />
+      {companyMissing ? (
+        <section aria-labelledby="company-attention-title" className="rounded-card border border-primary/15 bg-primary/[0.04] p-5 shadow-card sm:p-6">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">Needs attention</p>
+          <div className="mt-2 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><h2 id="company-attention-title" className="text-2xl font-semibold tracking-tight text-ink">Set up your company profile</h2><p className="mt-2 max-w-2xl text-sm leading-6 text-secondary">Add your company details before posting vacancies and reviewing candidate matches.</p></div><a href="#employer-company" className="inline-flex min-h-control items-center rounded-button bg-primary px-4 text-sm font-medium text-white shadow-sm shadow-primary/25 transition hover:-translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2">Set up company</a></div>
+        </section>
+      ) : null}
 
-        <div>
-          <h3 className="text-sm font-semibold uppercase tracking-wide text-secondary">
-            Company
-          </h3>
-          <div className="mt-3">
-            <CompanyPanel enabled={enabled} />
-          </div>
-        </div>
+      {hasCompany ? <EmployerDashboard enabled /> : null}
 
-        <div>
-          <h3 className="text-sm font-semibold uppercase tracking-wide text-secondary">Jobs</h3>
-          <div className="mt-3">
-            <VacanciesPanel enabled={hasCompany} />
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+      <section id="employer-company" aria-labelledby="company-overview-title">
+        <div className="flex flex-wrap items-end justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">Organization</p><h2 id="company-overview-title" className="mt-1 text-2xl font-semibold tracking-tight text-ink">Company overview</h2><p className="mt-2 text-sm leading-6 text-secondary">Keep the company information used for your existing vacancies in one place.</p></div></div>
+        <div className="mt-5"><CompanyPanel enabled={enabled} /></div>
+      </section>
+
+      <section aria-labelledby="quick-actions-title">
+        <div><p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">Hiring workflow</p><h2 id="quick-actions-title" className="mt-1 text-2xl font-semibold tracking-tight text-ink">Quick actions</h2><p className="mt-2 text-sm leading-6 text-secondary">Create a new vacancy using the same existing workflow.</p></div>
+        <div className="mt-5"><VacanciesPanel enabled={hasCompany} /></div>
+      </section>
+    </section>
   );
 }

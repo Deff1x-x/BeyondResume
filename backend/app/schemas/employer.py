@@ -98,8 +98,20 @@ class MatchDetailsMatchResponse(BaseModel):
     preferred: MatchSkillGroupResponse
 
 
+class MatchDetailsPassportSkillResponse(BaseModel):
+    """Employer-safe, read-only projection of an existing passport skill."""
+
+    name: str
+    evidence_confidence: float
+    evidence_count: int
+    source_types: list[str]
+
+
 class MatchDetailsPassportResponse(BaseModel):
+    # Retained for existing match-review clients.
     top_skills: list[str]
+    # Values come directly from the candidate's existing Skill Passport.
+    skills: list[MatchDetailsPassportSkillResponse] = []
 
 
 class MatchDetailsEvidenceResponse(BaseModel):

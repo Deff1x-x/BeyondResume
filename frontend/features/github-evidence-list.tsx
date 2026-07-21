@@ -102,8 +102,8 @@ function EvidenceCard({ evidence }: Readonly<{ evidence: EvidenceResponse }>) {
               </p>
             ) : (
               <ul className="mt-2 flex flex-wrap gap-2" aria-label="Evidence skills">
-                {evidence.skills.map((skill) => (
-                  <li key={`${skill.name}-${skill.extraction_method}`} className="min-w-0 max-w-full">
+                {evidence.skills.map((skill, index) => (
+                  <li key={`${skill.name}-${skill.extraction_method}-${index}`} className="min-w-0 max-w-full">
                     <Badge
                       variant="success"
                       title={`${skill.name} · ${evidenceConfidencePercent(skill.evidence_confidence)}`}
@@ -155,8 +155,8 @@ function EvidenceCard({ evidence }: Readonly<{ evidence: EvidenceResponse }>) {
                 <div className="sm:col-span-2">
                   <dt className="text-secondary">Skill extraction</dt>
                   <dd className="mt-1 space-y-1">
-                    {evidence.skills.map((skill) => (
-                      <p key={`${skill.name}-${skill.extraction_method}`} className="text-ink">
+                    {evidence.skills.map((skill, index) => (
+                      <p key={`${skill.name}-${skill.extraction_method}-${index}`} className="text-ink">
                         {skill.name}
                         <span className="text-secondary">
                           {" "}

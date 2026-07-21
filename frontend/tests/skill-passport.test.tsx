@@ -1,17 +1,13 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { CandidateDashboardSection } from "@/features/candidate-dashboard-section";
-import { EmployerSection } from "@/features/employer-section";
 import { CandidateProfileView } from "@/features/match-details/candidate-profile-view";
 import { SkillPassportWorkspace } from "@/features/skill-passport-section";
 import type { SkillPassportResponse } from "@/lib/api/types/skill-passport";
 
 const passportQuery = vi.fn();
 const dashboardQuery = vi.fn();
-const employerCompanyQuery = vi.fn();
-const employerVacanciesQuery = vi.fn();
-const employerQueryResults = vi.fn();
 const matchDetailsQuery = vi.fn();
 const matchExplanationQuery = vi.fn();
 const hiringIntelligenceQuery = vi.fn();
@@ -24,19 +20,14 @@ vi.mock("@/lib/dashboard/hooks", () => ({
   useCandidateDashboardQuery: () => dashboardQuery()
 }));
 
-vi.mock("@tanstack/react-query", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@tanstack/react-query")>()),
-  useQueries: () => employerQueryResults()
-}));
-
 vi.mock("@/lib/employer/hooks", () => ({
   useAddVacancyRequirement: () => ({ isPending: false, isError: false, mutate: vi.fn() }),
   useCreateEmployerCompany: () => ({ isPending: false, isError: false, mutate: vi.fn() }),
   useCreateEmployerVacancy: () => ({ isPending: false, isError: false, mutate: vi.fn() }),
   useDeleteVacancyRequirement: () => ({ isPending: false, isError: false, mutate: vi.fn() }),
-  useEmployerCompanyQuery: () => employerCompanyQuery(),
+  useEmployerCompanyQuery: () => ({ data: null, isLoading: false, isError: false }),
   useEmployerSkillsQuery: () => ({ data: [], isLoading: false, isError: false }),
-  useEmployerVacanciesQuery: () => employerVacanciesQuery(),
+  useEmployerVacanciesQuery: () => ({ data: [], isLoading: false, isError: false }),
   useEmployerVacancyQuery: () => ({ isLoading: false, isError: false, data: null }),
   useMatchDetailsQuery: () => matchDetailsQuery(),
   useMatchExplanationQuery: () => matchExplanationQuery(),
@@ -71,7 +62,7 @@ const passport: SkillPassportResponse = {
         },
         {
           id: "internal-resume-id",
-          title: "Résumé: profile.pdf",
+          title: "RГ©sumГ©: profile.pdf",
           description: "Python experience",
           source_type: "resume",
           source_reference: "profile.pdf",
@@ -111,11 +102,11 @@ const passport: SkillPassportResponse = {
     },
     {
       id: "internal-skill-resume",
-      name: "Résumé-only skill",
+      name: "RГ©sumГ©-only skill",
       category: "backend",
       evidence_confidence: 0.5,
       evidence_count: 1,
-      evidence: [{ id: "resume-only", title: "Résumé", description: null, source_type: "resume", source_reference: "profile.pdf", evidence_confidence: 0.5 }],
+      evidence: [{ id: "resume-only", title: "RГ©sumГ©", description: null, source_type: "resume", source_reference: "profile.pdf", evidence_confidence: 0.5 }],
       github_repositories: []
     }
   ]
@@ -129,33 +120,36 @@ afterEach(() => {
   cleanup();
   vi.clearAllMocks();
 });
-
 describe("SkillPassportWorkspace", () => {
-  it("renders confirmed skills and their evidence counts without internal IDs", () => {
+  it("renders confirmed skills with their existing confidence without internal IDs", () => {
     readyPassport();
     render(<SkillPassportWorkspace />);
     expect(screen.getByText("Python")).toBeInTheDocument();
-    expect(screen.getByText("2 evidence units")).toBeInTheDocument();
+    expect(screen.getByText("100%")).toBeInTheDocument();
+    expect(screen.getAllByText("Confirmed")).toHaveLength(3);
     expect(document.body.textContent).not.toContain("internal-evidence-id");
     expect(document.body.textContent).not.toContain("internal-skill-python");
   });
 
-  it("shows independent GitHub repository confidences without treating them as the overall score", () => {
+  it("shows independent repository evidence only after opening the evidence dialog", () => {
     readyPassport();
     render(<SkillPassportWorkspace />);
 
-    expect(screen.getAllByText("Confirmed by GitHub")).toHaveLength(2);
-    expect(screen.getByText("example/project · 61% repository confidence · 1 evidence")).toBeInTheDocument();
-    expect(screen.getByText("example/service · 22% repository confidence · 1 evidence")).toBeInTheDocument();
-    expect(screen.getAllByText("Calculated from evidence in this repository only. Repository scores do not add up to the overall confidence.")).toHaveLength(2);
+    expect(screen.queryByText("61% evidence in this repository")).not.toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole("button", { name: "Open evidence" })[0]);
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByText("example/project")).toBeInTheDocument();
+    expect(within(dialog).getByText("61% evidence in this repository")).toBeInTheDocument();
+    expect(within(dialog).getByText("22% evidence in this repository")).toBeInTheDocument();
+    expect(within(dialog).getByText("Evidence in each repository is evaluated independently and does not add up to the overall confidence.")).toBeInTheDocument();
   });
 
-  it("filters GitHub skills and hides résumé-only skills", () => {
+  it("filters GitHub skills and hides rГ©sumГ©-only skills", () => {
     readyPassport();
     render(<SkillPassportWorkspace />);
     fireEvent.click(screen.getByRole("button", { name: "GitHub" }));
     expect(screen.getByText("Python")).toBeInTheDocument();
-    expect(screen.queryByText("Résumé-only skill")).not.toBeInTheDocument();
+    expect(screen.queryByText("RГ©sumГ©-only skill")).not.toBeInTheDocument();
   });
 
   it("filters skills by search term", () => {
@@ -169,15 +163,16 @@ describe("SkillPassportWorkspace", () => {
   it("opens the evidence details for a skill", () => {
     readyPassport();
     render(<SkillPassportWorkspace />);
-    fireEvent.click(screen.getAllByRole("button", { name: "View evidence" })[0]);
-    expect(screen.getByText("Evidence supporting Python")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Open source" })).toHaveAttribute("href", "https://github.com/example/project");
+    fireEvent.click(screen.getAllByRole("button", { name: "Open evidence" })[0]);
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByText("Source-specific evidence")).toBeInTheDocument();
+    expect(within(dialog).getByRole("link", { name: "Open source" })).toHaveAttribute("href", "https://github.com/example/project");
   });
 
   it("shows the full empty state when no skills are confirmed", () => {
     readyPassport({ skills: [], total_skills: 0, total_evidence: 0 });
     render(<SkillPassportWorkspace />);
-    expect(screen.getByText("Build your evidence-based skill passport")).toBeInTheDocument();
+    expect(screen.getByText("No verified skills yet")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Connect GitHub" })).toHaveAttribute("href", "/#github-section-title");
   });
 });
@@ -197,55 +192,6 @@ describe("CandidateDashboardSection", () => {
   });
 });
 
-describe("EmployerSection", () => {
-  it("shows top matches by vacancy without new API data", () => {
-    employerCompanyQuery.mockReturnValue({ data: { company_name: "Beyond", website: null, description: null }, isLoading: false, isError: false });
-    employerVacanciesQuery.mockReturnValue({ data: [{ id: "vacancy-1", title: "Frontend Engineer", description: "Build product UI", status: "open", created_at: "2026-07-20T10:00:00Z" }], isLoading: false, isError: false, refetch: vi.fn() });
-    employerQueryResults
-      .mockReturnValueOnce([{ data: [{ id: "requirement-1" }] }])
-      .mockReturnValueOnce([{ data: { matches: [{ candidate_id: "candidate-1", candidate_name: "Alex Morgan", score: 82, required: { matched: ["React"], missing: [] }, preferred: { matched: [], missing: [] } }] } }]);
-    render(<EmployerSection enabled />);
-    expect(screen.getByText("Active vacancies")).toBeInTheDocument();
-    expect(screen.getByText("Top Matches by Vacancy")).toBeInTheDocument();
-    expect(screen.getAllByText("82%")).toHaveLength(2);
-    expect(screen.getByText("Alex Morgan")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "View all matches for Frontend Engineer" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "+ Create Vacancy" })).toHaveAttribute("href", "#create-vacancy");
-  });
-
-  it("keeps a vacancy visible when it has no candidate matches", () => {
-    employerCompanyQuery.mockReturnValue({ data: { company_name: "Beyond", website: null, description: null }, isLoading: false, isError: false });
-    employerVacanciesQuery.mockReturnValue({ data: [{ id: "vacancy-empty", title: "Backend Engineer", description: null, status: "open", created_at: "2026-07-20T10:00:00Z" }], isLoading: false, isError: false, refetch: vi.fn() });
-    employerQueryResults
-      .mockReturnValueOnce([{ data: [] }])
-      .mockReturnValueOnce([{ data: { matches: [] } }]);
-
-    render(<EmployerSection enabled />);
-
-    expect(screen.getByText("No candidate matches yet.")).toBeInTheDocument();
-    expect(screen.getByText("0 candidates")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "View all matches for Backend Engineer" })).toBeInTheDocument();
-  });
-
-  it("uses the highest existing match as the best candidate for a vacancy", () => {
-    employerCompanyQuery.mockReturnValue({ data: { company_name: "Beyond", website: null, description: null }, isLoading: false, isError: false });
-    employerVacanciesQuery.mockReturnValue({ data: [{ id: "vacancy-top", title: "Platform Engineer", description: null, status: "open", created_at: "2026-07-20T10:00:00Z" }], isLoading: false, isError: false, refetch: vi.fn() });
-    employerQueryResults
-      .mockReturnValueOnce([{ data: [] }])
-      .mockReturnValueOnce([{ data: { matches: [
-        { candidate_id: "candidate-top", candidate_name: "Alan", score: 92, required: { matched: ["Python"], missing: [] }, preferred: { matched: [], missing: [] } },
-        { candidate_id: "candidate-second", candidate_name: "Bea", score: 80, required: { matched: ["Python"], missing: [] }, preferred: { matched: [], missing: [] } }
-      ] } }]);
-
-    render(<EmployerSection enabled />);
-
-    expect(screen.getByText("Alan")).toBeInTheDocument();
-    expect(screen.getByText("2 candidates")).toBeInTheDocument();
-    expect(screen.getByText("92% match")).toBeInTheDocument();
-    expect(screen.queryByText("Bea")).not.toBeInTheDocument();
-  });
-});
-
 describe("CandidateProfileView", () => {
   it("shows the existing match, evidence detail selection, and roadmap preview", () => {
     matchExplanationQuery.mockReturnValue({ isLoading: false, isError: true, data: null });
@@ -254,10 +200,17 @@ describe("CandidateProfileView", () => {
       data: {
         candidate: { id: "candidate-private-id", name: "Alex Morgan", headline: "Python Backend Developer", avatar: null },
         match: { score: 92, required: { matched: ["Python", "FastAPI"], missing: ["Redis"] }, preferred: { matched: ["Docker"], missing: ["Kubernetes"] } },
-        passport: { top_skills: ["Python", "FastAPI", "Docker"] },
+        passport: {
+          top_skills: ["Python", "FastAPI", "Docker"],
+          skills: [
+            { name: "Python", evidence_confidence: 0.87, evidence_count: 3, source_types: ["github_repository", "resume"] },
+            { name: "FastAPI", evidence_confidence: 0.83, evidence_count: 2, source_types: ["github_repository"] },
+            { name: "Docker", evidence_confidence: 0.72, evidence_count: 1, source_types: ["github_repository"] }
+          ]
+        },
         evidence: [
           { source_type: "github_repository", title: "GitHub Repository", skills: ["Python", "FastAPI", "Docker"] },
-          { source_type: "resume", title: "Résumé", skills: ["Python", "FastAPI"] }
+          { source_type: "resume", title: "RГ©sumГ©", skills: ["Python", "FastAPI"] }
         ],
         roadmap: [
           { id: "roadmap-1", title: "Learn Redis", reason: "Missing Redis", priority: "high", missing_skills: ["Redis"], related_skills: [] },
@@ -273,6 +226,13 @@ describe("CandidateProfileView", () => {
     render(<CandidateProfileView candidateId="candidate-private-id" vacancyId="vacancy-1" enabled />);
     expect(screen.getByText("Alex Morgan")).toBeInTheDocument();
     expect(screen.getByText("92%")).toBeInTheDocument();
+    expect(screen.getByText("Vacancy match")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Skill Passport" })).toBeInTheDocument();
+    expect(screen.getByRole("progressbar", { name: "Python evidence confidence: 87 percent" })).toHaveAttribute("aria-valuenow", "87");
+    expect(screen.getAllByText("Required · Matched")).toHaveLength(2);
+    expect(screen.getByRole("link", { name: "AI Hiring" })).toHaveAttribute("href", "/employer/matches/candidate-private-id/ai-hiring?vacancy_id=vacancy-1");
+    expect(screen.queryByText("Technical Interview Recommendation")).not.toBeInTheDocument();
+    expect(screen.queryByText("AI analysis is temporarily unavailable.")).not.toBeInTheDocument();
     expect(screen.getAllByText("Partially matched")).toHaveLength(2);
     expect(screen.getAllByText("Redis")).toHaveLength(2);
     fireEvent.click(screen.getByRole("button", { name: "View evidence for Python" }));

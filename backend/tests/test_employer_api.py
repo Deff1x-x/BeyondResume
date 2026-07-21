@@ -396,6 +396,7 @@ def test_match_details_endpoint(client: TestClient, monkeypatch: pytest.MonkeyPa
         MatchDetailsEvidenceResponse,
         MatchDetailsMatchResponse,
         MatchDetailsPassportResponse,
+        MatchDetailsPassportSkillResponse,
         MatchDetailsResponse,
         MatchDetailsRoadmapItemResponse,
         MatchSkillGroupResponse,
@@ -423,7 +424,17 @@ def test_match_details_endpoint(client: TestClient, monkeypatch: pytest.MonkeyPa
                 required=MatchSkillGroupResponse(matched=["Python"], missing=[]),
                 preferred=MatchSkillGroupResponse(matched=[], missing=["Docker"]),
             ),
-            passport=MatchDetailsPassportResponse(top_skills=["Python", "FastAPI"]),
+            passport=MatchDetailsPassportResponse(
+                top_skills=["Python", "FastAPI"],
+                skills=[
+                    MatchDetailsPassportSkillResponse(
+                        name="Python",
+                        evidence_confidence=0.87,
+                        evidence_count=3,
+                        source_types=["github_repository", "resume"],
+                    )
+                ],
+            ),
             evidence=[
                 MatchDetailsEvidenceResponse(
                     source_type="resume",
@@ -454,6 +465,14 @@ def test_match_details_endpoint(client: TestClient, monkeypatch: pytest.MonkeyPa
     assert body["candidate"]["name"] == "Ada Lovelace"
     assert body["match"]["score"] == 91
     assert body["passport"]["top_skills"] == ["Python", "FastAPI"]
+    assert body["passport"]["skills"] == [
+        {
+            "name": "Python",
+            "evidence_confidence": 0.87,
+            "evidence_count": 3,
+            "source_types": ["github_repository", "resume"],
+        }
+    ]
     assert body["evidence"][0]["source_type"] == "resume"
     assert body["roadmap"][0]["id"] == "add-docker"
 

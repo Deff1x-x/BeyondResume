@@ -81,6 +81,15 @@ export type MatchDetailsMatch = {
 
 export type MatchDetailsPassport = {
   top_skills: string[];
+  /** Optional while independently deployed backends may still return the legacy summary. */
+  skills?: MatchDetailsPassportSkill[];
+};
+
+export type MatchDetailsPassportSkill = {
+  name: string;
+  evidence_confidence: number;
+  evidence_count: number;
+  source_types: string[];
 };
 
 export type MatchDetailsEvidence = {

@@ -128,6 +128,13 @@ def test_build_match_details_aggregates_existing_services(
     assert result.match.required.matched == ["Python"]
     assert result.match.required.missing == ["C#"]
     assert result.passport.top_skills == ["Python", "FastAPI"]
+    assert [skill.name for skill in result.passport.skills] == ["Python", "FastAPI"]
+    assert result.passport.skills[0].evidence_confidence == 1.0
+    assert result.passport.skills[0].evidence_count == 1
+    assert result.passport.skills[0].source_types == ["resume"]
+    # The employer projection does not expose candidate-private evidence details.
+    assert "source_reference" not in result.passport.skills[0].model_dump()
+    assert "description" not in result.passport.skills[0].model_dump()
     assert len(result.evidence) == 1
     assert result.evidence[0].source_type == "resume"
     assert result.evidence[0].skills == ["FastAPI", "Python"]
