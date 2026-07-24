@@ -5,7 +5,7 @@ from uuid import UUID, uuid4
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
@@ -156,6 +156,14 @@ def _put(client: TestClient, vacancy_id: UUID, candidate_id: UUID):
     )
 
 
+def _patch(client: TestClient, vacancy_id: UUID, candidate_id: UUID, stage: str, **extra):
+    body: dict[str, object] = {"stage": stage, **extra}
+    return client.patch(
+        f"/api/v1/employer/vacancies/{vacancy_id}/shortlist/{candidate_id}",
+        json=body,
+    )
+
+
 def _delete(client: TestClient, vacancy_id: UUID, candidate_id: UUID):
     return client.delete(
         f"/api/v1/employer/vacancies/{vacancy_id}/shortlist/{candidate_id}"
@@ -165,6 +173,24 @@ def _delete(client: TestClient, vacancy_id: UUID, candidate_id: UUID):
 def _get(client: TestClient, vacancy_id: UUID):
     return client.get(f"/api/v1/employer/vacancies/{vacancy_id}/shortlist")
 
+
+SHORTLIST_RESPONSE_KEYS = {
+    "id",
+    "vacancy_id",
+    "candidate_id",
+    "stage",
+    "created_at",
+    "updated_at",
+}
+
+ALL_STAGES = (
+    "shortlisted",
+    "screening",
+    "interview",
+    "offer",
+    "hired",
+    "rejected",
+)
 
 def test_save_is_idempotent_and_persists_across_requests(
     shortlist_client: tuple[TestClient, ShortlistContext],
@@ -180,19 +206,15 @@ def test_save_is_idempotent_and_persists_across_requests(
     assert second.status_code == 200
     assert first.json() == second.json()
     assert first.json()["id"] == second.json()["id"]
+    assert first.json()["stage"] == "shortlisted"
     assert "employer_id" not in first.json()
-    assert set(first.json()) == {
-        "id",
-        "vacancy_id",
-        "candidate_id",
-        "created_at",
-        "updated_at",
-    }
+    assert set(first.json()) == SHORTLIST_RESPONSE_KEYS
     assert first.json()["vacancy_id"] == str(context.vacancy.id)
     assert first.json()["candidate_id"] == str(candidate_id)
     assert persisted.status_code == 200
     assert persisted.json()["entries"] == [first.json()]
     assert all("employer_id" not in entry for entry in persisted.json()["entries"])
+    assert all(entry["stage"] == "shortlisted" for entry in persisted.json()["entries"])
 
 
 def test_save_rejects_missing_candidate_and_non_candidate_identifier(
@@ -223,14 +245,29 @@ def test_foreign_vacancy_shortlist_is_not_disclosed_or_mutated(
     save_missing = _put(client, context.foreign_vacancy.id, missing_candidate_id)
     listing = _get(client, context.foreign_vacancy.id)
     removal = _delete(client, context.foreign_vacancy.id, candidate_id)
+    stage_change = _patch(
+        client, context.foreign_vacancy.id, candidate_id, "interview"
+    )
+    stage_missing = _patch(
+        client, context.foreign_vacancy.id, missing_candidate_id, "interview"
+    )
 
-    for response in (save_known, save_missing, listing, removal):
+    for response in (
+        save_known,
+        save_missing,
+        listing,
+        removal,
+        stage_change,
+        stage_missing,
+    ):
         assert response.status_code == 404
         assert response.json()["error"]["code"] == "VACANCY_NOT_FOUND"
 
     session = context.new_session()
     try:
-        assert session.get(EmployerCandidateShortlist, context.foreign_entry_id) is not None
+        foreign_entry = session.get(EmployerCandidateShortlist, context.foreign_entry_id)
+        assert foreign_entry is not None
+        assert foreign_entry.stage == "shortlisted"
     finally:
         session.close()
 
@@ -303,6 +340,7 @@ def test_list_is_vacancy_scoped_and_newest_first_with_id_tiebreaker(
     entries = response.json()["entries"]
     assert [entry["id"] for entry in entries] == [str(high_id), str(low_id)]
     assert all(entry["vacancy_id"] == str(context.vacancy.id) for entry in entries)
+    assert all(entry["stage"] == "shortlisted" for entry in entries)
     assert all("employer_id" not in entry for entry in entries)
 
 
@@ -344,3 +382,253 @@ def test_repeated_save_creates_only_one_database_row(
         session.close()
 
     assert count == 1
+
+
+def test_patch_supports_every_valid_stage_and_persists(
+    shortlist_client: tuple[TestClient, ShortlistContext],
+) -> None:
+    client, context = shortlist_client
+    candidate_id = context.candidate_ids[0]
+    assert _put(client, context.vacancy.id, candidate_id).status_code == 200
+
+    for stage in ALL_STAGES:
+        response = _patch(client, context.vacancy.id, candidate_id, stage)
+        assert response.status_code == 200
+        assert response.json()["stage"] == stage
+        assert set(response.json()) == SHORTLIST_RESPONSE_KEYS
+        assert "employer_id" not in response.json()
+
+        session = context.new_session()
+        try:
+            entry = session.execute(
+                select(EmployerCandidateShortlist).where(
+                    EmployerCandidateShortlist.vacancy_id == context.vacancy.id,
+                    EmployerCandidateShortlist.candidate_id == candidate_id,
+                )
+            ).scalar_one()
+            assert entry.stage == stage
+        finally:
+            session.close()
+
+
+def test_same_stage_patch_is_idempotent_and_does_not_change_updated_at(
+    shortlist_client: tuple[TestClient, ShortlistContext],
+) -> None:
+    client, context = shortlist_client
+    candidate_id = context.candidate_ids[0]
+    created = _put(client, context.vacancy.id, candidate_id).json()
+    moved = _patch(client, context.vacancy.id, candidate_id, "interview").json()
+    repeated = _patch(client, context.vacancy.id, candidate_id, "interview")
+
+    assert repeated.status_code == 200
+    assert repeated.json()["id"] == moved["id"] == created["id"]
+    assert repeated.json()["stage"] == "interview"
+    assert repeated.json()["updated_at"] == moved["updated_at"]
+    assert repeated.json()["created_at"] == created["created_at"]
+
+    session = context.new_session()
+    try:
+        count = session.scalar(
+            select(func.count())
+            .select_from(EmployerCandidateShortlist)
+            .where(
+                EmployerCandidateShortlist.vacancy_id == context.vacancy.id,
+                EmployerCandidateShortlist.candidate_id == candidate_id,
+            )
+        )
+    finally:
+        session.close()
+    assert count == 1
+
+
+def test_real_stage_change_updates_updated_at(
+    shortlist_client: tuple[TestClient, ShortlistContext],
+) -> None:
+    client, context = shortlist_client
+    candidate_id = context.candidate_ids[0]
+    created = _put(client, context.vacancy.id, candidate_id).json()
+    controlled_updated_at = datetime(2026, 1, 1, tzinfo=UTC)
+
+    session = context.new_session()
+    try:
+        session.execute(
+            update(EmployerCandidateShortlist)
+            .where(
+                EmployerCandidateShortlist.vacancy_id == context.vacancy.id,
+                EmployerCandidateShortlist.candidate_id == candidate_id,
+            )
+            .values(updated_at=controlled_updated_at)
+        )
+        session.commit()
+    finally:
+        session.close()
+
+    changed = _patch(client, context.vacancy.id, candidate_id, "offer")
+    assert changed.status_code == 200
+    assert changed.json()["stage"] == "offer"
+    assert changed.json()["created_at"] == created["created_at"]
+    assert changed.json()["updated_at"] != controlled_updated_at.isoformat().replace(
+        "+00:00", "Z"
+    )
+    assert changed.json()["updated_at"] != "2026-01-01T00:00:00+00:00"
+    assert changed.json()["updated_at"] != "2026-01-01T00:00:00Z"
+
+    session = context.new_session()
+    try:
+        entry = session.execute(
+            select(EmployerCandidateShortlist).where(
+                EmployerCandidateShortlist.vacancy_id == context.vacancy.id,
+                EmployerCandidateShortlist.candidate_id == candidate_id,
+            )
+        ).scalar_one()
+        assert entry.stage == "offer"
+        assert entry.updated_at != controlled_updated_at
+    finally:
+        session.close()
+
+
+def test_repeated_put_after_patch_does_not_reset_stage(
+    shortlist_client: tuple[TestClient, ShortlistContext],
+) -> None:
+    client, context = shortlist_client
+    candidate_id = context.candidate_ids[0]
+    created = _put(client, context.vacancy.id, candidate_id).json()
+    patched = _patch(client, context.vacancy.id, candidate_id, "interview").json()
+    repeated = _put(client, context.vacancy.id, candidate_id)
+
+    assert repeated.status_code == 200
+    assert repeated.json()["id"] == created["id"] == patched["id"]
+    assert repeated.json()["stage"] == "interview"
+    assert _get(client, context.vacancy.id).json()["entries"][0]["stage"] == "interview"
+
+
+def test_patch_rejects_invalid_stage_and_extra_fields(
+    shortlist_client: tuple[TestClient, ShortlistContext],
+) -> None:
+    client, context = shortlist_client
+    candidate_id = context.candidate_ids[0]
+    assert _put(client, context.vacancy.id, candidate_id).status_code == 200
+
+    invalid = _patch(client, context.vacancy.id, candidate_id, "archived")
+    extra = _patch(
+        client,
+        context.vacancy.id,
+        candidate_id,
+        "interview",
+        employer_id=str(context.employer.id),
+    )
+
+    assert invalid.status_code == 422
+    assert extra.status_code == 422
+    assert _get(client, context.vacancy.id).json()["entries"][0]["stage"] == "shortlisted"
+
+
+def test_patch_missing_entry_returns_shortlist_entry_not_found(
+    shortlist_client: tuple[TestClient, ShortlistContext],
+) -> None:
+    client, context = shortlist_client
+
+    missing = _patch(client, context.vacancy.id, uuid4(), "interview")
+    employer_uuid = _patch(
+        client, context.vacancy.id, context.employer_user.id, "interview"
+    )
+
+    assert missing.status_code == 404
+    assert missing.json()["error"]["code"] == "SHORTLIST_ENTRY_NOT_FOUND"
+    assert employer_uuid.status_code == 404
+    assert employer_uuid.json()["error"]["code"] == "SHORTLIST_ENTRY_NOT_FOUND"
+    assert _get(client, context.vacancy.id).json() == {"entries": []}
+
+
+def test_get_returns_entries_across_all_stages_without_reordering_on_patch(
+    shortlist_client: tuple[TestClient, ShortlistContext],
+) -> None:
+    client, context = shortlist_client
+    first_candidate, second_candidate, _ = context.candidate_ids
+    timestamp = datetime(2026, 7, 25, tzinfo=UTC)
+    older_id = UUID(int=10)
+    newer_id = UUID(int=20)
+
+    session = context.new_session()
+    try:
+        session.add_all(
+            [
+                EmployerCandidateShortlist(
+                    id=older_id,
+                    employer_id=context.employer.id,
+                    vacancy_id=context.vacancy.id,
+                    candidate_id=first_candidate,
+                    stage="screening",
+                    created_at=timestamp,
+                    updated_at=timestamp,
+                ),
+                EmployerCandidateShortlist(
+                    id=newer_id,
+                    employer_id=context.employer.id,
+                    vacancy_id=context.vacancy.id,
+                    candidate_id=second_candidate,
+                    stage="hired",
+                    created_at=timestamp,
+                    updated_at=timestamp,
+                ),
+            ]
+        )
+        session.commit()
+    finally:
+        session.close()
+
+    before = _get(client, context.vacancy.id)
+    assert [entry["id"] for entry in before.json()["entries"]] == [
+        str(newer_id),
+        str(older_id),
+    ]
+    assert {entry["stage"] for entry in before.json()["entries"]} == {
+        "screening",
+        "hired",
+    }
+
+    patched = _patch(client, context.vacancy.id, first_candidate, "interview")
+    assert patched.status_code == 200
+
+    after = _get(client, context.vacancy.id)
+    assert [entry["id"] for entry in after.json()["entries"]] == [
+        str(newer_id),
+        str(older_id),
+    ]
+    assert after.json()["entries"][1]["stage"] == "interview"
+
+
+def test_stage_update_is_isolated_across_vacancies(
+    shortlist_client: tuple[TestClient, ShortlistContext],
+) -> None:
+    client, context = shortlist_client
+    candidate_id = context.candidate_ids[0]
+    first = _put(client, context.vacancy.id, candidate_id).json()
+    second = _put(client, context.second_vacancy.id, candidate_id).json()
+
+    patched = _patch(client, context.vacancy.id, candidate_id, "offer")
+    assert patched.status_code == 200
+    assert patched.json()["stage"] == "offer"
+    assert patched.json()["id"] == first["id"]
+
+    other = _get(client, context.second_vacancy.id).json()["entries"][0]
+    assert other["id"] == second["id"]
+    assert other["stage"] == "shortlisted"
+
+
+def test_delete_after_non_default_stage_remains_idempotent(
+    shortlist_client: tuple[TestClient, ShortlistContext],
+) -> None:
+    client, context = shortlist_client
+    candidate_id = context.candidate_ids[0]
+    assert _put(client, context.vacancy.id, candidate_id).status_code == 200
+    assert _patch(client, context.vacancy.id, candidate_id, "interview").status_code == 200
+
+    first_delete = _delete(client, context.vacancy.id, candidate_id)
+    repeated_delete = _delete(client, context.vacancy.id, candidate_id)
+
+    assert first_delete.status_code == 204
+    assert first_delete.content == b""
+    assert repeated_delete.status_code == 204
+    assert repeated_delete.content == b""
+    assert _get(client, context.vacancy.id).json() == {"entries": []}

@@ -16,6 +16,10 @@ class ShortlistCandidateNotFoundError(Exception):
     pass
 
 
+class ShortlistEntryNotFoundError(Exception):
+    pass
+
+
 class ShortlistPersistenceError(Exception):
     pass
 
@@ -109,3 +113,34 @@ def list_shortlisted_candidates(
         .scalars()
         .all()
     )
+
+
+def update_candidate_stage(
+    session: Session,
+    *,
+    vacancy: Vacancy,
+    candidate_id: UUID,
+    stage: str,
+) -> EmployerCandidateShortlist:
+    """Update hiring stage for an existing shortlist entry on an owned vacancy."""
+    entry = session.execute(
+        select(EmployerCandidateShortlist).where(
+            EmployerCandidateShortlist.employer_id == vacancy.employer_id,
+            EmployerCandidateShortlist.vacancy_id == vacancy.id,
+            EmployerCandidateShortlist.candidate_id == candidate_id,
+        )
+    ).scalar_one_or_none()
+    if entry is None:
+        raise ShortlistEntryNotFoundError
+
+    if entry.stage == stage:
+        return entry
+
+    entry.stage = stage
+    try:
+        session.commit()
+    except SQLAlchemyError:
+        session.rollback()
+        raise
+    session.refresh(entry)
+    return entry

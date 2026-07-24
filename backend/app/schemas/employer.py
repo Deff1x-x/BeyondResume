@@ -125,12 +125,29 @@ class VacancyMatchesResponse(BaseModel):
     matches: list[VacancyMatchResponse]
 
 
+EmployerCandidateStage = Literal[
+    "shortlisted",
+    "screening",
+    "interview",
+    "offer",
+    "hired",
+    "rejected",
+]
+
+
+class EmployerShortlistStageUpdateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    stage: EmployerCandidateStage
+
+
 class EmployerShortlistEntryResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
     vacancy_id: UUID
     candidate_id: UUID
+    stage: EmployerCandidateStage
     created_at: datetime
     updated_at: datetime
 

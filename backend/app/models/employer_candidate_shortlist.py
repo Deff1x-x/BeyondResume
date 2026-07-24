@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import ForeignKey, UniqueConstraint
+from sqlalchemy import CheckConstraint, ForeignKey, String, UniqueConstraint, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -17,6 +17,12 @@ class EmployerCandidateShortlist(TimestampMixin, Base):
             "candidate_id",
             name="uq_employer_candidate_shortlists_vacancy_candidate",
         ),
+        CheckConstraint(
+            "stage IN ("
+            "'shortlisted', 'screening', 'interview', 'offer', 'hired', 'rejected'"
+            ")",
+            name="ck_employer_candidate_shortlists_stage",
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -30,4 +36,7 @@ class EmployerCandidateShortlist(TimestampMixin, Base):
     )
     candidate_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("candidate_profiles.id"), nullable=False
+    )
+    stage: Mapped[str] = mapped_column(
+        String(20), nullable=False, server_default=text("'shortlisted'")
     )
