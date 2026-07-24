@@ -37,6 +37,28 @@ vi.mock("@/lib/employer/hooks", () => ({
   useMatchExplanationQuery: () => matchExplanationQuery(),
   useVacancyMatchesQuery: () => ({ data: { matches: [] }, isLoading: false, isError: false }),
   useVacancyRequirementsQuery: () => ({ data: [], isLoading: false, isError: false }),
+  useVacancyShortlistQuery: () => ({
+    data: { entries: [] },
+    isLoading: false,
+    isError: false,
+    isSuccess: true
+  }),
+  useSaveCandidateToShortlist: () => ({
+    mutate: vi.fn(),
+    isPending: false,
+    isError: false,
+    error: null,
+    variables: undefined,
+    reset: vi.fn()
+  }),
+  useRemoveCandidateFromShortlist: () => ({
+    mutate: vi.fn(),
+    isPending: false,
+    isError: false,
+    error: null,
+    variables: undefined,
+    reset: vi.fn()
+  }),
   vacancyMatchesQueryKey: (vacancyId: string) => ["matches", vacancyId],
   vacancyRequirementsQueryKey: (vacancyId: string) => ["requirements", vacancyId]
 }));

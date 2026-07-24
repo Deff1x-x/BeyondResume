@@ -14,10 +14,14 @@ import {
   listEmployerSkills,
   listEmployerVacancies,
   listVacancyMatches,
-  listVacancyRequirements
+  listVacancyRequirements,
+  listVacancyShortlist,
+  removeCandidateFromShortlist,
+  saveCandidateToShortlist
 } from "@/lib/api/employer";
 import type {
   EmployerCompanyCreateRequest,
+  EmployerShortlistResponse,
   VacancyCreateRequest,
   VacancyRequirementCreateRequest
 } from "@/lib/api/types/employer";
@@ -37,6 +41,10 @@ export function vacancyRequirementsQueryKey(vacancyId: string) {
 
 export function vacancyMatchesQueryKey(vacancyId: string) {
   return ["employer", "vacancy", vacancyId, "matches"] as const;
+}
+
+export function vacancyShortlistQueryKey(vacancyId: string) {
+  return ["employer", "vacancy", vacancyId, "shortlist"] as const;
 }
 
 export function useEmployerCompanyQuery(enabled: boolean) {
@@ -205,5 +213,57 @@ export function useMatchExplanationQuery(
     staleTime: 300_000,
     gcTime: 600_000,
     retry: false
+  });
+}
+
+export function useVacancyShortlistQuery(vacancyId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: vacancyShortlistQueryKey(vacancyId),
+    queryFn: () => listVacancyShortlist(vacancyId),
+    enabled,
+    staleTime: 30_000,
+    gcTime: 300_000
+  });
+}
+
+export function useSaveCandidateToShortlist(vacancyId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (candidateId: string) => saveCandidateToShortlist(vacancyId, candidateId),
+    onSuccess: (entry) => {
+      queryClient.setQueryData<EmployerShortlistResponse>(
+        vacancyShortlistQueryKey(vacancyId),
+        (current) => {
+          const entries = current?.entries ?? [];
+          if (entries.some((item) => item.candidate_id === entry.candidate_id)) {
+            return {
+              entries: entries.map((item) =>
+                item.candidate_id === entry.candidate_id ? entry : item
+              )
+            };
+          }
+          return { entries: [entry, ...entries] };
+        }
+      );
+    }
+  });
+}
+
+export function useRemoveCandidateFromShortlist(vacancyId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (candidateId: string) => removeCandidateFromShortlist(vacancyId, candidateId),
+    onSuccess: (_result, candidateId) => {
+      queryClient.setQueryData<EmployerShortlistResponse>(
+        vacancyShortlistQueryKey(vacancyId),
+        (current) => ({
+          entries: (current?.entries ?? []).filter(
+            (entry) => entry.candidate_id !== candidateId
+          )
+        })
+      );
+    }
   });
 }

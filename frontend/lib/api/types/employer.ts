@@ -160,3 +160,15 @@ export type AiMatchExplanation = {
   gaps: string[];
   next_steps: string[];
 };
+
+export type EmployerShortlistEntry = {
+  id: string;
+  vacancy_id: string;
+  candidate_id: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type EmployerShortlistResponse = {
+  entries: EmployerShortlistEntry[];
+};

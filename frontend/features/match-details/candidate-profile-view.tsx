@@ -9,6 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { SkeletonCard, SkeletonListRow } from "@/components/ui/skeleton";
+import { ShortlistSaveButton } from "@/features/employer/shortlist-save-button";
 import { EvidenceCard } from "@/features/match-details/evidence-card";
 import { EmployerSkillPassport } from "@/features/match-details/employer-skill-passport";
 import { MatchReviewNavigation } from "@/features/match-details/match-review-navigation";
@@ -16,7 +17,7 @@ import { RoadmapCard } from "@/features/match-details/roadmap-card";
 import { SkillsComparisonCard } from "@/features/match-details/skills-comparison-card";
 import { ApiClientError } from "@/lib/api/error";
 import type { MatchDetailsResponse } from "@/lib/api/types/employer";
-import { useMatchDetailsQuery } from "@/lib/employer/hooks";
+import { useMatchDetailsQuery, useVacancyShortlistQuery } from "@/lib/employer/hooks";
 
 type CandidateProfileViewProps = Readonly<{ candidateId: string; vacancyId: string; enabled: boolean }>;
 
@@ -34,8 +35,17 @@ function MatchDetailsSkeleton() {
   return <div className="space-y-6" role="status" aria-label="Loading candidate profile"><SkeletonCard className="min-h-56" /><div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]"><SkeletonCard className="min-h-80" /><div className="space-y-4"><SkeletonListRow /><SkeletonListRow /><SkeletonListRow /></div></div></div>;
 }
 
-function MatchHero({ details }: Readonly<{ details: MatchDetailsResponse }>) {
+function MatchHero({
+  details,
+  vacancyId,
+  candidateId
+}: Readonly<{ details: MatchDetailsResponse; vacancyId: string; candidateId: string }>) {
   const sources = [...new Set(details.evidence.map((item) => item.source_type))];
+  const shortlistQuery = useVacancyShortlistQuery(vacancyId, true);
+  const isSaved =
+    shortlistQuery.data?.entries.some((entry) => entry.candidate_id === candidateId) ??
+    false;
+
   return (
     <section
       aria-labelledby="candidate-profile-title"
@@ -45,6 +55,7 @@ function MatchHero({ details }: Readonly<{ details: MatchDetailsResponse }>) {
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant="success">Match evaluated</Badge>
+            {isSaved ? <Badge variant="neutral">Saved</Badge> : null}
             {sources.map((source) => (
               <Badge key={source} variant="neutral">
                 {sourceLabel(source)}
@@ -64,6 +75,13 @@ function MatchHero({ details }: Readonly<{ details: MatchDetailsResponse }>) {
             <span className="font-medium text-ink">{details.evidence.length}</span> evidence{" "}
             {details.evidence.length === 1 ? "source supports" : "sources support"} this evaluation.
           </p>
+          <div className="mt-5">
+            <ShortlistSaveButton
+              vacancyId={vacancyId}
+              candidateId={candidateId}
+              candidateName={details.candidate.name}
+            />
+          </div>
         </div>
         <div className="w-full max-w-sm shrink-0 rounded-2xl border border-primary/15 bg-background/90 px-5 py-4">
           <div className="flex items-center gap-4">
@@ -138,7 +156,7 @@ export function CandidateProfileView({ candidateId, vacancyId, enabled }: Candid
     <div className="space-y-8">
       <div className="text-sm">{backLink}</div>
       <MatchReviewNavigation candidateId={candidateId} vacancyId={vacancyId} active="review" />
-      <MatchHero details={details} />
+      <MatchHero details={details} vacancyId={vacancyId} candidateId={candidateId} />
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
         <div className="space-y-6">
           <EmployerSkillPassport

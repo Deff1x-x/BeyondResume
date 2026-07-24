@@ -3,6 +3,8 @@ import type {
   EmployerCompany,
   EmployerCompanyCreateRequest,
   AiMatchExplanation,
+  EmployerShortlistEntry,
+  EmployerShortlistResponse,
   MatchDetailsResponse,
   SkillOption,
   Vacancy,
@@ -90,4 +92,29 @@ export function generateMatchExplanation(
     `/employer/matches/${candidateId}/explanation?${params.toString()}`,
     { method: "POST" }
   );
+}
+
+export function listVacancyShortlist(vacancyId: string): Promise<EmployerShortlistResponse> {
+  return apiRequest<EmployerShortlistResponse>(
+    `/employer/vacancies/${vacancyId}/shortlist`
+  );
+}
+
+export function saveCandidateToShortlist(
+  vacancyId: string,
+  candidateId: string
+): Promise<EmployerShortlistEntry> {
+  return apiRequest<EmployerShortlistEntry>(
+    `/employer/vacancies/${vacancyId}/shortlist/${candidateId}`,
+    { method: "PUT" }
+  );
+}
+
+export function removeCandidateFromShortlist(
+  vacancyId: string,
+  candidateId: string
+): Promise<void> {
+  return apiRequest<void>(`/employer/vacancies/${vacancyId}/shortlist/${candidateId}`, {
+    method: "DELETE"
+  });
 }

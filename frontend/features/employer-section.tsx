@@ -11,6 +11,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Icon } from "@/components/ui/icon";
 import { Input, controlClassName } from "@/components/ui/input";
 import { SkeletonCard, SkeletonListRow } from "@/components/ui/skeleton";
+import { VacancyMatchCard } from "@/features/employer/vacancy-match-card";
 import { cn } from "@/lib/cn";
 import { ApiClientError } from "@/lib/api/error";
 import { listVacancyMatches, listVacancyRequirements } from "@/lib/api/employer";
@@ -31,6 +32,7 @@ import {
   useEmployerVacancyQuery,
   useVacancyMatchesQuery,
   useVacancyRequirementsQuery,
+  useVacancyShortlistQuery,
   vacancyMatchesQueryKey,
   vacancyRequirementsQueryKey
 } from "@/lib/employer/hooks";
@@ -296,35 +298,82 @@ function VacancyDetail({ vacancyId }: Readonly<{ vacancyId: string }>) {
 
 function MatchCard({
   match,
-  vacancyId
-}: Readonly<{ match: VacancyMatch; vacancyId: string }>) {
-  const href = `/employer/matches/${match.candidate_id}?vacancy_id=${encodeURIComponent(vacancyId)}`;
-  const requiredTotal = match.required.matched.length + match.required.missing.length;
-  const preferredTotal = match.preferred.matched.length + match.preferred.missing.length;
-
-  return (
-    <li className="rounded-xl border border-border bg-background p-4">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0"><p className="break-words text-base font-semibold text-ink">{match.candidate_name}</p><p className="mt-1 text-sm text-secondary">Candidate match for this vacancy</p></div>
-        <div className="shrink-0 text-left sm:text-right"><p className="text-xl font-semibold tabular-nums text-ink">{match.score}%</p><p className="text-xs font-medium uppercase tracking-wide text-secondary">Vacancy match</p></div>
-      </div>
-      <div className="mt-4 h-2 overflow-hidden rounded-full bg-surface-subtle" role="progressbar" aria-label={`${match.candidate_name} vacancy match`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={match.score}><div className="h-full rounded-full bg-primary transition-[width] duration-200" style={{ width: `${match.score}%` }} /></div>
-      <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
-        <div className="rounded-lg bg-surface-subtle/70 p-3"><dt className="text-secondary">Required skills</dt><dd className="mt-1 font-medium text-ink">{match.required.matched.length} matched{requiredTotal > 0 ? ` of ${requiredTotal}` : ""}</dd>{match.required.missing.length > 0 ? <p className="mt-1 text-xs leading-5 text-secondary">{match.required.missing.length} missing</p> : null}</div>
-        <div className="rounded-lg bg-surface-subtle/70 p-3"><dt className="text-secondary">Preferred skills</dt><dd className="mt-1 font-medium text-ink">{match.preferred.matched.length} matched{preferredTotal > 0 ? ` of ${preferredTotal}` : ""}</dd>{match.preferred.missing.length > 0 ? <p className="mt-1 text-xs leading-5 text-secondary">{match.preferred.missing.length} missing</p> : null}</div>
-      </dl>
-      <div className="mt-4 border-t border-border pt-4"><Link href={href} className="inline-flex min-h-control items-center rounded-button bg-primary px-4 text-sm font-medium text-white shadow-sm shadow-primary/25 transition hover:-translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2" aria-label={`Review candidate ${match.candidate_name}`}>Review candidate</Link></div>
-    </li>
-  );
+  vacancyId,
+  saved
+}: Readonly<{ match: VacancyMatch; vacancyId: string; saved: boolean }>) {
+  return <VacancyMatchCard match={match} vacancyId={vacancyId} saved={saved} />;
 }
 
 function VacancyMatches({ vacancyId }: Readonly<{ vacancyId: string }>) {
   const matchesQuery = useVacancyMatchesQuery(vacancyId, true);
+  const shortlistQuery = useVacancyShortlistQuery(vacancyId, true);
+  const [filter, setFilter] = useState<"all" | "saved">("all");
   const matches = matchesQuery.data?.matches ?? [];
+  const savedIds = new Set(
+    (shortlistQuery.data?.entries ?? []).map((entry) => entry.candidate_id)
+  );
+  const visibleMatches =
+    filter === "saved" ? matches.filter((match) => savedIds.has(match.candidate_id)) : matches;
+  const shortlistHref = `/employer/vacancies/${encodeURIComponent(vacancyId)}/shortlist`;
 
   return (
-    <section id={`vacancy-matches-${vacancyId}`} aria-labelledby={`vacancy-matches-title-${vacancyId}`} className="space-y-5 border-t border-border pt-5">
-      <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">Candidate review</p><h3 id={`vacancy-matches-title-${vacancyId}`} className="mt-1 text-lg font-semibold tracking-tight text-ink">Candidate matches</h3><p className="mt-1 text-sm leading-6 text-secondary">Results are shown in the existing match order for this vacancy.</p></div>{matchesQuery.data ? <Badge variant="neutral">{matches.length} {matches.length === 1 ? "candidate" : "candidates"}</Badge> : null}</div>
+    <section
+      id={`vacancy-matches-${vacancyId}`}
+      aria-labelledby={`vacancy-matches-title-${vacancyId}`}
+      className="space-y-5 border-t border-border pt-5"
+    >
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">
+            Candidate review
+          </p>
+          <h3
+            id={`vacancy-matches-title-${vacancyId}`}
+            className="mt-1 text-lg font-semibold tracking-tight text-ink"
+          >
+            Candidate matches
+          </h3>
+          <p className="mt-1 text-sm leading-6 text-secondary">
+            Results are shown in the existing match order for this vacancy.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {matchesQuery.data ? (
+            <Badge variant="neutral">
+              {matches.length} {matches.length === 1 ? "candidate" : "candidates"}
+            </Badge>
+          ) : null}
+          <Link
+            href={shortlistHref}
+            className="inline-flex min-h-9 items-center rounded-button border border-border bg-surface px-3 text-sm font-medium text-ink transition hover:border-border-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2"
+          >
+            Open shortlist
+          </Link>
+        </div>
+      </div>
+
+      <div
+        className="flex w-fit rounded-xl border border-border bg-surface-subtle p-1"
+        role="group"
+        aria-label="Filter candidate matches"
+      >
+        <button
+          type="button"
+          aria-pressed={filter === "all"}
+          className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 ${filter === "all" ? "bg-background text-ink shadow-sm" : "text-secondary hover:bg-background/70 hover:text-ink"}`}
+          onClick={() => setFilter("all")}
+        >
+          All
+        </button>
+        <button
+          type="button"
+          aria-pressed={filter === "saved"}
+          className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 ${filter === "saved" ? "bg-background text-ink shadow-sm" : "text-secondary hover:bg-background/70 hover:text-ink"}`}
+          onClick={() => setFilter("saved")}
+        >
+          Saved
+        </button>
+      </div>
 
       {matchesQuery.isLoading ? (
         <div role="status" aria-label="Loading candidate matches">
@@ -347,13 +396,39 @@ function VacancyMatches({ vacancyId }: Readonly<{ vacancyId: string }>) {
       ) : null}
 
       {matchesQuery.isSuccess && matches.length === 0 ? (
-        <EmptyState title="No candidate matches yet" description="No candidates currently match this vacancy." className="py-6" />
+        <EmptyState
+          title="No candidate matches yet"
+          description="No candidates currently match this vacancy."
+          className="py-6"
+        />
       ) : null}
 
-      {matches.length > 0 ? (
+      {shortlistQuery.isError ? (
+        <p className="text-sm text-danger" role="alert">
+          {errorMessage(shortlistQuery.error)}
+        </p>
+      ) : null}
+
+      {matchesQuery.isSuccess &&
+      matches.length > 0 &&
+      visibleMatches.length === 0 &&
+      !shortlistQuery.isError ? (
+        <EmptyState
+          title="No saved candidates in this vacancy."
+          description="Save a candidate from Candidate Review to filter by Saved."
+          className="py-6"
+        />
+      ) : null}
+
+      {visibleMatches.length > 0 ? (
         <ul className="space-y-3">
-          {matches.map((match) => (
-            <MatchCard key={match.candidate_id} match={match} vacancyId={vacancyId} />
+          {visibleMatches.map((match) => (
+            <MatchCard
+              key={match.candidate_id}
+              match={match}
+              vacancyId={vacancyId}
+              saved={savedIds.has(match.candidate_id)}
+            />
           ))}
         </ul>
       ) : null}
