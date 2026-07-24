@@ -6,12 +6,15 @@ Does not recompute scores or regenerate passport/roadmap rules.
 
 from __future__ import annotations
 
+from collections import defaultdict
+from collections.abc import Mapping, Sequence
 from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.candidate_profile import CandidateProfile
+from app.models.evidence_skill_link import EvidenceSkillLink
 from app.schemas.employer import (
     MatchDetailsCandidateResponse,
     MatchDetailsEvidenceResponse,
@@ -23,14 +26,22 @@ from app.schemas.employer import (
     MatchedSkillDetailsResponse,
     MatchedSkillEvidenceResponse,
     MatchSkillGroupResponse,
+    SignalSummaryResponse,
 )
-from app.schemas.skill_passport import SkillPassportResponse, SkillPassportSkillResponse
+from app.schemas.skill_passport import (
+    SkillPassportEvidenceResponse,
+    SkillPassportResponse,
+    SkillPassportSkillResponse,
+)
 from app.services.employer import list_vacancy_requirements
 from app.services.matching import MatchRequirement, match_passport_to_requirements
 from app.services.roadmap import build_roadmap_from_match
+from app.services.signal_summaries import public_categories_for_evidence
 from app.services.skill_passport import build_passport
 
 TOP_SKILLS_LIMIT = 6
+
+LinkContextIndex = dict[tuple[UUID, UUID], list[Mapping[str, object] | None]]
 
 
 class MatchDetailsCandidateNotFoundError(Exception):
@@ -62,6 +73,16 @@ def build_match_details(
         preferred_missing=match.preferred.missing,
     )
 
+    passport_skill_ids = {skill.id for skill in passport.skills}
+    matched_skill_ids = {
+        requirement.skill_id
+        for requirement in requirements
+        if requirement.skill_id in passport_skill_ids
+    }
+    link_contexts = _fetch_evidence_link_contexts(
+        session, candidate_id=candidate_id, skill_ids=matched_skill_ids
+    )
+
     name = candidate.display_name.strip() if candidate.display_name else "Unnamed candidate"
     headline = candidate.target_role.strip() if candidate.target_role else None
 
@@ -81,6 +102,7 @@ def build_match_details(
                     requirements=requirements,
                     requirement_type="required",
                     passport=passport,
+                    link_contexts=link_contexts,
                 ),
             ),
             preferred=MatchSkillGroupResponse(
@@ -90,6 +112,7 @@ def build_match_details(
                     requirements=requirements,
                     requirement_type="preferred",
                     passport=passport,
+                    link_contexts=link_contexts,
                 ),
             ),
         ),
@@ -112,6 +135,36 @@ def build_match_details(
     )
 
 
+def _fetch_evidence_link_contexts(
+    session: Session,
+    *,
+    candidate_id: UUID,
+    skill_ids: set[UUID],
+) -> LinkContextIndex:
+    """Batch-load link contexts for matched skills of one candidate.
+
+    Selects only skill_id, evidence_unit_id, and context — never raw payloads.
+    """
+    if not skill_ids:
+        return {}
+    rows = session.execute(
+        select(
+            EvidenceSkillLink.skill_id,
+            EvidenceSkillLink.evidence_unit_id,
+            EvidenceSkillLink.context,
+        ).where(
+            EvidenceSkillLink.candidate_id == candidate_id,
+            EvidenceSkillLink.skill_id.in_(skill_ids),
+        )
+    ).all()
+    contexts_by_pair: LinkContextIndex = defaultdict(list)
+    for skill_id, evidence_unit_id, context in rows:
+        contexts_by_pair[(skill_id, evidence_unit_id)].append(
+            context if isinstance(context, Mapping) else None
+        )
+    return dict(contexts_by_pair)
+
+
 def _employer_safe_passport_skills(
     passport: SkillPassportResponse,
 ) -> list[MatchDetailsPassportSkillResponse]:
@@ -132,6 +185,7 @@ def _matched_details_for_group(
     requirements: list[MatchRequirement],
     requirement_type: str,
     passport: SkillPassportResponse,
+    link_contexts: LinkContextIndex,
 ) -> list[MatchedSkillDetailsResponse]:
     """Project matched requirements onto passport evidence by Skill.id.
 
@@ -154,19 +208,38 @@ def _matched_details_for_group(
                 skill_id=skill.id,
                 skill_name=skill.name,
                 evidence=[
-                    MatchedSkillEvidenceResponse(
-                        id=item.id,
-                        source_type=item.source_type,
-                        title=item.title,
-                        verification_status=item.verification_status,
-                        ownership_status=item.ownership_status,
-                        evidence_confidence=item.evidence_confidence,
+                    _employer_safe_matched_evidence(
+                        skill_id=skill.id,
+                        evidence=item,
+                        link_contexts=link_contexts,
                     )
                     for item in skill.evidence
                 ],
             )
         )
     return details
+
+
+def _employer_safe_matched_evidence(
+    *,
+    skill_id: UUID,
+    evidence: SkillPassportEvidenceResponse,
+    link_contexts: LinkContextIndex,
+) -> MatchedSkillEvidenceResponse:
+    contexts: Sequence[Mapping[str, object] | None] = link_contexts.get((skill_id, evidence.id), ())
+    categories = public_categories_for_evidence(
+        source_type=evidence.source_type,
+        contexts=contexts,
+    )
+    return MatchedSkillEvidenceResponse(
+        id=evidence.id,
+        source_type=evidence.source_type,
+        title=evidence.title,
+        verification_status=evidence.verification_status,
+        ownership_status=evidence.ownership_status,
+        evidence_confidence=evidence.evidence_confidence,
+        signal_summaries=[SignalSummaryResponse(category=category) for category in categories],
+    )
 
 
 def _evidence_from_passport(

@@ -115,11 +115,47 @@ def _session_with_candidate(candidate: CandidateProfile) -> Mock:
     return session
 
 
-def test_build_match_details_aggregates_existing_services(
+def _stub_link_contexts(
     monkeypatch: pytest.MonkeyPatch,
+    contexts: dict[tuple[UUID, UUID], list] | None = None,
 ) -> None:
     from app.services import match_details
 
+    monkeypatch.setattr(
+        match_details,
+        "_fetch_evidence_link_contexts",
+        lambda *_args, **_kwargs: contexts or {},
+    )
+
+
+def _run_match(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    candidate: CandidateProfile,
+    vacancy_id: UUID,
+    passport: SkillPassportResponse,
+    requirements: list,
+    match_result: MatchResult,
+    link_contexts: dict[tuple[UUID, UUID], list] | None = None,
+):
+    from app.services import match_details
+
+    monkeypatch.setattr(match_details, "build_passport", lambda *_args: passport)
+    monkeypatch.setattr(match_details, "list_vacancy_requirements", lambda *_args: requirements)
+    monkeypatch.setattr(
+        match_details, "match_passport_to_requirements", lambda *_args: match_result
+    )
+    _stub_link_contexts(monkeypatch, link_contexts)
+    return build_match_details(
+        _session_with_candidate(candidate),
+        vacancy_id=vacancy_id,
+        candidate_id=candidate.id,
+    )
+
+
+def test_build_match_details_aggregates_existing_services(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     candidate = make_candidate()
     vacancy_id = uuid4()
     python_id = uuid4()
@@ -132,24 +168,18 @@ def test_build_match_details_aggregates_existing_services(
         requirement_type="required",
     )
 
-    session = _session_with_candidate(candidate)
-    monkeypatch.setattr(match_details, "build_passport", lambda *_args: passport)
-    monkeypatch.setattr(
-        match_details,
-        "list_vacancy_requirements",
-        lambda *_args: [(requirement, skill)],
-    )
-    monkeypatch.setattr(
-        match_details,
-        "match_passport_to_requirements",
-        lambda *_args: MatchResult(
+    result = _run_match(
+        monkeypatch,
+        candidate=candidate,
+        vacancy_id=vacancy_id,
+        passport=passport,
+        requirements=[(requirement, skill)],
+        match_result=MatchResult(
             score=91,
             required=SkillGroupBreakdown(matched=("Python",), missing=("C#",)),
             preferred=SkillGroupBreakdown(matched=(), missing=()),
         ),
     )
-
-    result = build_match_details(session, vacancy_id=vacancy_id, candidate_id=candidate.id)
 
     assert result.candidate.name == "Ada Lovelace"
     assert result.candidate.headline == "Backend Engineer"
@@ -179,14 +209,13 @@ def test_build_match_details_aggregates_existing_services(
     assert detail.skill_name == "Python"
     assert len(detail.evidence) == 1
     assert detail.evidence[0].id == passport.skills[0].evidence[0].id
+    assert [item.category for item in detail.evidence[0].signal_summaries] == ["resume_evidence"]
     assert result.match.preferred.matched_details == []
 
 
 def test_matched_details_required_and_preferred_groups(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from app.services import match_details
-
     candidate = make_candidate()
     vacancy_id = uuid4()
     python_id = uuid4()
@@ -226,22 +255,17 @@ def test_matched_details_required_and_preferred_groups(
         ),
     ]
 
-    monkeypatch.setattr(match_details, "build_passport", lambda *_args: passport)
-    monkeypatch.setattr(match_details, "list_vacancy_requirements", lambda *_args: requirements)
-    monkeypatch.setattr(
-        match_details,
-        "match_passport_to_requirements",
-        lambda *_args: MatchResult(
+    result = _run_match(
+        monkeypatch,
+        candidate=candidate,
+        vacancy_id=vacancy_id,
+        passport=passport,
+        requirements=requirements,
+        match_result=MatchResult(
             score=85,
             required=SkillGroupBreakdown(matched=("Python",), missing=("C#",)),
             preferred=SkillGroupBreakdown(matched=("FastAPI",), missing=()),
         ),
-    )
-
-    result = build_match_details(
-        _session_with_candidate(candidate),
-        vacancy_id=vacancy_id,
-        candidate_id=candidate.id,
     )
 
     assert result.match.score == 85
@@ -261,8 +285,6 @@ def test_matched_details_required_and_preferred_groups(
 def test_matched_details_preserves_multi_evidence_and_repos(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from app.services import match_details
-
     candidate = make_candidate()
     vacancy_id = uuid4()
     skill_id = uuid4()
@@ -306,26 +328,31 @@ def test_matched_details_preserves_multi_evidence_and_repos(
         requirement_type="required",
     )
 
-    monkeypatch.setattr(match_details, "build_passport", lambda *_args: passport)
-    monkeypatch.setattr(
-        match_details,
-        "list_vacancy_requirements",
-        lambda *_args: [(requirement, skill)],
-    )
-    monkeypatch.setattr(
-        match_details,
-        "match_passport_to_requirements",
-        lambda *_args: MatchResult(
+    result = _run_match(
+        monkeypatch,
+        candidate=candidate,
+        vacancy_id=vacancy_id,
+        passport=passport,
+        requirements=[(requirement, skill)],
+        match_result=MatchResult(
             score=100,
             required=SkillGroupBreakdown(matched=("React",), missing=()),
             preferred=SkillGroupBreakdown(matched=(), missing=()),
         ),
-    )
-
-    result = build_match_details(
-        _session_with_candidate(candidate),
-        vacancy_id=vacancy_id,
-        candidate_id=candidate.id,
+        link_contexts={
+            (skill_id, evidence_a.id): [
+                {
+                    "signals": [
+                        {
+                            "type": "source_import",
+                            "manifest": "src/App.tsx",
+                            "matched_value": "react",
+                            "rule_id": "secret.rule",
+                        }
+                    ]
+                }
+            ]
+        },
     )
 
     detail = result.match.required.matched_details[0]
@@ -339,15 +366,15 @@ def test_matched_details_preserves_multi_evidence_and_repos(
     assert detail.evidence[0].verification_status == "issuer_verified"
     assert detail.evidence[0].ownership_status == "verified"
     assert detail.evidence[0].evidence_confidence == 0.92
+    assert [item.category for item in detail.evidence[0].signal_summaries] == ["source_code_usage"]
     assert detail.evidence[1].verification_status is None
     assert detail.evidence[1].ownership_status is None
+    assert detail.evidence[1].signal_summaries == []
 
 
 def test_matched_details_nested_evidence_is_employer_safe(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from app.services import match_details
-
     candidate = make_candidate()
     vacancy_id = uuid4()
     skill_id = uuid4()
@@ -380,26 +407,39 @@ def test_matched_details_nested_evidence_is_employer_safe(
         requirement_type="required",
     )
 
-    monkeypatch.setattr(match_details, "build_passport", lambda *_args: passport)
-    monkeypatch.setattr(
-        match_details,
-        "list_vacancy_requirements",
-        lambda *_args: [(requirement, skill)],
-    )
-    monkeypatch.setattr(
-        match_details,
-        "match_passport_to_requirements",
-        lambda *_args: MatchResult(
+    result = _run_match(
+        monkeypatch,
+        candidate=candidate,
+        vacancy_id=vacancy_id,
+        passport=passport,
+        requirements=[(requirement, skill)],
+        match_result=MatchResult(
             score=100,
             required=SkillGroupBreakdown(matched=("Python",), missing=()),
             preferred=SkillGroupBreakdown(matched=(), missing=()),
         ),
-    )
-
-    result = build_match_details(
-        _session_with_candidate(candidate),
-        vacancy_id=vacancy_id,
-        candidate_id=candidate.id,
+        link_contexts={
+            (skill_id, evidence.id): [
+                {
+                    "extractor": "evidence_skill_v1",
+                    "version": "evidence-skill-v1",
+                    "matched_term": "Python",
+                    "match_kind": "alias",
+                    "signals": [
+                        {
+                            "type": "dependency_manifest",
+                            "manifest": "package.json",
+                            "path": "src/secret.py",
+                            "filename": "secret.py",
+                            "matched_value": "react",
+                            "rule_id": "gh_rule.secret",
+                            "ecosystem": "npm",
+                            "manifest_kind": "package_json",
+                        }
+                    ],
+                }
+            ]
+        },
     )
     nested = result.match.required.matched_details[0].evidence[0].model_dump()
     assert set(nested) == {
@@ -409,7 +449,10 @@ def test_matched_details_nested_evidence_is_employer_safe(
         "verification_status",
         "ownership_status",
         "evidence_confidence",
+        "signal_summaries",
     }
+    assert nested["signal_summaries"] == [{"category": "resume_evidence"}]
+    serialized = str(nested)
     for forbidden in (
         "description",
         "source_reference",
@@ -419,8 +462,241 @@ def test_matched_details_nested_evidence_is_employer_safe(
         "manifest",
         "matched_value",
         "rule_id",
+        "ecosystem",
+        "manifest_kind",
+        "matched_term",
+        "match_kind",
+        "extractor",
+        "version",
+        "filename",
+        "path",
+        "package.json",
+        "secret.py",
     ):
-        assert forbidden not in nested
+        assert forbidden not in serialized
+
+
+def test_signal_summaries_github_mixed_and_isolated_by_skill(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    candidate = make_candidate()
+    vacancy_id = uuid4()
+    python_id = uuid4()
+    react_id = uuid4()
+    shared_evidence_id = uuid4()
+    python_only_evidence = make_evidence(
+        title="GitHub repository: demo/backend",
+        source_type="github_repository",
+        evidence_confidence=0.8,
+    )
+    shared = make_evidence(
+        evidence_id=shared_evidence_id,
+        title="GitHub repository: demo/shared",
+        source_type="github_repository",
+        evidence_confidence=0.7,
+    )
+    passport = SkillPassportResponse(
+        skills=[
+            SkillPassportSkillResponse(
+                id=python_id,
+                name="Python",
+                category="language",
+                evidence_confidence=0.85,
+                evidence_count=2,
+                evidence=[python_only_evidence, shared],
+            ),
+            SkillPassportSkillResponse(
+                id=react_id,
+                name="React",
+                category="frontend",
+                evidence_confidence=0.7,
+                evidence_count=1,
+                evidence=[
+                    make_evidence(
+                        evidence_id=shared_evidence_id,
+                        title="GitHub repository: demo/shared",
+                        source_type="github_repository",
+                        evidence_confidence=0.7,
+                    )
+                ],
+            ),
+        ],
+        total_skills=2,
+        total_evidence=2,
+    )
+    python = make_skill(skill_id=python_id, name="Python")
+    react = make_skill(skill_id=react_id, name="React", category="frontend")
+    sensitive_context = {
+        "extractor": "github_deterministic",
+        "version": "github-deterministic-v1",
+        "signals": [
+            {
+                "type": "dependency_manifest",
+                "manifest": "requirements.txt",
+                "manifest_kind": "requirements_txt",
+                "ecosystem": "pypi",
+                "matched_value": "fastapi",
+                "rule_id": "gh_rule.dep.fastapi.v1",
+            },
+            {
+                "type": "source_import",
+                "manifest": "app/main.py",
+                "manifest_kind": "source_file",
+                "ecosystem": "github",
+                "matched_value": "source_import",
+                "rule_id": "gh_rule.code.python.import.v1",
+            },
+            {
+                "type": "source_api_call",
+                "manifest": "app/api.py",
+                "manifest_kind": "source_file",
+                "ecosystem": "github",
+                "matched_value": "source_api_call",
+                "rule_id": "gh_rule.code.python.api.v1",
+            },
+            {
+                "type": "docker",
+                "manifest": "Dockerfile",
+                "manifest_kind": "source_file",
+                "ecosystem": "github",
+                "matched_value": "docker_artifact",
+                "rule_id": "gh_rule.code.docker.artifact.v1",
+            },
+            {
+                "type": "future_unknown_signal",
+                "manifest": "secret.path",
+                "matched_value": "leak",
+                "rule_id": "nope",
+            },
+        ],
+    }
+    react_only_context = {
+        "signals": [
+            {
+                "type": "dependency_manifest",
+                "manifest": "package.json",
+                "matched_value": "react",
+                "rule_id": "gh_rule.dep.react.v1",
+                "ecosystem": "npm",
+                "manifest_kind": "package_json",
+            }
+        ]
+    }
+
+    result = _run_match(
+        monkeypatch,
+        candidate=candidate,
+        vacancy_id=vacancy_id,
+        passport=passport,
+        requirements=[
+            (
+                VacancySkillRequirement(
+                    id=uuid4(),
+                    vacancy_id=vacancy_id,
+                    skill_id=python.id,
+                    requirement_type="required",
+                ),
+                python,
+            ),
+            (
+                VacancySkillRequirement(
+                    id=uuid4(),
+                    vacancy_id=vacancy_id,
+                    skill_id=react.id,
+                    requirement_type="preferred",
+                ),
+                react,
+            ),
+        ],
+        match_result=MatchResult(
+            score=90,
+            required=SkillGroupBreakdown(matched=("Python",), missing=()),
+            preferred=SkillGroupBreakdown(matched=("React",), missing=()),
+        ),
+        link_contexts={
+            (python_id, python_only_evidence.id): [
+                sensitive_context,
+                # Second extraction version for the same pair merges without duplicates.
+                {
+                    "signals": [
+                        {"type": "dependency_manifest", "manifest": "pyproject.toml"},
+                        {"type": "ci", "manifest": ".github/workflows/ci.yml"},
+                    ]
+                },
+            ],
+            (python_id, shared_evidence_id): [sensitive_context],
+            (react_id, shared_evidence_id): [react_only_context],
+            # Unmatched / other-candidate style noise must not appear (not referenced).
+            (uuid4(), shared_evidence_id): [sensitive_context],
+        },
+    )
+
+    assert result.match.score == 90
+    assert result.match.required.matched == ["Python"]
+    assert result.match.preferred.matched == ["React"]
+    python_detail = result.match.required.matched_details[0]
+    react_detail = result.match.preferred.matched_details[0]
+    assert [item.category for item in python_detail.evidence[0].signal_summaries] == [
+        "project_dependencies",
+        "source_code_usage",
+        "container_configuration",
+        "ci_cd_configuration",
+    ]
+    assert [item.category for item in python_detail.evidence[1].signal_summaries] == [
+        "project_dependencies",
+        "source_code_usage",
+        "container_configuration",
+    ]
+    assert [item.category for item in react_detail.evidence[0].signal_summaries] == [
+        "project_dependencies"
+    ]
+    # Flat evidence unchanged and free of signal summaries.
+    assert "signal_summaries" not in result.evidence[0].model_dump()
+    leaked = str(result.model_dump())
+    for forbidden in (
+        "requirements.txt",
+        "package.json",
+        "matched_value",
+        "rule_id",
+        "future_unknown_signal",
+        "secret.path",
+    ):
+        assert forbidden not in leaked
+
+
+def test_fetch_evidence_link_contexts_filters_candidate_and_skills() -> None:
+    from app.services.match_details import _fetch_evidence_link_contexts
+
+    candidate_id = uuid4()
+    skill_a = uuid4()
+    skill_b = uuid4()
+    evidence_id = uuid4()
+    session = Mock()
+    result = Mock()
+    result.all.return_value = [
+        (skill_a, evidence_id, {"signals": [{"type": "docker"}]}),
+    ]
+    session.execute.return_value = result
+
+    contexts = _fetch_evidence_link_contexts(
+        session, candidate_id=candidate_id, skill_ids={skill_a, skill_b}
+    )
+
+    assert contexts == {(skill_a, evidence_id): [{"signals": [{"type": "docker"}]}]}
+    assert session.execute.call_count == 1
+    statement = session.execute.call_args.args[0]
+    # SQLAlchemy Core/ORM select retains where criteria referencing both filters.
+    where_sql = str(statement.compile(compile_kwargs={"literal_binds": False}))
+    assert "candidate_id" in where_sql
+    assert "skill_id" in where_sql
+
+
+def test_fetch_evidence_link_contexts_empty_skill_ids_skips_query() -> None:
+    from app.services.match_details import _fetch_evidence_link_contexts
+
+    session = Mock()
+    assert _fetch_evidence_link_contexts(session, candidate_id=uuid4(), skill_ids=set()) == {}
+    session.execute.assert_not_called()
 
 
 def test_build_match_details_requires_candidate(monkeypatch: pytest.MonkeyPatch) -> None:

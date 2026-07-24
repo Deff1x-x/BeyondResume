@@ -68,6 +68,12 @@ class SkillOptionResponse(BaseModel):
     category: str
 
 
+class SignalSummaryResponse(BaseModel):
+    """Employer-safe public category describing why evidence supports a skill."""
+
+    category: str
+
+
 class MatchedSkillEvidenceResponse(BaseModel):
     """Employer-safe evidence unit supporting one matched vacancy skill."""
 
@@ -77,6 +83,7 @@ class MatchedSkillEvidenceResponse(BaseModel):
     verification_status: str | None
     ownership_status: str | None
     evidence_confidence: float
+    signal_summaries: list[SignalSummaryResponse] = Field(default_factory=list)
 
 
 class MatchedSkillDetailsResponse(BaseModel):

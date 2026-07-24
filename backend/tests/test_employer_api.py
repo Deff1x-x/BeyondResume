@@ -513,7 +513,11 @@ def test_match_details_endpoint(client: TestClient, monkeypatch: pytest.MonkeyPa
         "verification_status",
         "ownership_status",
         "evidence_confidence",
+        "signal_summaries",
     }
+    assert body["match"]["required"]["matched_details"][0]["evidence"][0][
+        "signal_summaries"
+    ] == []
     assert body["match"]["preferred"]["matched_details"] == []
     assert body["roadmap"][0]["id"] == "add-docker"
 
@@ -555,6 +559,7 @@ def test_match_skill_group_schema_exposes_matched_details(client: TestClient) ->
         "verification_status",
         "ownership_status",
         "evidence_confidence",
+        "signal_summaries",
     }
     assert set(evidence["required"]) >= {
         "id",
@@ -564,15 +569,35 @@ def test_match_skill_group_schema_exposes_matched_details(client: TestClient) ->
         "ownership_status",
         "evidence_confidence",
     }
-    # Required keys, nullable values.
-    assert evidence["properties"]["verification_status"].get("type") != "string" or (
-        "anyOf" in evidence["properties"]["verification_status"]
-        or evidence["properties"]["verification_status"].get("nullable") is True
-    )
+    # signal_summaries is optional via default_factory (may be absent from required).
+    summaries = evidence["properties"]["signal_summaries"]
+    assert summaries["type"] == "array"
+    summary_ref = summaries["items"]["$ref"]
+    assert summary_ref.endswith("/SignalSummaryResponse")
+
+    summary = schemas["SignalSummaryResponse"]
+    assert set(summary["properties"]) == {"category"}
+    assert set(summary["required"]) >= {"category"}
+
+    passport_evidence = schemas["SkillPassportEvidenceResponse"]["properties"]
+    assert "signal_summaries" not in passport_evidence
+    assert "context" not in passport_evidence
+    assert "signals" not in passport_evidence
+
     verification = evidence["properties"]["verification_status"]
     ownership = evidence["properties"]["ownership_status"]
     assert "anyOf" in verification or verification.get("nullable") is True
     assert "anyOf" in ownership or ownership.get("nullable") is True
+
+
+def test_signal_summary_requires_category() -> None:
+    from pydantic import ValidationError
+
+    from app.schemas.employer import SignalSummaryResponse
+
+    with pytest.raises(ValidationError):
+        SignalSummaryResponse()  # type: ignore[call-arg]
+
 
 
 @pytest.mark.parametrize("missing_field", ["verification_status", "ownership_status"])
