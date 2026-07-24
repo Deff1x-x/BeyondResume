@@ -17,10 +17,12 @@ import {
   listVacancyRequirements,
   listVacancyShortlist,
   removeCandidateFromShortlist,
-  saveCandidateToShortlist
+  saveCandidateToShortlist,
+  updateEmployerShortlistStage
 } from "@/lib/api/employer";
 import type {
   EmployerCompanyCreateRequest,
+  EmployerCandidateStage,
   EmployerShortlistResponse,
   VacancyCreateRequest,
   VacancyRequirementCreateRequest
@@ -263,6 +265,33 @@ export function useRemoveCandidateFromShortlist(vacancyId: string) {
             (entry) => entry.candidate_id !== candidateId
           )
         })
+      );
+    }
+  });
+}
+
+export function useUpdateEmployerShortlistStage(vacancyId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      candidateId,
+      stage
+    }: {
+      candidateId: string;
+      stage: EmployerCandidateStage;
+    }) => updateEmployerShortlistStage(vacancyId, candidateId, stage),
+    onSuccess: (entry) => {
+      queryClient.setQueryData<EmployerShortlistResponse>(
+        vacancyShortlistQueryKey(vacancyId),
+        (current) =>
+          current
+            ? {
+                entries: current.entries.map((item) =>
+                  item.candidate_id === entry.candidate_id ? entry : item
+                )
+              }
+            : current
       );
     }
   });

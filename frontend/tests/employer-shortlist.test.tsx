@@ -2,21 +2,28 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ShortlistSaveButton } from "@/features/employer/shortlist-save-button";
+import { ShortlistStageControl } from "@/features/employer/shortlist-stage-control";
 import { VacancyShortlistView } from "@/features/employer/vacancy-shortlist-view";
 import { EmployerSection } from "@/features/employer-section";
 import { CandidateProfileView } from "@/features/match-details/candidate-profile-view";
 import {
   listVacancyShortlist,
   removeCandidateFromShortlist,
-  saveCandidateToShortlist
+  saveCandidateToShortlist,
+  updateEmployerShortlistStage
 } from "@/lib/api/employer";
 import { ApiClientError } from "@/lib/api/error";
+import type { EmployerShortlistEntry } from "@/lib/api/types/employer";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { useState } from "react";
 
 const shortlistQuery = vi.fn();
 const saveMutate = vi.fn();
 const removeMutate = vi.fn();
+const updateStageMutate = vi.fn();
 const saveState = vi.fn();
 const removeState = vi.fn();
+const updateStageState = vi.fn();
 const matchDetailsQuery = vi.fn();
 const companyQuery = vi.fn();
 const vacanciesQuery = vi.fn();
@@ -56,6 +63,7 @@ vi.mock("@/lib/employer/hooks", () => ({
   useVacancyShortlistQuery: () => shortlistQuery(),
   useSaveCandidateToShortlist: () => saveState(),
   useRemoveCandidateFromShortlist: () => removeState(),
+  useUpdateEmployerShortlistStage: () => updateStageState(),
   vacancyMatchesQueryKey: (vacancyId: string) => ["employer", "vacancy", vacancyId, "matches"],
   vacancyRequirementsQueryKey: (vacancyId: string) => [
     "employer",
@@ -113,20 +121,31 @@ const matchDetails = {
   roadmap: []
 };
 
-const shortlistEntry = {
+const shortlistEntry: EmployerShortlistEntry = {
   id: "entry-1",
   vacancy_id: "vacancy-1",
   candidate_id: "candidate-1",
+  stage: "shortlisted",
   created_at: "2026-07-25T10:00:00Z",
   updated_at: "2026-07-25T10:00:00Z"
 };
 
-const secondShortlistEntry = {
+const secondShortlistEntry: EmployerShortlistEntry = {
   id: "entry-2",
   vacancy_id: "vacancy-1",
   candidate_id: "candidate-2",
+  stage: "interview",
   created_at: "2026-07-25T11:00:00Z",
   updated_at: "2026-07-25T11:00:00Z"
+};
+
+const rejectedShortlistEntry: EmployerShortlistEntry = {
+  id: "entry-rejected",
+  vacancy_id: "vacancy-1",
+  candidate_id: "candidate-1",
+  stage: "rejected",
+  created_at: "2026-07-25T10:00:00Z",
+  updated_at: "2026-07-25T12:00:00Z"
 };
 
 const shortlistLoadError = new ApiClientError({
@@ -179,6 +198,7 @@ function readyEmployerWorkspace({
 beforeEach(() => {
   saveMutate.mockReset();
   removeMutate.mockReset();
+  updateStageMutate.mockReset();
   saveState.mockReturnValue({
     mutate: saveMutate,
     isPending: false,
@@ -189,6 +209,14 @@ beforeEach(() => {
   });
   removeState.mockReturnValue({
     mutate: removeMutate,
+    isPending: false,
+    isError: false,
+    error: null,
+    variables: undefined,
+    reset: vi.fn()
+  });
+  updateStageState.mockReturnValue({
+    mutate: updateStageMutate,
     isPending: false,
     isError: false,
     error: null,
@@ -320,7 +348,7 @@ describe("Employer shortlist UI", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("Database operation failed");
   });
 
-  it("shows Saved badge in Candidate Review when the backend shortlist includes the candidate", () => {
+  it("shows Saved badge and stage control in Candidate Review when the backend shortlist includes the candidate", () => {
     shortlistQuery.mockReturnValue({
       data: { entries: [shortlistEntry] },
       isLoading: false,
@@ -333,10 +361,29 @@ describe("Employer shortlist UI", () => {
     );
 
     expect(screen.getAllByText("Saved").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("Shortlisted").length).toBeGreaterThanOrEqual(1);
+    expect(
+      screen.getByRole("combobox", { name: "Hiring stage for Alex Morgan" })
+    ).toHaveValue("shortlisted");
     expect(
       screen.getByRole("button", { name: "Remove Alex Morgan from shortlist" })
     ).toBeInTheDocument();
     expect(screen.queryByText("employer_id")).not.toBeInTheDocument();
+  });
+
+  it("keeps interview and rejected candidates in the Saved filter", () => {
+    readyEmployerWorkspace({
+      shortlistEntries: [
+        { ...shortlistEntry, stage: "interview" },
+        { ...secondShortlistEntry, candidate_id: "candidate-2", stage: "rejected" }
+      ]
+    });
+    render(<EmployerSection enabled />);
+    fireEvent.click(screen.getByRole("button", { name: "Manage vacancy" }));
+    fireEvent.click(screen.getByRole("button", { name: "Saved" }));
+
+    expect(screen.getByRole("link", { name: "Review candidate Alex Morgan" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Review candidate Bea Chen" })).toBeInTheDocument();
   });
 
   it("filters Candidate matches by All and Saved without changing match order", () => {
@@ -517,7 +564,8 @@ describe("Employer shortlist UI", () => {
           {
             ...shortlistEntry,
             id: "entry-3",
-            candidate_id: "candidate-unmatched"
+            candidate_id: "candidate-unmatched",
+            stage: "screening"
           }
         ]
       },
@@ -530,6 +578,7 @@ describe("Employer shortlist UI", () => {
     render(<VacancyShortlistView vacancyId="vacancy-1" enabled />);
 
     expect(screen.getByText("Saved candidate")).toBeInTheDocument();
+    expect(screen.getAllByText("Screening").length).toBeGreaterThanOrEqual(1);
     expect(screen.queryByText("candidate-unmatched")).not.toBeInTheDocument();
     expect(screen.queryByText("entry-3")).not.toBeInTheDocument();
   });
@@ -548,6 +597,236 @@ describe("Employer shortlist UI", () => {
 
     expect(screen.getByRole("alert")).toHaveTextContent("Database operation failed");
     expect(screen.queryByText("No saved candidates yet.")).not.toBeInTheDocument();
+  });
+
+  it("filters the shortlist page by hiring stage without changing backend order", () => {
+    shortlistQuery.mockReturnValue({
+      data: {
+        entries: [
+          secondShortlistEntry,
+          shortlistEntry,
+          { ...rejectedShortlistEntry, candidate_id: "candidate-unmatched", id: "entry-3" }
+        ]
+      },
+      isLoading: false,
+      isError: false,
+      isSuccess: true,
+      refetch: vi.fn()
+    });
+
+    render(<VacancyShortlistView vacancyId="vacancy-1" enabled />);
+
+    expect(
+      screen.getAllByRole("link", { name: /Review candidate/ }).map((link) =>
+        link.getAttribute("href")
+      )
+    ).toEqual([
+      "/employer/matches/candidate-2?vacancy_id=vacancy-1",
+      "/employer/matches/candidate-1?vacancy_id=vacancy-1",
+      "/employer/matches/candidate-unmatched?vacancy_id=vacancy-1"
+    ]);
+
+    fireEvent.click(screen.getByRole("button", { name: "Interview" }));
+    expect(screen.getByRole("link", { name: "Review candidate Bea Chen" })).toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "Review candidate Alex Morgan" })
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Offer" }));
+    expect(screen.getByText("No candidates in Offer.")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "All" }));
+    expect(screen.getByRole("link", { name: "Review candidate Alex Morgan" })).toBeInTheDocument();
+  });
+
+  it("changes hiring stage through the shortlist stage control", () => {
+    shortlistQuery.mockReturnValue({
+      data: { entries: [shortlistEntry] },
+      isLoading: false,
+      isError: false,
+      isSuccess: true,
+      refetch: vi.fn()
+    });
+
+    render(<VacancyShortlistView vacancyId="vacancy-1" enabled />);
+
+    const select = screen.getByRole("combobox", {
+      name: "Hiring stage for Alex Morgan"
+    });
+    expect(select).toHaveValue("shortlisted");
+    expect(screen.getByRole("option", { name: "Interview" })).toBeInTheDocument();
+
+    fireEvent.change(select, { target: { value: "shortlisted" } });
+    expect(updateStageMutate).not.toHaveBeenCalled();
+
+    fireEvent.change(select, { target: { value: "interview" } });
+    expect(updateStageMutate).toHaveBeenCalledWith({
+      candidateId: "candidate-1",
+      stage: "interview"
+    });
+  });
+
+  it("disables the stage select while a stage mutation is pending", () => {
+    updateStageState.mockReturnValue({
+      mutate: updateStageMutate,
+      isPending: true,
+      isError: false,
+      error: null,
+      variables: { candidateId: "candidate-1", stage: "interview" },
+      reset: vi.fn()
+    });
+
+    render(
+      <ShortlistStageControl
+        vacancyId="vacancy-1"
+        candidateId="candidate-1"
+        stage="shortlisted"
+        candidateLabel="Alex Morgan"
+      />
+    );
+
+    const select = screen.getByRole("combobox", {
+      name: "Hiring stage for Alex Morgan"
+    });
+    expect(select).toBeDisabled();
+    expect(select).toHaveAttribute("aria-busy", "true");
+    expect(select).toHaveValue("shortlisted");
+    fireEvent.change(select, { target: { value: "offer" } });
+    expect(updateStageMutate).not.toHaveBeenCalled();
+  });
+
+  it("keeps the persisted stage visible and shows an alert when stage update fails", () => {
+    updateStageState.mockReturnValue({
+      mutate: updateStageMutate,
+      isPending: false,
+      isError: true,
+      error: shortlistLoadError,
+      variables: { candidateId: "candidate-1", stage: "interview" },
+      reset: vi.fn()
+    });
+
+    render(
+      <ShortlistStageControl
+        vacancyId="vacancy-1"
+        candidateId="candidate-1"
+        stage="shortlisted"
+        candidateLabel="Alex Morgan"
+      />
+    );
+
+    expect(screen.getByRole("combobox")).toHaveValue("shortlisted");
+    expect(screen.getAllByText("Shortlisted").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByRole("alert")).toHaveTextContent("Database operation failed");
+  });
+
+  it("hides stage control for unsaved candidates and shows it after save state appears", () => {
+    shortlistQuery.mockReturnValue({
+      data: { entries: [] },
+      isLoading: false,
+      isError: false,
+      isSuccess: true
+    });
+    const { rerender } = render(
+      <CandidateProfileView candidateId="candidate-1" vacancyId="vacancy-1" enabled />
+    );
+
+    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save Alex Morgan to shortlist" })).toBeInTheDocument();
+
+    shortlistQuery.mockReturnValue({
+      data: { entries: [shortlistEntry] },
+      isLoading: false,
+      isError: false,
+      isSuccess: true
+    });
+    rerender(
+      <CandidateProfileView candidateId="candidate-1" vacancyId="vacancy-1" enabled />
+    );
+
+    expect(screen.getByRole("combobox", { name: "Hiring stage for Alex Morgan" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Remove Alex Morgan from shortlist" })
+    ).toBeInTheDocument();
+  });
+
+  it("renders the persisted stage from props without keeping a stale local selection", () => {
+    const { rerender } = render(
+      <ShortlistStageControl
+        vacancyId="vacancy-1"
+        candidateId="candidate-1"
+        stage="shortlisted"
+        candidateLabel="Alex Morgan"
+      />
+    );
+
+    const select = screen.getByRole("combobox", {
+      name: "Hiring stage for Alex Morgan"
+    });
+    fireEvent.change(select, { target: { value: "offer" } });
+    expect(select).toHaveValue("shortlisted");
+    expect(screen.getAllByText("Shortlisted").length).toBeGreaterThanOrEqual(1);
+
+    rerender(
+      <ShortlistStageControl
+        vacancyId="vacancy-1"
+        candidateId="candidate-1"
+        stage="offer"
+        candidateLabel="Alex Morgan"
+      />
+    );
+
+    expect(
+      screen.getByRole("combobox", { name: "Hiring stage for Alex Morgan" })
+    ).toHaveValue("offer");
+    expect(screen.getAllByText("Offer").length).toBeGreaterThanOrEqual(1);
+  });
+
+  it.each([
+    ["shortlisted", "Shortlisted"],
+    ["screening", "Screening"],
+    ["interview", "Interview"],
+    ["offer", "Offer"],
+    ["hired", "Hired"],
+    ["rejected", "Rejected"]
+  ] as const)("filters the shortlist page by the %s stage", (stage, label) => {
+    shortlistQuery.mockReturnValue({
+      data: {
+        entries: [
+          { ...shortlistEntry, stage },
+          { ...secondShortlistEntry, stage: stage === "offer" ? "hired" : "offer" }
+        ]
+      },
+      isLoading: false,
+      isError: false,
+      isSuccess: true,
+      refetch: vi.fn()
+    });
+
+    render(<VacancyShortlistView vacancyId="vacancy-1" enabled />);
+    fireEvent.click(screen.getByRole("button", { name: label }));
+
+    expect(screen.getByRole("link", { name: "Review candidate Alex Morgan" })).toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "Review candidate Bea Chen" })
+    ).not.toBeInTheDocument();
+  });
+
+  it("removes a non-default stage entry from the shortlist page", async () => {
+    shortlistQuery.mockReturnValue({
+      data: { entries: [{ ...shortlistEntry, stage: "interview" }] },
+      isLoading: false,
+      isError: false,
+      isSuccess: true,
+      refetch: vi.fn()
+    });
+
+    render(<VacancyShortlistView vacancyId="vacancy-1" enabled />);
+    fireEvent.click(
+      screen.getByRole("button", { name: "Remove Alex Morgan from shortlist" })
+    );
+    await waitFor(() => {
+      expect(removeMutate).toHaveBeenCalledWith("candidate-1");
+    });
   });
 });
 
@@ -592,5 +871,205 @@ describe("Shortlist API client contract", () => {
       "/api/v1/employer/vacancies/vacancy-1/shortlist/candidate-1"
     );
     expect(fetchMock.mock.calls[2][1].method).toBe("DELETE");
+  });
+
+  it("PATCHes the hiring stage with the exact body and returns the server entry", async () => {
+    const updatedEntry = {
+      ...shortlistEntry,
+      stage: "interview" as const,
+      updated_at: "2026-07-26T12:00:00Z"
+    };
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify(updatedEntry), {
+        status: 200,
+        headers: { "Content-Type": "application/json" }
+      })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      updateEmployerShortlistStage("vacancy-1", "candidate-1", "interview")
+    ).resolves.toEqual(updatedEntry);
+
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      "/api/v1/employer/vacancies/vacancy-1/shortlist/candidate-1"
+    );
+    expect(fetchMock.mock.calls[0][1].method).toBe("PATCH");
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body as string)).toEqual({
+      stage: "interview"
+    });
+  });
+
+  it("propagates structured API errors from stage PATCH", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            error: {
+              code: "SHORTLIST_ENTRY_NOT_FOUND",
+              message: "Shortlist entry not found",
+              details: [],
+              request_id: "req-1"
+            }
+          }),
+          { status: 404, headers: { "Content-Type": "application/json" } }
+        )
+      )
+    );
+
+    await expect(
+      updateEmployerShortlistStage("vacancy-1", "candidate-1", "interview")
+    ).rejects.toMatchObject({
+      status: 404,
+      code: "SHORTLIST_ENTRY_NOT_FOUND"
+    });
+  });
+});
+
+describe("Stage mutation cache", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("replaces only the matching entry, preserves order, and ignores failed mutations", async () => {
+    const hooks = await vi.importActual<typeof import("@/lib/employer/hooks")>(
+      "@/lib/employer/hooks"
+    );
+    const updatedEntry = {
+      ...shortlistEntry,
+      stage: "offer" as const,
+      updated_at: "2026-07-26T15:00:00Z"
+    };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(updatedEntry), {
+          status: 200,
+          headers: { "Content-Type": "application/json" }
+        })
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            error: {
+              code: "DATABASE_ERROR",
+              message: "Database operation failed",
+              details: [],
+              request_id: "req-2"
+            }
+          }),
+          { status: 500, headers: { "Content-Type": "application/json" } }
+        )
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const queryClient = new QueryClient({
+      defaultOptions: { mutations: { retry: false }, queries: { retry: false } }
+    });
+    queryClient.setQueryData(hooks.vacancyShortlistQueryKey("vacancy-1"), {
+      entries: [shortlistEntry, secondShortlistEntry]
+    });
+    queryClient.setQueryData(hooks.vacancyShortlistQueryKey("vacancy-2"), {
+      entries: [{ ...shortlistEntry, vacancy_id: "vacancy-2", id: "entry-other" }]
+    });
+
+    function Probe() {
+      const mutation = hooks.useUpdateEmployerShortlistStage("vacancy-1");
+      const [error, setError] = useState<string | null>(null);
+      return (
+        <div>
+          <button
+            type="button"
+            onClick={() =>
+              mutation.mutate(
+                { candidateId: "candidate-1", stage: "offer" },
+                {
+                  onError: (err) =>
+                    setError(err instanceof ApiClientError ? err.message : "failed")
+                }
+              )
+            }
+          >
+            apply
+          </button>
+          {error ? <p role="alert">{error}</p> : null}
+        </div>
+      );
+    }
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <Probe />
+      </QueryClientProvider>
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "apply" }));
+    await waitFor(() => {
+      expect(queryClient.getQueryData(hooks.vacancyShortlistQueryKey("vacancy-1"))).toEqual({
+        entries: [updatedEntry, secondShortlistEntry]
+      });
+    });
+    expect(queryClient.getQueryData(hooks.vacancyShortlistQueryKey("vacancy-2"))).toEqual({
+      entries: [{ ...shortlistEntry, vacancy_id: "vacancy-2", id: "entry-other" }]
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "apply" }));
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toHaveTextContent("Database operation failed");
+    });
+    expect(queryClient.getQueryData(hooks.vacancyShortlistQueryKey("vacancy-1"))).toEqual({
+      entries: [updatedEntry, secondShortlistEntry]
+    });
+
+    vi.unstubAllGlobals();
+  });
+
+  it("does not seed an empty shortlist into a cache that was never loaded", async () => {
+    const hooks = await vi.importActual<typeof import("@/lib/employer/hooks")>(
+      "@/lib/employer/hooks"
+    );
+    const updatedEntry = { ...shortlistEntry, stage: "hired" as const };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify(updatedEntry), {
+          status: 200,
+          headers: { "Content-Type": "application/json" }
+        })
+      )
+    );
+
+    const queryClient = new QueryClient({
+      defaultOptions: { mutations: { retry: false }, queries: { retry: false } }
+    });
+
+    function Probe() {
+      const mutation = hooks.useUpdateEmployerShortlistStage("vacancy-1");
+      return (
+        <button
+          type="button"
+          onClick={() => mutation.mutate({ candidateId: "candidate-1", stage: "hired" })}
+        >
+          apply
+        </button>
+      );
+    }
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <Probe />
+      </QueryClientProvider>
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "apply" }));
+    await waitFor(() => {
+      expect(
+        (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.length
+      ).toBeGreaterThan(0);
+    });
+    await waitFor(() => {
+      expect(queryClient.getQueryData(hooks.vacancyShortlistQueryKey("vacancy-1"))).toBeUndefined();
+    });
   });
 });

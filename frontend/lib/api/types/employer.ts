@@ -161,10 +161,37 @@ export type AiMatchExplanation = {
   next_steps: string[];
 };
 
+export type EmployerCandidateStage =
+  | "shortlisted"
+  | "screening"
+  | "interview"
+  | "offer"
+  | "hired"
+  | "rejected";
+
+export const EMPLOYER_CANDIDATE_STAGES = [
+  "shortlisted",
+  "screening",
+  "interview",
+  "offer",
+  "hired",
+  "rejected"
+] as const satisfies readonly EmployerCandidateStage[];
+
+export const EMPLOYER_CANDIDATE_STAGE_LABELS: Record<EmployerCandidateStage, string> = {
+  shortlisted: "Shortlisted",
+  screening: "Screening",
+  interview: "Interview",
+  offer: "Offer",
+  hired: "Hired",
+  rejected: "Rejected"
+};
+
 export type EmployerShortlistEntry = {
   id: string;
   vacancy_id: string;
   candidate_id: string;
+  stage: EmployerCandidateStage;
   created_at: string;
   updated_at: string;
 };

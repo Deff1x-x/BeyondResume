@@ -10,6 +10,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { SkeletonCard, SkeletonListRow } from "@/components/ui/skeleton";
 import { ShortlistSaveButton } from "@/features/employer/shortlist-save-button";
+import { ShortlistStageControl } from "@/features/employer/shortlist-stage-control";
 import { EvidenceCard } from "@/features/match-details/evidence-card";
 import { EmployerSkillPassport } from "@/features/match-details/employer-skill-passport";
 import { MatchReviewNavigation } from "@/features/match-details/match-review-navigation";
@@ -42,9 +43,10 @@ function MatchHero({
 }: Readonly<{ details: MatchDetailsResponse; vacancyId: string; candidateId: string }>) {
   const sources = [...new Set(details.evidence.map((item) => item.source_type))];
   const shortlistQuery = useVacancyShortlistQuery(vacancyId, true);
-  const isSaved =
-    shortlistQuery.data?.entries.some((entry) => entry.candidate_id === candidateId) ??
-    false;
+  const savedEntry = shortlistQuery.data?.entries.find(
+    (entry) => entry.candidate_id === candidateId
+  );
+  const isSaved = savedEntry !== undefined;
 
   return (
     <section
@@ -75,12 +77,20 @@ function MatchHero({
             <span className="font-medium text-ink">{details.evidence.length}</span> evidence{" "}
             {details.evidence.length === 1 ? "source supports" : "sources support"} this evaluation.
           </p>
-          <div className="mt-5">
+          <div className="mt-5 flex flex-col gap-4 sm:flex-row sm:items-start">
             <ShortlistSaveButton
               vacancyId={vacancyId}
               candidateId={candidateId}
               candidateName={details.candidate.name}
             />
+            {savedEntry ? (
+              <ShortlistStageControl
+                vacancyId={vacancyId}
+                candidateId={candidateId}
+                stage={savedEntry.stage}
+                candidateLabel={details.candidate.name}
+              />
+            ) : null}
           </div>
         </div>
         <div className="w-full max-w-sm shrink-0 rounded-2xl border border-primary/15 bg-background/90 px-5 py-4">

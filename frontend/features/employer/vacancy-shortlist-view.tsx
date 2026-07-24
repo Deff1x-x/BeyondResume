@@ -1,15 +1,23 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { SkeletonCard, SkeletonListRow } from "@/components/ui/skeleton";
+import { ShortlistStageControl } from "@/features/employer/shortlist-stage-control";
 import { VacancyMatchCard } from "@/features/employer/vacancy-match-card";
 import { ApiClientError } from "@/lib/api/error";
-import type { VacancyMatch } from "@/lib/api/types/employer";
+import type {
+  EmployerCandidateStage,
+  VacancyMatch
+} from "@/lib/api/types/employer";
+import {
+  EMPLOYER_CANDIDATE_STAGE_LABELS,
+  EMPLOYER_CANDIDATE_STAGES
+} from "@/lib/api/types/employer";
 import {
   useEmployerVacancyQuery,
   useRemoveCandidateFromShortlist,
@@ -21,6 +29,8 @@ type VacancyShortlistViewProps = Readonly<{
   vacancyId: string;
   enabled: boolean;
 }>;
+
+type StageFilter = "all" | EmployerCandidateStage;
 
 function errorMessage(error: unknown): string {
   if (error instanceof ApiClientError) {
@@ -75,10 +85,19 @@ function ShortlistRemoveButton({
   );
 }
 
+function filterButtonClass(active: boolean): string {
+  return `rounded-lg px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 ${
+    active
+      ? "bg-background text-ink shadow-sm"
+      : "text-secondary hover:bg-background/70 hover:text-ink"
+  }`;
+}
+
 export function VacancyShortlistView({ vacancyId, enabled }: VacancyShortlistViewProps) {
   const vacancyQuery = useEmployerVacancyQuery(vacancyId, enabled);
   const shortlistQuery = useVacancyShortlistQuery(vacancyId, enabled);
   const matchesQuery = useVacancyMatchesQuery(vacancyId, enabled);
+  const [stageFilter, setStageFilter] = useState<StageFilter>("all");
 
   const matchesByCandidate = useMemo(() => {
     const map = new Map<string, VacancyMatch>();
@@ -89,6 +108,10 @@ export function VacancyShortlistView({ vacancyId, enabled }: VacancyShortlistVie
   }, [matchesQuery.data?.matches]);
 
   const entries = shortlistQuery.data?.entries ?? [];
+  const visibleEntries =
+    stageFilter === "all"
+      ? entries
+      : entries.filter((entry) => entry.stage === stageFilter);
   const backHref = "/#employer-vacancies";
   const breadcrumb = (
     <nav aria-label="Breadcrumb" className="flex flex-wrap items-center gap-2">
@@ -165,15 +188,53 @@ export function VacancyShortlistView({ vacancyId, enabled }: VacancyShortlistVie
         </p>
       ) : null}
 
+      {entries.length > 0 ? (
+        <div
+          className="flex w-fit max-w-full flex-wrap rounded-xl border border-border bg-surface-subtle p-1"
+          role="group"
+          aria-label="Filter shortlist by hiring stage"
+        >
+          <button
+            type="button"
+            aria-pressed={stageFilter === "all"}
+            className={filterButtonClass(stageFilter === "all")}
+            onClick={() => setStageFilter("all")}
+          >
+            All
+          </button>
+          {EMPLOYER_CANDIDATE_STAGES.map((stage) => (
+            <button
+              key={stage}
+              type="button"
+              aria-pressed={stageFilter === stage}
+              className={filterButtonClass(stageFilter === stage)}
+              onClick={() => setStageFilter(stage)}
+            >
+              {EMPLOYER_CANDIDATE_STAGE_LABELS[stage]}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
       {entries.length === 0 ? (
         <EmptyState
           title="No saved candidates yet."
           description="Save a candidate from Candidate Review to see them here."
           className="py-8"
         />
-      ) : (
+      ) : null}
+
+      {entries.length > 0 && visibleEntries.length === 0 && stageFilter !== "all" ? (
+        <EmptyState
+          title={`No candidates in ${EMPLOYER_CANDIDATE_STAGE_LABELS[stageFilter]}.`}
+          description="Choose another stage filter or move a saved candidate into this stage."
+          className="py-8"
+        />
+      ) : null}
+
+      {visibleEntries.length > 0 ? (
         <ul className="space-y-3">
-          {entries.map((entry) => {
+          {visibleEntries.map((entry) => {
             const match =
               matchesByCandidate.get(entry.candidate_id) ??
               fallbackMatch(entry.candidate_id);
@@ -182,19 +243,26 @@ export function VacancyShortlistView({ vacancyId, enabled }: VacancyShortlistVie
                 key={entry.id}
                 match={match}
                 vacancyId={vacancyId}
-                saved
                 actions={
-                  <ShortlistRemoveButton
-                    vacancyId={vacancyId}
-                    candidateId={entry.candidate_id}
-                    candidateName={match.candidate_name}
-                  />
+                  <div className="flex w-full flex-wrap items-start gap-3 sm:w-auto">
+                    <ShortlistStageControl
+                      vacancyId={vacancyId}
+                      candidateId={entry.candidate_id}
+                      stage={entry.stage}
+                      candidateLabel={match.candidate_name}
+                    />
+                    <ShortlistRemoveButton
+                      vacancyId={vacancyId}
+                      candidateId={entry.candidate_id}
+                      candidateName={match.candidate_name}
+                    />
+                  </div>
                 }
               />
             );
           })}
         </ul>
-      )}
+      ) : null}
     </div>
   );
 }

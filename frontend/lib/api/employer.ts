@@ -3,6 +3,7 @@ import type {
   EmployerCompany,
   EmployerCompanyCreateRequest,
   AiMatchExplanation,
+  EmployerCandidateStage,
   EmployerShortlistEntry,
   EmployerShortlistResponse,
   MatchDetailsResponse,
@@ -117,4 +118,18 @@ export function removeCandidateFromShortlist(
   return apiRequest<void>(`/employer/vacancies/${vacancyId}/shortlist/${candidateId}`, {
     method: "DELETE"
   });
+}
+
+export function updateEmployerShortlistStage(
+  vacancyId: string,
+  candidateId: string,
+  stage: EmployerCandidateStage
+): Promise<EmployerShortlistEntry> {
+  return apiRequest<EmployerShortlistEntry>(
+    `/employer/vacancies/${vacancyId}/shortlist/${candidateId}`,
+    {
+      method: "PATCH",
+      body: { stage }
+    }
+  );
 }
