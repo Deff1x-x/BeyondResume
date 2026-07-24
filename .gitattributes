@@ -1,0 +1,2 @@
+# Force LF for shell scripts used as container entrypoints.
+*.sh text eol=lf

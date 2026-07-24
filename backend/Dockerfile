@@ -6,7 +6,10 @@ COPY pyproject.toml ./
 RUN pip install --no-cache-dir .
 
 COPY . .
+# Ensure the entrypoint is executable even when checked out on Windows without +x.
+RUN chmod +x /app/docker-entrypoint.sh
 
 EXPOSE 8000
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Invoke via /bin/sh so startup does not depend solely on the executable bit.
+CMD ["/bin/sh", "/app/docker-entrypoint.sh"]
