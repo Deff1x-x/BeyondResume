@@ -68,9 +68,27 @@ class SkillOptionResponse(BaseModel):
     category: str
 
 
+class MatchedSkillEvidenceResponse(BaseModel):
+    """Employer-safe evidence unit supporting one matched vacancy skill."""
+
+    id: UUID
+    source_type: str
+    title: str | None
+    verification_status: str | None
+    ownership_status: str | None
+    evidence_confidence: float
+
+
+class MatchedSkillDetailsResponse(BaseModel):
+    skill_id: UUID
+    skill_name: str
+    evidence: list[MatchedSkillEvidenceResponse]
+
+
 class MatchSkillGroupResponse(BaseModel):
     matched: list[str]
     missing: list[str]
+    matched_details: list[MatchedSkillDetailsResponse] = Field(default_factory=list)
 
 
 class VacancyMatchResponse(BaseModel):

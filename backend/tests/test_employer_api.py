@@ -369,8 +369,13 @@ def test_vacancy_matches_endpoint(client: TestClient, monkeypatch: pytest.Monkey
     assert body["matches"][0]["required"] == {
         "matched": ["Python"],
         "missing": ["Docker"],
+        "matched_details": [],
     }
-    assert body["matches"][0]["preferred"] == {"matched": ["React"], "missing": []}
+    assert body["matches"][0]["preferred"] == {
+        "matched": ["React"],
+        "missing": [],
+        "matched_details": [],
+    }
 
 
 def test_vacancy_matches_requires_owned_vacancy(
@@ -399,6 +404,8 @@ def test_match_details_endpoint(client: TestClient, monkeypatch: pytest.MonkeyPa
         MatchDetailsPassportSkillResponse,
         MatchDetailsResponse,
         MatchDetailsRoadmapItemResponse,
+        MatchedSkillDetailsResponse,
+        MatchedSkillEvidenceResponse,
         MatchSkillGroupResponse,
     )
 
@@ -421,7 +428,26 @@ def test_match_details_endpoint(client: TestClient, monkeypatch: pytest.MonkeyPa
             ),
             match=MatchDetailsMatchResponse(
                 score=91,
-                required=MatchSkillGroupResponse(matched=["Python"], missing=[]),
+                required=MatchSkillGroupResponse(
+                    matched=["Python"],
+                    missing=[],
+                    matched_details=[
+                        MatchedSkillDetailsResponse(
+                            skill_id=uuid4(),
+                            skill_name="Python",
+                            evidence=[
+                                MatchedSkillEvidenceResponse(
+                                    id=uuid4(),
+                                    source_type="resume",
+                                    title="Resume: ada.pdf",
+                                    verification_status="unverified",
+                                    ownership_status="verified",
+                                    evidence_confidence=0.87,
+                                )
+                            ],
+                        )
+                    ],
+                ),
                 preferred=MatchSkillGroupResponse(matched=[], missing=["Docker"]),
             ),
             passport=MatchDetailsPassportResponse(
@@ -478,6 +504,17 @@ def test_match_details_endpoint(client: TestClient, monkeypatch: pytest.MonkeyPa
     assert body["evidence"][0]["source_type"] == "resume"
     assert body["evidence"][0]["verification_status"] == "unverified"
     assert body["evidence"][0]["ownership_status"] == "verified"
+    assert body["match"]["required"]["matched"] == ["Python"]
+    assert body["match"]["required"]["matched_details"][0]["skill_name"] == "Python"
+    assert set(body["match"]["required"]["matched_details"][0]["evidence"][0]) == {
+        "id",
+        "source_type",
+        "title",
+        "verification_status",
+        "ownership_status",
+        "evidence_confidence",
+    }
+    assert body["match"]["preferred"]["matched_details"] == []
     assert body["roadmap"][0]["id"] == "add-docker"
 
 
@@ -490,6 +527,52 @@ def test_match_details_evidence_schema_exposes_status_fields(client: TestClient)
         "verification_status",
         "ownership_status",
     }
+
+
+def test_match_skill_group_schema_exposes_matched_details(client: TestClient) -> None:
+    schemas = client.get("/openapi.json").json()["components"]["schemas"]
+    group = schemas["MatchSkillGroupResponse"]
+    assert set(group["properties"]) >= {"matched", "missing", "matched_details"}
+    assert group["properties"]["matched"]["type"] == "array"
+    assert group["properties"]["matched"]["items"]["type"] == "string"
+    assert group["properties"]["missing"]["type"] == "array"
+    assert group["properties"]["missing"]["items"]["type"] == "string"
+    details_ref = group["properties"]["matched_details"]["items"]["$ref"]
+    assert details_ref.endswith("/MatchedSkillDetailsResponse")
+
+    details = schemas["MatchedSkillDetailsResponse"]
+    assert set(details["properties"]) == {"skill_id", "skill_name", "evidence"}
+    assert details["properties"]["skill_id"]["format"] == "uuid"
+    assert details["properties"]["skill_name"]["type"] == "string"
+    evidence_ref = details["properties"]["evidence"]["items"]["$ref"]
+    assert evidence_ref.endswith("/MatchedSkillEvidenceResponse")
+
+    evidence = schemas["MatchedSkillEvidenceResponse"]
+    assert set(evidence["properties"]) == {
+        "id",
+        "source_type",
+        "title",
+        "verification_status",
+        "ownership_status",
+        "evidence_confidence",
+    }
+    assert set(evidence["required"]) >= {
+        "id",
+        "source_type",
+        "title",
+        "verification_status",
+        "ownership_status",
+        "evidence_confidence",
+    }
+    # Required keys, nullable values.
+    assert evidence["properties"]["verification_status"].get("type") != "string" or (
+        "anyOf" in evidence["properties"]["verification_status"]
+        or evidence["properties"]["verification_status"].get("nullable") is True
+    )
+    verification = evidence["properties"]["verification_status"]
+    ownership = evidence["properties"]["ownership_status"]
+    assert "anyOf" in verification or verification.get("nullable") is True
+    assert "anyOf" in ownership or ownership.get("nullable") is True
 
 
 @pytest.mark.parametrize("missing_field", ["verification_status", "ownership_status"])

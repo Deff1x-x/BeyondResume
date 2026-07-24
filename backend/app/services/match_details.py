@@ -20,9 +20,11 @@ from app.schemas.employer import (
     MatchDetailsPassportSkillResponse,
     MatchDetailsResponse,
     MatchDetailsRoadmapItemResponse,
+    MatchedSkillDetailsResponse,
+    MatchedSkillEvidenceResponse,
     MatchSkillGroupResponse,
 )
-from app.schemas.skill_passport import SkillPassportResponse
+from app.schemas.skill_passport import SkillPassportResponse, SkillPassportSkillResponse
 from app.services.employer import list_vacancy_requirements
 from app.services.matching import MatchRequirement, match_passport_to_requirements
 from app.services.roadmap import build_roadmap_from_match
@@ -75,10 +77,20 @@ def build_match_details(
             required=MatchSkillGroupResponse(
                 matched=list(match.required.matched),
                 missing=list(match.required.missing),
+                matched_details=_matched_details_for_group(
+                    requirements=requirements,
+                    requirement_type="required",
+                    passport=passport,
+                ),
             ),
             preferred=MatchSkillGroupResponse(
                 matched=list(match.preferred.matched),
                 missing=list(match.preferred.missing),
+                matched_details=_matched_details_for_group(
+                    requirements=requirements,
+                    requirement_type="preferred",
+                    passport=passport,
+                ),
             ),
         ),
         passport=MatchDetailsPassportResponse(
@@ -113,6 +125,48 @@ def _employer_safe_passport_skills(
         )
         for skill in passport.skills
     ]
+
+
+def _matched_details_for_group(
+    *,
+    requirements: list[MatchRequirement],
+    requirement_type: str,
+    passport: SkillPassportResponse,
+) -> list[MatchedSkillDetailsResponse]:
+    """Project matched requirements onto passport evidence by Skill.id.
+
+    Uses the same binary ownership check as matching (``skill_id in passport``)
+    without recomputing the score. ``MatchResult.matched`` / ``missing`` remain
+    the public name lists.
+    """
+    passport_by_id: dict[UUID, SkillPassportSkillResponse] = {
+        skill.id: skill for skill in passport.skills
+    }
+    details: list[MatchedSkillDetailsResponse] = []
+    for requirement in requirements:
+        if requirement.requirement_type != requirement_type:
+            continue
+        skill = passport_by_id.get(requirement.skill_id)
+        if skill is None:
+            continue
+        details.append(
+            MatchedSkillDetailsResponse(
+                skill_id=skill.id,
+                skill_name=skill.name,
+                evidence=[
+                    MatchedSkillEvidenceResponse(
+                        id=item.id,
+                        source_type=item.source_type,
+                        title=item.title,
+                        verification_status=item.verification_status,
+                        ownership_status=item.ownership_status,
+                        evidence_confidence=item.evidence_confidence,
+                    )
+                    for item in skill.evidence
+                ],
+            )
+        )
+    return details
 
 
 def _evidence_from_passport(
