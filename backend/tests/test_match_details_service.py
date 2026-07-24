@@ -1,3 +1,6 @@
+import ast
+from pathlib import Path
+import re
 from unittest.mock import Mock
 from uuid import UUID, uuid4
 
@@ -16,6 +19,7 @@ from app.services.match_details import (
     build_match_details,
 )
 from app.services.matching import MatchResult, SkillGroupBreakdown
+from app.utils.github_code_usage_rules import GitHubCodeUsageRule
 
 
 def make_candidate() -> CandidateProfile:
@@ -137,6 +141,8 @@ def _run_match(
     requirements: list,
     match_result: MatchResult,
     link_contexts: dict[tuple[UUID, UUID], list] | None = None,
+    session: Mock | None = None,
+    link_context_loader: Mock | None = None,
 ):
     from app.services import match_details
 
@@ -145,9 +151,12 @@ def _run_match(
     monkeypatch.setattr(
         match_details, "match_passport_to_requirements", lambda *_args: match_result
     )
-    _stub_link_contexts(monkeypatch, link_contexts)
+    if link_context_loader is not None:
+        monkeypatch.setattr(match_details, "_fetch_evidence_link_contexts", link_context_loader)
+    else:
+        _stub_link_contexts(monkeypatch, link_contexts)
     return build_match_details(
-        _session_with_candidate(candidate),
+        session or _session_with_candidate(candidate),
         vacancy_id=vacancy_id,
         candidate_id=candidate.id,
     )
@@ -662,6 +671,323 @@ def test_signal_summaries_github_mixed_and_isolated_by_skill(
         "secret.path",
     ):
         assert forbidden not in leaked
+
+
+def _gap_requirements(vacancy_id: UUID, skills: list[tuple[Skill, str]]) -> list:
+    return [
+        (
+            VacancySkillRequirement(
+                id=uuid4(),
+                vacancy_id=vacancy_id,
+                skill_id=skill.id,
+                requirement_type=requirement_type,
+            ),
+            skill,
+        )
+        for skill, requirement_type in skills
+    ]
+
+
+def _run_gap_match(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    session: Mock | None = None,
+    link_context_loader: Mock | None = None,
+    extra_required: list[Skill] | None = None,
+):
+    """React is owned; Docker and C# are required gaps, GitHub Actions/Pytest preferred."""
+    candidate = make_candidate()
+    vacancy_id = uuid4()
+    react_id = uuid4()
+    passport = SkillPassportResponse(
+        skills=[
+            SkillPassportSkillResponse(
+                id=react_id,
+                name="React",
+                category="frontend",
+                evidence_confidence=0.9,
+                evidence_count=1,
+                evidence=[make_evidence(source_type="github_repository")],
+            )
+        ],
+        total_skills=1,
+        total_evidence=1,
+    )
+    react = make_skill(skill_id=react_id, name="React", category="frontend")
+    docker = make_skill(name="Docker", category="infrastructure")
+    csharp = make_skill(name="C#")
+    actions = make_skill(name="GitHub Actions", category="infrastructure")
+    pytest_skill = make_skill(name="Pytest", category="testing")
+    ordered = [
+        (docker, "required"),
+        (csharp, "required"),
+        (react, "required"),
+        *[(skill, "required") for skill in extra_required or []],
+        (actions, "preferred"),
+        (pytest_skill, "preferred"),
+    ]
+    required_missing = tuple(
+        skill.canonical_name
+        for skill, requirement_type in ordered
+        if requirement_type == "required" and skill.id != react_id
+    )
+    result = _run_match(
+        monkeypatch,
+        candidate=candidate,
+        vacancy_id=vacancy_id,
+        passport=passport,
+        requirements=_gap_requirements(vacancy_id, ordered),
+        match_result=MatchResult(
+            score=25,
+            required=SkillGroupBreakdown(matched=("React",), missing=required_missing),
+            preferred=SkillGroupBreakdown(matched=(), missing=("GitHub Actions", "Pytest")),
+        ),
+        session=session,
+        link_context_loader=link_context_loader,
+    )
+    return result, react_id, docker.id
+
+
+def test_missing_details_explain_required_gaps(monkeypatch: pytest.MonkeyPatch) -> None:
+    result, _react_id, docker_id = _run_gap_match(monkeypatch)
+
+    required = result.match.required
+    assert [item.skill_name for item in required.missing_details] == ["Docker", "C#"]
+    assert required.missing_details[0].skill_id == docker_id
+    assert [
+        suggestion.category for suggestion in required.missing_details[0].evidence_suggestions
+    ] == ["resume_evidence", "container_configuration", "ci_cd_configuration"]
+
+
+def test_missing_details_explain_preferred_gaps(monkeypatch: pytest.MonkeyPatch) -> None:
+    result, _react_id, _docker_id = _run_gap_match(monkeypatch)
+
+    preferred = result.match.preferred
+    assert [item.skill_name for item in preferred.missing_details] == ["GitHub Actions", "Pytest"]
+    assert [
+        suggestion.category for suggestion in preferred.missing_details[0].evidence_suggestions
+    ] == ["resume_evidence", "ci_cd_configuration"]
+    # Pytest has source, config, and CI detectors — and only those.
+    assert [
+        suggestion.category for suggestion in preferred.missing_details[1].evidence_suggestions
+    ] == [
+        "resume_evidence",
+        "source_code_usage",
+        "test_usage",
+        "application_configuration",
+        "ci_cd_configuration",
+    ]
+
+
+def test_missing_details_exclude_matched_skills(monkeypatch: pytest.MonkeyPatch) -> None:
+    result, _react_id, _docker_id = _run_gap_match(monkeypatch)
+
+    every_gap = [
+        item.skill_name
+        for group in (result.match.required, result.match.preferred)
+        for item in group.missing_details
+    ]
+    assert "React" not in every_gap
+
+
+def test_missing_details_do_not_mix_required_and_preferred(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    result, _react_id, _docker_id = _run_gap_match(monkeypatch)
+
+    required_names = {item.skill_name for item in result.match.required.missing_details}
+    preferred_names = {item.skill_name for item in result.match.preferred.missing_details}
+    assert required_names == {"Docker", "C#"}
+    assert preferred_names == {"GitHub Actions", "Pytest"}
+    assert required_names.isdisjoint(preferred_names)
+
+
+def test_missing_stays_a_string_list_aligned_with_missing_details(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    result, _react_id, _docker_id = _run_gap_match(monkeypatch)
+
+    for group in (result.match.required, result.match.preferred):
+        assert all(isinstance(name, str) for name in group.missing)
+        assert group.missing == [item.skill_name for item in group.missing_details]
+        for index, name in enumerate(group.missing):
+            assert group.missing_details[index].skill_name == name
+
+
+def test_missing_details_order_survives_extra_requirements(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    extra = [make_skill(name="Kotlin"), make_skill(name="Redis", category="database")]
+    result, _react_id, _docker_id = _run_gap_match(monkeypatch, extra_required=extra)
+
+    assert result.match.required.missing == ["Docker", "C#", "Kotlin", "Redis"]
+    assert [item.skill_name for item in result.match.required.missing_details] == [
+        "Docker",
+        "C#",
+        "Kotlin",
+        "Redis",
+    ]
+
+
+def test_skill_without_github_rules_suggests_resume_evidence_only(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    result, _react_id, _docker_id = _run_gap_match(monkeypatch)
+
+    csharp = result.match.required.missing_details[1]
+    assert csharp.skill_name == "C#"
+    assert [suggestion.category for suggestion in csharp.evidence_suggestions] == [
+        "resume_evidence"
+    ]
+
+
+def test_missing_details_do_not_change_score_matching_or_existing_fields(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    result, react_id, _docker_id = _run_gap_match(monkeypatch)
+
+    assert result.match.score == 25
+    assert result.match.required.matched == ["React"]
+    assert result.match.required.missing == ["Docker", "C#"]
+    assert result.match.preferred.matched == []
+    assert result.match.preferred.missing == ["GitHub Actions", "Pytest"]
+    # matched_details and flat evidence keep their previous shape.
+    assert [item.skill_name for item in result.match.required.matched_details] == ["React"]
+    assert result.match.required.matched_details[0].skill_id == react_id
+    assert result.match.preferred.matched_details == []
+    assert len(result.evidence) == 1
+    assert result.evidence[0].skills == ["React"]
+    assert "evidence_suggestions" not in result.evidence[0].model_dump()
+    assert "missing_details" not in result.passport.model_dump()
+
+
+def test_gap_suggestions_do_not_read_candidate_evidence_or_add_queries(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session = Mock()
+    candidate_result = Mock()
+    candidate_result.scalar_one_or_none.return_value = make_candidate()
+    session.execute.return_value = candidate_result
+    loader = Mock(return_value={})
+
+    def run(session_mock: Mock) -> object:
+        candidate = make_candidate()
+        candidate_result.scalar_one_or_none.return_value = candidate
+        return _run_gap_match(monkeypatch, session=session_mock, link_context_loader=loader)
+
+    result, react_id, _docker_id = run(session)
+
+    # Only the candidate lookup hits the session; gaps add no EvidenceUnit or
+    # EvidenceSkillLink query, and the link-context loader is scoped to matches.
+    assert session.execute.call_count == 1
+    assert loader.call_count == 1
+    assert loader.call_args.kwargs["skill_ids"] == {react_id}
+    assert result.match.required.missing_details[0].skill_name == "Docker"
+
+
+def test_gap_helper_module_has_no_session_or_ai_dependency() -> None:
+    from app.services import skill_gap_suggestions
+
+    tree = ast.parse(Path(skill_gap_suggestions.__file__).read_text(encoding="utf-8"))
+    imported: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            imported.update(alias.name for alias in node.names)
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            imported.add(node.module)
+
+    assert imported == {
+        "__future__",
+        "app.services.signal_summaries",
+        "app.utils.github_code_usage_rules",
+        "app.utils.github_skill_rules",
+    }
+    for forbidden in ("sqlalchemy", "app.models", "openai", "httpx", "requests"):
+        assert not any(module.startswith(forbidden) for module in imported)
+
+
+def test_missing_details_are_employer_safe(monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.services import skill_gap_suggestions
+    from app.services.skill_gap_suggestions import _code_rule_capabilities
+
+    sensitive_rule = GitHubCodeUsageRule(
+        "Synthetic Skill",
+        frozenset({".py", ".tsx"}),
+        imports=(re.compile(r"\bimport\s+secretpkg\b"),),
+        api_calls=(re.compile(r"\bSecretClient\s*\("),),
+        class_or_function_usage=(re.compile(r"\bsecret_function\b"),),
+        config_files=(re.compile(r"(?:^|/)secret\.config\.json$"),),
+        config_patterns=(re.compile(r"secret://"),),
+        ci_patterns=(re.compile(r"\bsecret-ci-job\b"),),
+    )
+    monkeypatch.setattr(
+        skill_gap_suggestions,
+        "_CAPABILITIES_BY_SKILL_NAME",
+        {
+            **skill_gap_suggestions._CAPABILITIES_BY_SKILL_NAME,
+            "Synthetic Skill": _code_rule_capabilities(sensitive_rule),
+        },
+    )
+
+    result, _react_id, _docker_id = _run_gap_match(
+        monkeypatch,
+        extra_required=[make_skill(name="Synthetic Skill", category="framework")],
+    )
+
+    details = [
+        item.model_dump()
+        for group in (result.match.required, result.match.preferred)
+        for item in group.missing_details
+    ]
+    synthetic = next(item for item in details if item["skill_name"] == "Synthetic Skill")
+    assert synthetic["evidence_suggestions"] == [
+        {"category": "resume_evidence"},
+        {"category": "source_code_usage"},
+        {"category": "test_usage"},
+        {"category": "application_configuration"},
+        {"category": "ci_cd_configuration"},
+    ]
+    for item in details:
+        assert set(item) == {"skill_id", "skill_name", "evidence_suggestions"}
+        for suggestion in item["evidence_suggestions"]:
+            assert set(suggestion) == {"category"}
+
+    serialized = str(details)
+    for forbidden in (
+        "regex",
+        "pattern",
+        "patterns",
+        "package",
+        "dependency",
+        "import",
+        "api_call",
+        "class",
+        "function",
+        "extension",
+        "rule_id",
+        "filename",
+        "path",
+        "manifest",
+        "matched_term",
+        "match_kind",
+        "extractor",
+        "version",
+        "confidence",
+        "weight",
+        "context",
+        "signals",
+        "description",
+        "aliases",
+        "secretpkg",
+        "SecretClient",
+        "secret_function",
+        "secret.config.json",
+        "secret://",
+        "secret-ci-job",
+        ".py",
+        ".tsx",
+    ):
+        assert forbidden not in serialized
 
 
 def test_fetch_evidence_link_contexts_filters_candidate_and_skills() -> None:

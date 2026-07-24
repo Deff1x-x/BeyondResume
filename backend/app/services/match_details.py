@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 from app.models.candidate_profile import CandidateProfile
 from app.models.evidence_skill_link import EvidenceSkillLink
 from app.schemas.employer import (
+    EvidenceSuggestionResponse,
     MatchDetailsCandidateResponse,
     MatchDetailsEvidenceResponse,
     MatchDetailsMatchResponse,
@@ -26,6 +27,7 @@ from app.schemas.employer import (
     MatchedSkillDetailsResponse,
     MatchedSkillEvidenceResponse,
     MatchSkillGroupResponse,
+    MissingSkillDetailsResponse,
     SignalSummaryResponse,
 )
 from app.schemas.skill_passport import (
@@ -37,6 +39,7 @@ from app.services.employer import list_vacancy_requirements
 from app.services.matching import MatchRequirement, match_passport_to_requirements
 from app.services.roadmap import build_roadmap_from_match
 from app.services.signal_summaries import public_categories_for_evidence
+from app.services.skill_gap_suggestions import evidence_suggestion_categories
 from app.services.skill_passport import build_passport
 
 TOP_SKILLS_LIMIT = 6
@@ -104,6 +107,11 @@ def build_match_details(
                     passport=passport,
                     link_contexts=link_contexts,
                 ),
+                missing_details=_missing_details_for_group(
+                    requirements=requirements,
+                    requirement_type="required",
+                    passport_skill_ids=passport_skill_ids,
+                ),
             ),
             preferred=MatchSkillGroupResponse(
                 matched=list(match.preferred.matched),
@@ -113,6 +121,11 @@ def build_match_details(
                     requirement_type="preferred",
                     passport=passport,
                     link_contexts=link_contexts,
+                ),
+                missing_details=_missing_details_for_group(
+                    requirements=requirements,
+                    requirement_type="preferred",
+                    passport_skill_ids=passport_skill_ids,
                 ),
             ),
         ),
@@ -218,6 +231,33 @@ def _matched_details_for_group(
             )
         )
     return details
+
+
+def _missing_details_for_group(
+    *,
+    requirements: list[MatchRequirement],
+    requirement_type: str,
+    passport_skill_ids: set[UUID],
+) -> list[MissingSkillDetailsResponse]:
+    """Explain which evidence categories could confirm each missing requirement.
+
+    Uses the same owned-skill-id set and the same requirement order as
+    ``MatchResult.missing``, so the two lists stay index-for-index aligned.
+    Suggestions come from the static rule registries only — no candidate data.
+    """
+    return [
+        MissingSkillDetailsResponse(
+            skill_id=requirement.skill_id,
+            skill_name=requirement.skill_name,
+            evidence_suggestions=[
+                EvidenceSuggestionResponse(category=category)
+                for category in evidence_suggestion_categories(requirement.skill_name)
+            ],
+        )
+        for requirement in requirements
+        if requirement.requirement_type == requirement_type
+        and requirement.skill_id not in passport_skill_ids
+    ]
 
 
 def _employer_safe_matched_evidence(

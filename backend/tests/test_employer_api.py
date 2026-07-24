@@ -370,11 +370,13 @@ def test_vacancy_matches_endpoint(client: TestClient, monkeypatch: pytest.Monkey
         "matched": ["Python"],
         "missing": ["Docker"],
         "matched_details": [],
+        "missing_details": [],
     }
     assert body["matches"][0]["preferred"] == {
         "matched": ["React"],
         "missing": [],
         "matched_details": [],
+        "missing_details": [],
     }
 
 
@@ -397,6 +399,7 @@ def test_vacancy_matches_requires_owned_vacancy(
 def test_match_details_endpoint(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
     from app.api.v1 import employer
     from app.schemas.employer import (
+        EvidenceSuggestionResponse,
         MatchDetailsCandidateResponse,
         MatchDetailsEvidenceResponse,
         MatchDetailsMatchResponse,
@@ -407,12 +410,14 @@ def test_match_details_endpoint(client: TestClient, monkeypatch: pytest.MonkeyPa
         MatchedSkillDetailsResponse,
         MatchedSkillEvidenceResponse,
         MatchSkillGroupResponse,
+        MissingSkillDetailsResponse,
     )
 
     user = make_user()
     company = make_company(user.id)
     vacancy = make_vacancy(company.id)
     candidate_id = uuid4()
+    docker_id = uuid4()
     authorize_employer(user)
     monkeypatch.setattr(employer, "get_employer_company", lambda *_args: company)
     monkeypatch.setattr(employer, "get_vacancy", lambda *_args: vacancy)
@@ -448,7 +453,21 @@ def test_match_details_endpoint(client: TestClient, monkeypatch: pytest.MonkeyPa
                         )
                     ],
                 ),
-                preferred=MatchSkillGroupResponse(matched=[], missing=["Docker"]),
+                preferred=MatchSkillGroupResponse(
+                    matched=[],
+                    missing=["Docker"],
+                    missing_details=[
+                        MissingSkillDetailsResponse(
+                            skill_id=docker_id,
+                            skill_name="Docker",
+                            evidence_suggestions=[
+                                EvidenceSuggestionResponse(category="resume_evidence"),
+                                EvidenceSuggestionResponse(category="container_configuration"),
+                                EvidenceSuggestionResponse(category="ci_cd_configuration"),
+                            ],
+                        )
+                    ],
+                ),
             ),
             passport=MatchDetailsPassportResponse(
                 top_skills=["Python", "FastAPI"],
@@ -519,6 +538,20 @@ def test_match_details_endpoint(client: TestClient, monkeypatch: pytest.MonkeyPa
         "signal_summaries"
     ] == []
     assert body["match"]["preferred"]["matched_details"] == []
+    # missing stays a plain string list; missing_details is purely additive.
+    assert body["match"]["preferred"]["missing"] == ["Docker"]
+    assert body["match"]["required"]["missing_details"] == []
+    assert body["match"]["preferred"]["missing_details"] == [
+        {
+            "skill_id": str(docker_id),
+            "skill_name": "Docker",
+            "evidence_suggestions": [
+                {"category": "resume_evidence"},
+                {"category": "container_configuration"},
+                {"category": "ci_cd_configuration"},
+            ],
+        }
+    ]
     assert body["roadmap"][0]["id"] == "add-docker"
 
 
@@ -588,6 +621,91 @@ def test_match_skill_group_schema_exposes_matched_details(client: TestClient) ->
     ownership = evidence["properties"]["ownership_status"]
     assert "anyOf" in verification or verification.get("nullable") is True
     assert "anyOf" in ownership or ownership.get("nullable") is True
+
+
+def test_match_skill_group_schema_exposes_missing_details(client: TestClient) -> None:
+    schemas = client.get("/openapi.json").json()["components"]["schemas"]
+    group = schemas["MatchSkillGroupResponse"]
+    assert set(group["properties"]) >= {
+        "matched",
+        "missing",
+        "matched_details",
+        "missing_details",
+    }
+    # Binary missing semantics unchanged.
+    assert group["properties"]["missing"]["type"] == "array"
+    assert group["properties"]["missing"]["items"]["type"] == "string"
+    # Additive array, optional via default_factory.
+    missing_details = group["properties"]["missing_details"]
+    assert missing_details["type"] == "array"
+    assert missing_details["items"]["$ref"].endswith("/MissingSkillDetailsResponse")
+    assert "missing_details" not in set(group.get("required", []))
+    assert "matched_details" not in set(group.get("required", []))
+    assert set(group["required"]) >= {"matched", "missing"}
+
+    details = schemas["MissingSkillDetailsResponse"]
+    assert set(details["properties"]) == {"skill_id", "skill_name", "evidence_suggestions"}
+    assert set(details["required"]) == {"skill_id", "skill_name", "evidence_suggestions"}
+    assert details["properties"]["skill_id"]["format"] == "uuid"
+    assert details["properties"]["skill_name"]["type"] == "string"
+    suggestions = details["properties"]["evidence_suggestions"]
+    assert suggestions["type"] == "array"
+    assert suggestions["items"]["$ref"].endswith("/EvidenceSuggestionResponse")
+
+    suggestion = schemas["EvidenceSuggestionResponse"]
+    assert set(suggestion["properties"]) == {"category"}
+    assert set(suggestion["required"]) == {"category"}
+    assert suggestion["properties"]["category"]["type"] == "string"
+
+    # Safe Signal Summaries and Skill Passport contracts are untouched.
+    assert set(schemas["SignalSummaryResponse"]["properties"]) == {"category"}
+    assert set(schemas["MatchedSkillEvidenceResponse"]["properties"]) == {
+        "id",
+        "source_type",
+        "title",
+        "verification_status",
+        "ownership_status",
+        "evidence_confidence",
+        "signal_summaries",
+    }
+    for schema_name in ("SkillPassportEvidenceResponse", "SkillPassportSkillResponse"):
+        properties = schemas[schema_name]["properties"]
+        assert "missing_details" not in properties
+        assert "evidence_suggestions" not in properties
+
+
+def test_evidence_suggestion_requires_category() -> None:
+    from pydantic import ValidationError
+
+    from app.schemas.employer import EvidenceSuggestionResponse
+
+    with pytest.raises(ValidationError):
+        EvidenceSuggestionResponse()  # type: ignore[call-arg]
+
+
+def test_missing_skill_details_requires_all_fields() -> None:
+    from pydantic import ValidationError
+
+    from app.schemas.employer import MissingSkillDetailsResponse
+
+    payload = {
+        "skill_id": str(uuid4()),
+        "skill_name": "Docker",
+        "evidence_suggestions": [{"category": "resume_evidence"}],
+    }
+    for field in payload:
+        incomplete = {key: value for key, value in payload.items() if key != field}
+        with pytest.raises(ValidationError):
+            MissingSkillDetailsResponse(**incomplete)  # type: ignore[arg-type]
+
+
+def test_match_skill_group_defaults_missing_details_to_empty_list() -> None:
+    from app.schemas.employer import MatchSkillGroupResponse
+
+    group = MatchSkillGroupResponse(matched=["Python"], missing=["Docker"])
+    assert group.missing_details == []
+    assert group.matched_details == []
+    assert group.model_dump()["missing_details"] == []
 
 
 def test_signal_summary_requires_category() -> None:

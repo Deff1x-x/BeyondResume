@@ -92,10 +92,25 @@ class MatchedSkillDetailsResponse(BaseModel):
     evidence: list[MatchedSkillEvidenceResponse]
 
 
+class EvidenceSuggestionResponse(BaseModel):
+    """One public evidence category that could confirm a missing skill."""
+
+    category: str
+
+
+class MissingSkillDetailsResponse(BaseModel):
+    """Deterministic evidence channels for one skill absent from the passport."""
+
+    skill_id: UUID
+    skill_name: str
+    evidence_suggestions: list[EvidenceSuggestionResponse]
+
+
 class MatchSkillGroupResponse(BaseModel):
     matched: list[str]
     missing: list[str]
     matched_details: list[MatchedSkillDetailsResponse] = Field(default_factory=list)
+    missing_details: list[MissingSkillDetailsResponse] = Field(default_factory=list)
 
 
 class VacancyMatchResponse(BaseModel):
