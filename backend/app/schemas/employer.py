@@ -125,6 +125,20 @@ class VacancyMatchesResponse(BaseModel):
     matches: list[VacancyMatchResponse]
 
 
+class EmployerShortlistEntryResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    vacancy_id: UUID
+    candidate_id: UUID
+    created_at: datetime
+    updated_at: datetime
+
+
+class EmployerShortlistListResponse(BaseModel):
+    entries: list[EmployerShortlistEntryResponse]
+
+
 class MatchDetailsCandidateResponse(BaseModel):
     id: UUID
     name: str

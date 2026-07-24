@@ -10,10 +10,13 @@ from app.api.errors import api_error
 from app.db.session import get_db
 from app.models.employer_profile import EmployerProfile
 from app.models.user import User
+from app.models.vacancy import Vacancy
 from app.schemas.employer import (
     AiMatchExplanationResponse,
     EmployerCompanyCreateRequest,
     EmployerCompanyResponse,
+    EmployerShortlistEntryResponse,
+    EmployerShortlistListResponse,
     MatchDetailsResponse,
     MatchSkillGroupResponse,
     SkillOptionResponse,
@@ -55,6 +58,13 @@ from app.services.employer import (
 from app.services.match_details import (
     MatchDetailsCandidateNotFoundError,
     build_match_details,
+)
+from app.services.employer_shortlist import (
+    ShortlistCandidateNotFoundError,
+    ShortlistPersistenceError,
+    list_shortlisted_candidates,
+    remove_candidate_from_shortlist,
+    save_candidate_to_shortlist,
 )
 from app.services.skill_passport import build_passport
 
@@ -298,6 +308,83 @@ def get_vacancy_matches(
                 ),
             )
             for item in matches
+        ]
+    )
+
+
+def _owned_vacancy(
+    session: Session, user_id: UUID, vacancy_id: UUID
+) -> Vacancy:
+    company = _require_owned_vacancy(session, user_id, vacancy_id)
+    vacancy = get_vacancy(session, company.id, vacancy_id)
+    if vacancy is None:
+        raise api_error(404, "VACANCY_NOT_FOUND", "Vacancy not found")
+    return vacancy
+
+
+@router.put(
+    "/vacancies/{vacancy_id}/shortlist/{candidate_id}",
+    response_model=EmployerShortlistEntryResponse,
+)
+def put_shortlisted_candidate(
+    vacancy_id: UUID,
+    candidate_id: UUID,
+    current_user: Annotated[User, Depends(require_employer)],
+    session: Annotated[Session, Depends(get_db)],
+) -> EmployerShortlistEntryResponse:
+    vacancy = _owned_vacancy(session, current_user.id, vacancy_id)
+    try:
+        entry = save_candidate_to_shortlist(
+            session,
+            vacancy=vacancy,
+            candidate_id=candidate_id,
+        )
+    except ShortlistCandidateNotFoundError:
+        raise api_error(404, "CANDIDATE_NOT_FOUND", "Candidate not found") from None
+    except (ShortlistPersistenceError, SQLAlchemyError):
+        raise api_error(500, "DATABASE_ERROR", "Database operation failed") from None
+    return EmployerShortlistEntryResponse.model_validate(entry)
+
+
+@router.delete(
+    "/vacancies/{vacancy_id}/shortlist/{candidate_id}",
+    status_code=204,
+)
+def delete_shortlisted_candidate(
+    vacancy_id: UUID,
+    candidate_id: UUID,
+    current_user: Annotated[User, Depends(require_employer)],
+    session: Annotated[Session, Depends(get_db)],
+) -> Response:
+    vacancy = _owned_vacancy(session, current_user.id, vacancy_id)
+    try:
+        remove_candidate_from_shortlist(
+            session,
+            vacancy=vacancy,
+            candidate_id=candidate_id,
+        )
+    except SQLAlchemyError:
+        raise api_error(500, "DATABASE_ERROR", "Database operation failed") from None
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get(
+    "/vacancies/{vacancy_id}/shortlist",
+    response_model=EmployerShortlistListResponse,
+)
+def get_shortlisted_candidates(
+    vacancy_id: UUID,
+    current_user: Annotated[User, Depends(require_employer)],
+    session: Annotated[Session, Depends(get_db)],
+) -> EmployerShortlistListResponse:
+    vacancy = _owned_vacancy(session, current_user.id, vacancy_id)
+    try:
+        entries = list_shortlisted_candidates(session, vacancy=vacancy)
+    except SQLAlchemyError:
+        raise api_error(500, "DATABASE_ERROR", "Database operation failed") from None
+    return EmployerShortlistListResponse(
+        entries=[
+            EmployerShortlistEntryResponse.model_validate(entry) for entry in entries
         ]
     )
 
