@@ -226,7 +226,15 @@ describe("CandidateProfileView", () => {
     render(<CandidateProfileView candidateId="candidate-private-id" vacancyId="vacancy-1" enabled />);
     expect(screen.getByText("Alex Morgan")).toBeInTheDocument();
     expect(screen.getByText("92%")).toBeInTheDocument();
-    expect(screen.getByText("Vacancy match")).toBeInTheDocument();
+    expect(screen.getByText("Requirement coverage")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Based on vacancy requirements and skills in the candidate’s Skill Passport"
+      )
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Vacancy match")).not.toBeInTheDocument();
+    expect(screen.queryByText(/verified skills/i)).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Evidence across Skill Passport" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Skill Passport" })).toBeInTheDocument();
     expect(screen.getByRole("progressbar", { name: "Python evidence confidence: 87 percent" })).toHaveAttribute("aria-valuenow", "87");
     expect(screen.getAllByText("Required · Matched")).toHaveLength(2);

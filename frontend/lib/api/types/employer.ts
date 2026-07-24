@@ -49,9 +49,44 @@ export type SkillOption = {
   category: string;
 };
 
+export type SignalSummary = {
+  category: string;
+};
+
+export type MatchedSkillEvidence = {
+  id: string;
+  source_type: string;
+  title: string | null;
+  verification_status: string | null;
+  ownership_status: string | null;
+  evidence_confidence: number;
+  /** Absent on older responses; treat as empty. */
+  signal_summaries?: SignalSummary[];
+};
+
+export type MatchedSkillDetails = {
+  skill_id: string;
+  skill_name: string;
+  evidence: MatchedSkillEvidence[];
+};
+
+export type EvidenceSuggestion = {
+  category: string;
+};
+
+export type MissingSkillDetails = {
+  skill_id: string;
+  skill_name: string;
+  evidence_suggestions: EvidenceSuggestion[];
+};
+
 export type MatchSkillGroup = {
   matched: string[];
   missing: string[];
+  /** Absent on older responses / list endpoint; treat as empty. */
+  matched_details?: MatchedSkillDetails[];
+  /** Absent on older responses / list endpoint; treat as empty. */
+  missing_details?: MissingSkillDetails[];
 };
 
 export type VacancyMatch = {
@@ -95,6 +130,10 @@ export type MatchDetailsPassportSkill = {
 export type MatchDetailsEvidence = {
   source_type: string;
   title: string | null;
+  /** Present on current backends; optional for older fixtures. */
+  verification_status?: string | null;
+  /** Present on current backends; optional for older fixtures. */
+  ownership_status?: string | null;
   skills: string[];
 };
 

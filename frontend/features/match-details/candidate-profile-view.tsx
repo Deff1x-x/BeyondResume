@@ -36,7 +36,67 @@ function MatchDetailsSkeleton() {
 
 function MatchHero({ details }: Readonly<{ details: MatchDetailsResponse }>) {
   const sources = [...new Set(details.evidence.map((item) => item.source_type))];
-  return <section aria-labelledby="candidate-profile-title" className="rounded-card border border-primary/15 bg-gradient-to-br from-primary/10 via-background to-cyan-50 p-6 shadow-card sm:p-7"><div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><Badge variant="success">Match evaluated</Badge>{sources.map((source) => <Badge key={source} variant="neutral">{sourceLabel(source)}</Badge>)}</div><h1 id="candidate-profile-title" className="mt-4 break-words text-3xl font-semibold tracking-[-0.035em] text-ink sm:text-4xl">{details.candidate.name}</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-secondary">{details.candidate.headline?.trim() || "Candidate match profile for this vacancy."}</p><p className="mt-5 text-sm text-secondary"><span className="font-medium text-ink">{details.evidence.length}</span> evidence {details.evidence.length === 1 ? "source supports" : "sources support"} this evaluation.</p></div><div className="w-full max-w-sm shrink-0 rounded-2xl border border-primary/15 bg-background/90 px-5 py-4"><div className="flex items-center gap-4"><div className="flex h-16 w-16 items-center justify-center rounded-full border-4 border-success/25 bg-success/10 text-xl font-semibold tabular-nums text-success" aria-label={`Vacancy match ${details.match.score} percent`}>{details.match.score}%</div><div><p className="text-sm font-medium text-ink">Vacancy match</p><p className="mt-1 text-sm text-secondary">Based on vacancy requirements and verified skills</p></div></div><div className="mt-4 h-2 overflow-hidden rounded-full bg-surface-subtle" role="progressbar" aria-label="Vacancy match score" aria-valuemin={0} aria-valuemax={100} aria-valuenow={details.match.score}><div className="h-full rounded-full bg-success" style={{ width: `${details.match.score}%` }} /></div></div></div></section>;
+  return (
+    <section
+      aria-labelledby="candidate-profile-title"
+      className="rounded-card border border-primary/15 bg-gradient-to-br from-primary/10 via-background to-cyan-50 p-6 shadow-card sm:p-7"
+    >
+      <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant="success">Match evaluated</Badge>
+            {sources.map((source) => (
+              <Badge key={source} variant="neutral">
+                {sourceLabel(source)}
+              </Badge>
+            ))}
+          </div>
+          <h1
+            id="candidate-profile-title"
+            className="mt-4 break-words text-3xl font-semibold tracking-[-0.035em] text-ink sm:text-4xl"
+          >
+            {details.candidate.name}
+          </h1>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-secondary">
+            {details.candidate.headline?.trim() || "Candidate match profile for this vacancy."}
+          </p>
+          <p className="mt-5 text-sm text-secondary">
+            <span className="font-medium text-ink">{details.evidence.length}</span> evidence{" "}
+            {details.evidence.length === 1 ? "source supports" : "sources support"} this evaluation.
+          </p>
+        </div>
+        <div className="w-full max-w-sm shrink-0 rounded-2xl border border-primary/15 bg-background/90 px-5 py-4">
+          <div className="flex items-center gap-4">
+            <div
+              className="flex h-16 w-16 items-center justify-center rounded-full border-4 border-success/25 bg-success/10 text-xl font-semibold tabular-nums text-success"
+              aria-label={`Requirement coverage ${details.match.score} percent`}
+            >
+              {details.match.score}%
+            </div>
+            <div>
+              <p className="text-sm font-medium text-ink">Requirement coverage</p>
+              <p className="mt-1 text-sm text-secondary">
+                Based on vacancy requirements and skills in the candidate’s Skill Passport
+              </p>
+            </div>
+          </div>
+          <div
+            className="mt-4 h-2 overflow-hidden rounded-full bg-surface-subtle"
+            role="progressbar"
+            aria-label="Requirement coverage"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={details.match.score}
+          >
+            <div
+              className="h-full rounded-full bg-success"
+              style={{ width: `${details.match.score}%` }}
+            />
+          </div>
+        </div>
+      </div>
+    </section>
+  );
 }
 
 function MatchSummary({ details }: Readonly<{ details: MatchDetailsResponse }>) {
@@ -60,8 +120,53 @@ export function CandidateProfileView({ candidateId, vacancyId, enabled }: Candid
   if (detailsQuery.isError || !detailsQuery.data) return <div className="space-y-8"><PageHeader title="Candidate match" breadcrumb={backLink} /><EmptyState role="alert" title="Match details unavailable" description={errorMessage(detailsQuery.error)} primaryAction={<Button variant="secondary" onClick={() => void detailsQuery.refetch()}>Try again</Button>} secondaryAction={backLink} /></div>;
 
   const details = detailsQuery.data;
-  const partialGroup = { matched: details.match.preferred.matched, missing: [] };
-  const missingGroup = { matched: [], missing: [...details.match.required.missing, ...details.match.preferred.missing] };
+  const partialGroup = {
+    matched: details.match.preferred.matched,
+    missing: [] as string[],
+    matched_details: details.match.preferred.matched_details
+  };
+  const missingGroup = {
+    matched: [] as string[],
+    missing: [...details.match.required.missing, ...details.match.preferred.missing],
+    missing_details: [
+      ...(details.match.required.missing_details ?? []),
+      ...(details.match.preferred.missing_details ?? [])
+    ]
+  };
 
-  return <div className="space-y-8"><div className="text-sm">{backLink}</div><MatchReviewNavigation candidateId={candidateId} vacancyId={vacancyId} active="review" /><MatchHero details={details} /><div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]"><div className="space-y-6"><EmployerSkillPassport passport={details.passport} match={details.match} onSelectSkill={setSelectedSkill} /><SkillsComparisonCard title="Skill comparison" headingId="skill-comparison-title" required={details.match.required} partial={partialGroup} missing={missingGroup} evidenceCountBySkill={evidenceCountBySkill} selectedSkill={selectedSkill} onSelectSkill={setSelectedSkill} /><EvidenceCard evidence={details.evidence} selectedSkill={selectedSkill} onClearSkill={() => setSelectedSkill(null)} /></div><aside className="space-y-6"><MatchSummary details={details} /><RoadmapCard items={details.roadmap} /></aside></div></div>;
+  return (
+    <div className="space-y-8">
+      <div className="text-sm">{backLink}</div>
+      <MatchReviewNavigation candidateId={candidateId} vacancyId={vacancyId} active="review" />
+      <MatchHero details={details} />
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
+        <div className="space-y-6">
+          <EmployerSkillPassport
+            passport={details.passport}
+            match={details.match}
+            onSelectSkill={setSelectedSkill}
+          />
+          <SkillsComparisonCard
+            title="Skill comparison"
+            headingId="skill-comparison-title"
+            required={details.match.required}
+            partial={partialGroup}
+            missing={missingGroup}
+            evidenceCountBySkill={evidenceCountBySkill}
+            selectedSkill={selectedSkill}
+            onSelectSkill={setSelectedSkill}
+          />
+          <EvidenceCard
+            evidence={details.evidence}
+            selectedSkill={selectedSkill}
+            onClearSkill={() => setSelectedSkill(null)}
+          />
+        </div>
+        <aside className="space-y-6">
+          <MatchSummary details={details} />
+          <RoadmapCard items={details.roadmap} />
+        </aside>
+      </div>
+    </div>
+  );
 }

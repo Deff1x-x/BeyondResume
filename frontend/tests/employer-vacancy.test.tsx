@@ -88,6 +88,9 @@ describe("Employer vacancy workflow", () => {
     expect(screen.getAllByRole("heading", { name: "Candidate matches" })).toHaveLength(2);
     expect(screen.getByRole("progressbar", { name: "Alex Morgan vacancy match" })).toHaveAttribute("aria-valuenow", "82");
     expect(screen.getByRole("link", { name: "Review candidate Alex Morgan" })).toHaveAttribute("href", "/employer/matches/candidate-1?vacancy_id=vacancy-1");
+    expect(screen.queryByRole("button", { name: /supporting evidence/i })).not.toBeInTheDocument();
+    expect(screen.queryByText("Not yet in Skill Passport")).not.toBeInTheDocument();
+    expect(screen.queryByText("Ways this skill could be evidenced")).not.toBeInTheDocument();
     expect(screen.queryByText("AI Hiring Intelligence")).not.toBeInTheDocument();
   });
 
