@@ -117,6 +117,8 @@ class MatchDetailsPassportResponse(BaseModel):
 class MatchDetailsEvidenceResponse(BaseModel):
     source_type: str
     title: str | None
+    verification_status: str | None
+    ownership_status: str | None
     skills: list[str]
 
 

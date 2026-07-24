@@ -9,7 +9,33 @@ from app.services.ai_hiring_intelligence import HiringIntelligenceUnavailableErr
 
 
 def passport(*skills: tuple[str, float]) -> SkillPassportResponse:
-    return SkillPassportResponse(skills=[SkillPassportSkillResponse(id=uuid4(), name=name, category="language", evidence_confidence=confidence, evidence_count=1, evidence=[SkillPassportEvidenceResponse(id=uuid4(), title=None, description=None, source_type="github_repository", source_reference="repo", evidence_confidence=confidence)], github_repositories=[]) for name, confidence in skills], total_skills=len(skills), total_evidence=len(skills))
+    return SkillPassportResponse(
+        skills=[
+            SkillPassportSkillResponse(
+                id=uuid4(),
+                name=name,
+                category="language",
+                evidence_confidence=confidence,
+                evidence_count=1,
+                evidence=[
+                    SkillPassportEvidenceResponse(
+                        id=uuid4(),
+                        title=None,
+                        description=None,
+                        source_type="github_repository",
+                        source_reference="repo",
+                        verification_status=None,
+                        ownership_status=None,
+                        evidence_confidence=confidence,
+                    )
+                ],
+                github_repositories=[],
+            )
+            for name, confidence in skills
+        ],
+        total_skills=len(skills),
+        total_evidence=len(skills),
+    )
 
 
 def test_context_is_deterministic_limited_and_has_no_raw_source_data() -> None:

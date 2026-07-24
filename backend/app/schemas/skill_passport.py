@@ -9,6 +9,8 @@ class SkillPassportEvidenceResponse(BaseModel):
     description: str | None
     source_type: str
     source_reference: str | None
+    verification_status: str | None
+    ownership_status: str | None
     evidence_confidence: float
 
 

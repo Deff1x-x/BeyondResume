@@ -77,6 +77,8 @@ def build_passport(session: Session, candidate_id: UUID) -> SkillPassportRespons
                     description=evidence_by_id[evidence_id].description,
                     source_type=evidence_by_id[evidence_id].source_type,
                     source_reference=evidence_by_id[evidence_id].source_reference,
+                    verification_status=evidence_by_id[evidence_id].verification_status,
+                    ownership_status=evidence_by_id[evidence_id].ownership_status,
                     evidence_confidence=confidence.evidence_confidences[index],
                 )
                 for index, evidence_id in enumerate(evidence_ids)

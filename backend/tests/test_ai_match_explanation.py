@@ -38,7 +38,15 @@ def _details() -> MatchDetailsResponse:
             preferred=MatchSkillGroupResponse(matched=[], missing=["Redis"]),
         ),
         passport=MatchDetailsPassportResponse(top_skills=["Python", "FastAPI"]),
-        evidence=[MatchDetailsEvidenceResponse(source_type="github_repository", title="Repository", skills=["Python"])],
+        evidence=[
+            MatchDetailsEvidenceResponse(
+                source_type="github_repository",
+                title="Repository",
+                verification_status=None,
+                ownership_status=None,
+                skills=["Python"],
+            )
+        ],
         roadmap=[MatchDetailsRoadmapItemResponse(id="roadmap.vacancy_gap.csharp.v1", title="Build C# fundamentals", reason="Gap", priority="high", missing_skills=["C#"], related_skills=[])],
     )
 

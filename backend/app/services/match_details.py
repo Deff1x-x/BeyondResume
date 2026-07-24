@@ -128,6 +128,8 @@ def _evidence_from_passport(
                 by_id[evidence.id] = MatchDetailsEvidenceResponse(
                     source_type=evidence.source_type,
                     title=evidence.title,
+                    verification_status=evidence.verification_status,
+                    ownership_status=evidence.ownership_status,
                     skills=[],
                 )
                 skill_names_by_evidence[evidence.id] = []
@@ -139,6 +141,8 @@ def _evidence_from_passport(
         MatchDetailsEvidenceResponse(
             source_type=item.source_type,
             title=item.title,
+            verification_status=item.verification_status,
+            ownership_status=item.ownership_status,
             skills=sorted(skill_names_by_evidence[evidence_id], key=str.lower),
         )
         for evidence_id, item in by_id.items()

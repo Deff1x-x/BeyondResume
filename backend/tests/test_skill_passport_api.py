@@ -17,6 +17,7 @@ from app.models.evidence_unit import EvidenceUnit
 from app.models.github_repository import GitHubRepository
 from app.models.skill import Skill
 from app.models.user import User
+from app.schemas.skill_passport import SkillPassportEvidenceResponse
 
 
 def make_user(role: str = "candidate") -> User:
@@ -54,18 +55,21 @@ def make_evidence(
     *,
     candidate_id: UUID,
     title: str,
+    source_type: str = "github_repository",
     source_reference: str = "https://github.com/demo/repo",
+    verification_status: str | None = "source_reachable",
+    ownership_status: str | None = "unverified",
 ) -> EvidenceUnit:
     return EvidenceUnit(
         id=uuid4(),
         candidate_id=candidate_id,
-        source_type="github_repository",
+        source_type=source_type,
         source_reference=source_reference,
         title=title,
         description=f"Description for {title}",
         observed_at=datetime.now(UTC),
-        verification_status="source_reachable",
-        ownership_status="unverified",
+        verification_status=verification_status,
+        ownership_status=ownership_status,
         strength_score=Decimal("1.00"),
     )
 
@@ -384,3 +388,146 @@ def test_skill_passport_sorts_by_evidence_confidence_then_name(
     assert response.status_code == 200
     names = [skill["name"] for skill in response.json()["skills"]]
     assert names == ["Beta", "Gamma", "Alpha"]
+
+
+def test_skill_passport_exposes_resume_evidence_verification_and_ownership(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.api.v1 import skill_passport
+
+    user = make_user()
+    profile = make_profile(user.id)
+    python = make_skill(name="Python")
+    evidence = make_evidence(
+        candidate_id=profile.id,
+        title="Resume: ada.pdf",
+        source_type="resume",
+        source_reference=str(uuid4()),
+        verification_status="unverified",
+        ownership_status="verified",
+    )
+
+    authorize_candidate(user)
+    monkeypatch.setattr(skill_passport, "get_candidate_profile", lambda *_args: profile)
+    app.dependency_overrides[get_db] = lambda: _session_returning_rows(
+        [(python, evidence, Decimal("1.00"))]
+    )
+
+    response = client.get("/api/v1/candidate/skill-passport")
+
+    assert response.status_code == 200
+    evidence_item = response.json()["skills"][0]["evidence"][0]
+    assert evidence_item["verification_status"] == "unverified"
+    assert evidence_item["ownership_status"] == "verified"
+
+
+def test_skill_passport_exposes_github_evidence_verification_and_ownership(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.api.v1 import skill_passport
+
+    user = make_user()
+    profile = make_profile(user.id)
+    python = make_skill(name="Python")
+    evidence = make_evidence(
+        candidate_id=profile.id,
+        title="Repo A",
+        source_type="github_repository",
+        verification_status="source_reachable",
+        ownership_status="unverified",
+    )
+
+    authorize_candidate(user)
+    monkeypatch.setattr(skill_passport, "get_candidate_profile", lambda *_args: profile)
+    app.dependency_overrides[get_db] = lambda: _session_returning_rows(
+        [(python, evidence, Decimal("1.00"))]
+    )
+
+    response = client.get("/api/v1/candidate/skill-passport")
+
+    assert response.status_code == 200
+    evidence_item = response.json()["skills"][0]["evidence"][0]
+    assert evidence_item["verification_status"] == "source_reachable"
+    assert evidence_item["ownership_status"] == "unverified"
+
+
+def test_skill_passport_copies_statuses_from_model_not_source_type(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.api.v1 import skill_passport
+
+    user = make_user()
+    profile = make_profile(user.id)
+    python = make_skill(name="Python")
+    # Non-standard but valid combination: a GitHub-sourced unit that carries
+    # an issuer-verified status. If statuses were derived from source_type this
+    # combination could not survive the round-trip.
+    evidence = make_evidence(
+        candidate_id=profile.id,
+        title="Repo A",
+        source_type="github_repository",
+        verification_status="issuer_verified",
+        ownership_status="verified",
+    )
+
+    authorize_candidate(user)
+    monkeypatch.setattr(skill_passport, "get_candidate_profile", lambda *_args: profile)
+    app.dependency_overrides[get_db] = lambda: _session_returning_rows(
+        [(python, evidence, Decimal("1.00"))]
+    )
+
+    response = client.get("/api/v1/candidate/skill-passport")
+
+    assert response.status_code == 200
+    evidence_item = response.json()["skills"][0]["evidence"][0]
+    assert evidence_item["verification_status"] == "issuer_verified"
+    assert evidence_item["ownership_status"] == "verified"
+    # Existing evidence fields are unchanged and additive-only.
+    assert evidence_item["source_type"] == "github_repository"
+    assert evidence_item["source_reference"] == "https://github.com/demo/repo"
+    assert 0 < evidence_item["evidence_confidence"] <= 0.95
+
+
+def test_skill_passport_evidence_schema_exposes_status_fields(client: TestClient) -> None:
+    schemas = client.get("/openapi.json").json()["components"]["schemas"]
+    properties = schemas["SkillPassportEvidenceResponse"]["properties"]
+    assert "verification_status" in properties
+    assert "ownership_status" in properties
+    assert set(schemas["SkillPassportEvidenceResponse"]["required"]) >= {
+        "verification_status",
+        "ownership_status",
+    }
+
+
+@pytest.mark.parametrize("missing_field", ["verification_status", "ownership_status"])
+def test_skill_passport_evidence_requires_status_keys(missing_field: str) -> None:
+    from pydantic import ValidationError
+
+    payload = {
+        "id": uuid4(),
+        "title": None,
+        "description": None,
+        "source_type": "resume",
+        "source_reference": None,
+        "verification_status": None,
+        "ownership_status": None,
+        "evidence_confidence": 0.5,
+    }
+    del payload[missing_field]
+    with pytest.raises(ValidationError):
+        SkillPassportEvidenceResponse(**payload)
+
+
+def test_skill_passport_evidence_accepts_explicit_null_statuses() -> None:
+    evidence = SkillPassportEvidenceResponse(
+        id=uuid4(),
+        title=None,
+        description=None,
+        source_type="resume",
+        source_reference=None,
+        verification_status=None,
+        ownership_status=None,
+        evidence_confidence=0.5,
+    )
+    assert evidence.verification_status is None
+    assert evidence.ownership_status is None

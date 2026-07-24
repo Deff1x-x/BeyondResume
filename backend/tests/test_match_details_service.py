@@ -45,6 +45,8 @@ def make_passport() -> SkillPassportResponse:
                         description="Python experience",
                         source_type="resume",
                         source_reference=str(uuid4()),
+                        verification_status="unverified",
+                        ownership_status="verified",
                         evidence_confidence=1.0,
                     )
                 ],
@@ -62,6 +64,8 @@ def make_passport() -> SkillPassportResponse:
                         description="Python experience",
                         source_type="resume",
                         source_reference=str(uuid4()),
+                        verification_status="unverified",
+                        ownership_status="verified",
                         evidence_confidence=0.9,
                     )
                 ],
@@ -137,6 +141,8 @@ def test_build_match_details_aggregates_existing_services(
     assert "description" not in result.passport.skills[0].model_dump()
     assert len(result.evidence) == 1
     assert result.evidence[0].source_type == "resume"
+    assert result.evidence[0].verification_status == "unverified"
+    assert result.evidence[0].ownership_status == "verified"
     assert result.evidence[0].skills == ["FastAPI", "Python"]
     assert result.roadmap[0].id == "roadmap.vacancy_gap.csharp.v1"
     assert result.roadmap[0].missing_skills == ["C#"]

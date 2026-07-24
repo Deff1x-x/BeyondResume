@@ -439,6 +439,8 @@ def test_match_details_endpoint(client: TestClient, monkeypatch: pytest.MonkeyPa
                 MatchDetailsEvidenceResponse(
                     source_type="resume",
                     title="Resume: ada.pdf",
+                    verification_status="unverified",
+                    ownership_status="verified",
                     skills=["Python", "FastAPI"],
                 )
             ],
@@ -474,7 +476,52 @@ def test_match_details_endpoint(client: TestClient, monkeypatch: pytest.MonkeyPa
         }
     ]
     assert body["evidence"][0]["source_type"] == "resume"
+    assert body["evidence"][0]["verification_status"] == "unverified"
+    assert body["evidence"][0]["ownership_status"] == "verified"
     assert body["roadmap"][0]["id"] == "add-docker"
+
+
+def test_match_details_evidence_schema_exposes_status_fields(client: TestClient) -> None:
+    schemas = client.get("/openapi.json").json()["components"]["schemas"]
+    properties = schemas["MatchDetailsEvidenceResponse"]["properties"]
+    assert "verification_status" in properties
+    assert "ownership_status" in properties
+    assert set(schemas["MatchDetailsEvidenceResponse"]["required"]) >= {
+        "verification_status",
+        "ownership_status",
+    }
+
+
+@pytest.mark.parametrize("missing_field", ["verification_status", "ownership_status"])
+def test_match_details_evidence_requires_status_keys(missing_field: str) -> None:
+    from pydantic import ValidationError
+
+    from app.schemas.employer import MatchDetailsEvidenceResponse
+
+    payload = {
+        "source_type": "resume",
+        "title": "Resume: ada.pdf",
+        "verification_status": None,
+        "ownership_status": None,
+        "skills": ["Python"],
+    }
+    del payload[missing_field]
+    with pytest.raises(ValidationError):
+        MatchDetailsEvidenceResponse(**payload)
+
+
+def test_match_details_evidence_accepts_explicit_null_statuses() -> None:
+    from app.schemas.employer import MatchDetailsEvidenceResponse
+
+    evidence = MatchDetailsEvidenceResponse(
+        source_type="resume",
+        title="Resume: ada.pdf",
+        verification_status=None,
+        ownership_status=None,
+        skills=["Python"],
+    )
+    assert evidence.verification_status is None
+    assert evidence.ownership_status is None
 
 
 def test_match_details_requires_vacancy_query(
