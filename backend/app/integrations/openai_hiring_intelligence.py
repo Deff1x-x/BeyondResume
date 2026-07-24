@@ -21,14 +21,14 @@ class OpenAIHiringIntelligenceProvider:
     provider_name = "openai"
 
     def __init__(self) -> None:
-        if not settings.openai_api_key:
+        if not settings.llm_api_key:
             raise OpenAIHiringIntelligenceProviderError("OpenAI API key is not configured")
         try:
             from openai import OpenAI
         except ImportError as error:
             raise OpenAIHiringIntelligenceProviderError("OpenAI SDK is not installed") from error
-        self._client = OpenAI(api_key=settings.openai_api_key, timeout=settings.llm_timeout_seconds)
-        self.model = settings.openai_model
+        self._client = OpenAI(api_key=settings.llm_api_key, timeout=settings.llm_timeout_seconds)
+        self.model = settings.llm_model
 
     def generate(self, prompt: str) -> str:
         started = monotonic()
@@ -44,7 +44,7 @@ class OpenAIHiringIntelligenceProvider:
             parsed = getattr(message, "parsed", None)
             if parsed is None:
                 raise OpenAIHiringIntelligenceProviderError("OpenAI response was empty")
-            content = parsed.model_dump_json()
+            content = str(parsed.model_dump_json())
         except Exception as error:
             logger.warning(
                 "AI Hiring Intelligence provider failed",
@@ -65,7 +65,12 @@ class OpenAIHiringIntelligenceProvider:
             ) from error
         logger.info(
             "AI Hiring Intelligence provider completed",
-            extra={"provider": self.provider_name, "model": self.model, "latency_ms": round((monotonic() - started) * 1000), "success": True},
+            extra={
+                "provider": self.provider_name,
+                "model": self.model,
+                "latency_ms": round((monotonic() - started) * 1000),
+                "success": True,
+            },
         )
         return content
 

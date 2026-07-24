@@ -121,7 +121,8 @@ def get_hiring_intelligence(context: CandidateHiringContext) -> AiHiringIntellig
         "prompt_version": PROMPT_VERSION,
         "service_version": SERVICE_VERSION,
         "response_schema_version": RESPONSE_SCHEMA_VERSION,
-        "model": settings.openai_model,
+        "provider": settings.llm_provider,
+        "model": settings.llm_model,
     }
     key = sha256(json.dumps(cache_material, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
     cached = _cache.get(key)

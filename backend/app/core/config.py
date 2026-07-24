@@ -38,8 +38,6 @@ class Settings(BaseSettings):
     llm_api_key: str = ""
     llm_model: str = "gpt-5-mini"
     llm_timeout_seconds: int = 20
-    openai_api_key: str = ""
-    openai_model: str = "gpt-5-mini"
 
 
 settings = Settings()

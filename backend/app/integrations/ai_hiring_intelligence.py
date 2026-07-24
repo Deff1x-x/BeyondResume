@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Protocol
 
+from app.core.config import settings
+
 
 class HiringIntelligenceProvider(Protocol):
     """Transport contract consumed by the domain service."""
@@ -11,8 +13,21 @@ class HiringIntelligenceProvider(Protocol):
     def generate(self, prompt: str) -> str: ...
 
 
-def get_hiring_intelligence_provider() -> HiringIntelligenceProvider:
-    """Wire the configured transport without coupling the service to OpenAI."""
-    from app.integrations.openai_hiring_intelligence import OpenAIHiringIntelligenceProvider
+class HiringIntelligenceProviderConfigurationError(Exception):
+    """The configured provider is not supported."""
 
-    return OpenAIHiringIntelligenceProvider()
+
+def get_hiring_intelligence_provider() -> HiringIntelligenceProvider:
+    """Wire the configured transport while keeping implementations lazy."""
+    if settings.llm_provider == "mock":
+        from app.integrations.mock_hiring_intelligence import MockHiringIntelligenceProvider
+
+        return MockHiringIntelligenceProvider()
+    if settings.llm_provider == "openai":
+        from app.integrations.openai_hiring_intelligence import OpenAIHiringIntelligenceProvider
+
+        return OpenAIHiringIntelligenceProvider()
+
+    raise HiringIntelligenceProviderConfigurationError(
+        f"Unsupported AI Hiring Intelligence provider: {settings.llm_provider!r}"
+    )
