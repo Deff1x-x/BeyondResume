@@ -4,6 +4,8 @@ export type SkillPassportEvidence = {
   description: string | null;
   source_type: string;
   source_reference: string | null;
+  verification_status: string | null;
+  ownership_status: string | null;
   evidence_confidence: number;
 };
 

@@ -12,6 +12,15 @@ import { Input } from "@/components/ui/input";
 import { SkeletonCard } from "@/components/ui/skeleton";
 import { ApiClientError } from "@/lib/api/error";
 import type { SkillPassportEvidence, SkillPassportSkill } from "@/lib/api/types/skill-passport";
+import {
+  EVIDENCE_STRENGTH_LABEL,
+  formatEvidenceStrengthPercent,
+  getEvidenceSourceTypeLabel,
+  getOwnershipBadgeTone,
+  getOwnershipStatusLabel,
+  getVerificationBadgeTone,
+  getVerificationStatusLabel
+} from "@/lib/evidence/explainability-labels";
 import { useSkillPassportQuery } from "@/lib/skill-passport/hooks";
 
 type SourceFilter = "all" | "github" | "resume" | "multiple";
@@ -33,12 +42,6 @@ function errorMessage(error: unknown): string {
     : "The skill passport could not be loaded. Please try again.";
 }
 
-function sourceTypeLabel(sourceType: string): string {
-  if (sourceType === "github_repository") return "GitHub";
-  if (sourceType === "resume") return "Resume";
-  return sourceType.replaceAll("_", " ");
-}
-
 function strengthFor(confidence: number): Strength {
   if (confidence >= 0.8) return "strong";
   if (confidence >= 0.5) return "moderate";
@@ -54,21 +57,32 @@ function uniqueSources(skill: SkillPassportSkill): string[] {
 }
 
 function EvidenceDetail({ evidence }: Readonly<{ evidence: SkillPassportEvidence }>) {
-  const title = evidence.title ?? evidence.source_reference ?? "Evidence";
+  const strength = formatEvidenceStrengthPercent(evidence.evidence_confidence);
   const hasSafeLink = Boolean(evidence.source_reference?.startsWith("https://"));
+  const verificationLabel = evidence.verification_status === null ? null : getVerificationStatusLabel(evidence.verification_status);
+  const ownershipLabel = evidence.ownership_status === null ? null : getOwnershipStatusLabel(evidence.ownership_status);
 
   return (
     <li className="border-t border-border py-4 first:border-t-0 first:pt-0">
       <div className="flex flex-wrap items-start justify-between gap-2">
-        <p className="min-w-0 break-words text-sm font-medium text-ink">{title}</p>
-        <Badge variant="neutral">{sourceTypeLabel(evidence.source_type)}</Badge>
+        {evidence.title ? <p className="min-w-0 break-words text-sm font-medium text-ink">{evidence.title}</p> : null}
+        <Badge variant="neutral">{getEvidenceSourceTypeLabel(evidence.source_type)}</Badge>
       </div>
-      {evidence.source_reference ? (
+      {hasSafeLink && evidence.source_reference ? (
         <p className="mt-2 break-all text-sm text-secondary">
-          {hasSafeLink ? <a href={evidence.source_reference} target="_blank" rel="noreferrer" className="app-link">Open source</a> : evidence.source_reference}
+          <a href={evidence.source_reference} target="_blank" rel="noreferrer" className="app-link">Open source</a>
         </p>
       ) : null}
       {evidence.description ? <p className="mt-2 text-sm leading-6 text-secondary">{evidence.description}</p> : null}
+      <p className="mt-2 text-sm text-secondary" aria-label={`${EVIDENCE_STRENGTH_LABEL} ${strength} percent`}>
+        {EVIDENCE_STRENGTH_LABEL}: <span className="font-medium tabular-nums text-ink">{strength}%</span>
+      </p>
+      {verificationLabel || ownershipLabel ? (
+        <div className="mt-2 flex flex-wrap gap-2">
+          {verificationLabel && evidence.verification_status ? <Badge variant={getVerificationBadgeTone(evidence.verification_status)}>{verificationLabel}</Badge> : null}
+          {ownershipLabel && evidence.ownership_status ? <Badge variant={getOwnershipBadgeTone(evidence.ownership_status)}>{ownershipLabel}</Badge> : null}
+        </div>
+      ) : null}
     </li>
   );
 }
@@ -106,7 +120,7 @@ function SkillEvidenceDialog({ skill, onClose }: Readonly<{ skill: SkillPassport
         <div className="p-5 sm:p-7">
           <div className="flex items-start justify-between gap-5 border-b border-border pb-5">
             <div className="min-w-0">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">Evidence details</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">Supporting evidence</p>
               <h2 id={`evidence-dialog-${skill.id}`} className="mt-1 break-words text-2xl font-semibold tracking-tight text-ink">{skill.name}</h2>
               <p className="mt-2 text-sm text-secondary">{strengthCopy(skill.evidence_confidence)} · {skill.evidence_count} {skill.evidence_count === 1 ? "evidence unit" : "evidence units"}</p>
             </div>
@@ -116,7 +130,7 @@ function SkillEvidenceDialog({ skill, onClose }: Readonly<{ skill: SkillPassport
           <section className="mt-6" aria-labelledby={`evidence-sources-${skill.id}`}>
             <h3 id={`evidence-sources-${skill.id}`} className="text-sm font-semibold text-ink">Evidence sources</h3>
             <div className="mt-3 flex flex-wrap gap-2">
-              {uniqueSources(skill).map((source) => <Badge key={source} variant="neutral">{sourceTypeLabel(source)}</Badge>)}
+              {uniqueSources(skill).map((source) => <Badge key={source} variant="neutral">{getEvidenceSourceTypeLabel(source)}</Badge>)}
             </div>
           </section>
 
@@ -161,7 +175,6 @@ function SkillCard({ skill, onOpenEvidence }: Readonly<{ skill: SkillPassportSki
           <h3 className="break-words text-lg font-semibold tracking-tight text-ink">{skill.name}</h3>
           <p className="mt-1 text-sm text-secondary">{categoryLabels[skill.category] ?? skill.category}</p>
         </div>
-        <Badge variant={badgeVariant}>Confirmed</Badge>
       </div>
 
       <div className="mt-6">
@@ -180,7 +193,7 @@ function SkillCard({ skill, onOpenEvidence }: Readonly<{ skill: SkillPassportSki
       <div className="mt-5">
         <p className="text-xs font-semibold uppercase tracking-[0.12em] text-secondary">Evidence sources</p>
         <div className="mt-2 flex flex-wrap gap-2">
-          {sources.map((source) => <Badge key={source} variant="neutral">{sourceTypeLabel(source)}</Badge>)}
+          {sources.map((source) => <Badge key={source} variant="neutral">{getEvidenceSourceTypeLabel(source)}</Badge>)}
         </div>
       </div>
 
@@ -200,7 +213,7 @@ function PassportEmptyState() {
     <EmptyState
       className="py-12"
       icon={<Icon name="passport" className="h-7 w-7" />}
-      title="No verified skills yet"
+      title="No skills in your Skill Passport yet"
       description="Connect GitHub or upload evidence to begin building your Skill Passport."
       primaryAction={<Link href="/#github-section-title" className="inline-flex min-h-control items-center rounded-button bg-primary px-4 text-sm font-medium text-white shadow-sm shadow-primary/25 transition hover:-translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2">Connect GitHub</Link>}
       secondaryAction={<Link href="/#resume-section-title" className="inline-flex min-h-control items-center rounded-button border border-border bg-surface px-4 text-sm font-medium text-ink transition hover:bg-surface-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2">Upload resume</Link>}
@@ -242,15 +255,15 @@ export function SkillPassportWorkspace() {
       {passport && passport.skills.length === 0 ? <PassportEmptyState /> : null}
       {passport && passport.skills.length > 0 && metrics ? <>
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <Metric label="Confirmed skills" value={passport.total_skills} detail="Skills with supporting evidence" />
+          <Metric label="Skills in your passport" value={passport.total_skills} detail="Skills with supporting evidence" />
           <Metric label="Evidence units" value={passport.total_evidence} detail="Distinct pieces of supporting work" />
-          <Metric label="Sources connected" value={metrics.sourceCount} detail="GitHub, resume, or other verified sources" />
-          <Metric label="Strongest category" value={metrics.strongestCategory ? categoryLabels[metrics.strongestCategory[0]] ?? metrics.strongestCategory[0] : "—"} detail={metrics.strongestCategory ? `${metrics.strongestCategory[1]} confirmed skills` : "No category data yet"} />
+          <Metric label="Sources connected" value={metrics.sourceCount} detail="GitHub, resume, or other evidence sources" />
+          <Metric label="Strongest category" value={metrics.strongestCategory ? categoryLabels[metrics.strongestCategory[0]] ?? metrics.strongestCategory[0] : "—"} detail={metrics.strongestCategory ? `${metrics.strongestCategory[1]} skills in this category` : "No category data yet"} />
         </div>
         <div className="mt-8 rounded-card border border-border bg-surface/90 p-5 sm:p-6">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-            <div><h2 className="text-xl font-semibold tracking-tight text-ink">Explore confirmed skills</h2><p className="mt-1 max-w-2xl text-sm leading-6 text-secondary">Filter by source or category, then open evidence only when you need its technical detail.</p></div>
-            <div className="w-full lg:max-w-xs"><label htmlFor="skill-passport-search" className="sr-only">Search confirmed skills</label><Input id="skill-passport-search" type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search skills" /></div>
+            <div><h2 className="text-xl font-semibold tracking-tight text-ink">Explore skills supported by your evidence</h2><p className="mt-1 max-w-2xl text-sm leading-6 text-secondary">Filter by source or category, then open evidence only when you need its technical detail.</p></div>
+            <div className="w-full lg:max-w-xs"><label htmlFor="skill-passport-search" className="sr-only">Search skills</label><Input id="skill-passport-search" type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search skills" /></div>
           </div>
           <div className="mt-6"><p className="text-xs font-semibold uppercase tracking-[0.12em] text-secondary">Evidence source</p><div className="mt-3 flex flex-wrap gap-2" aria-label="Evidence source filters">
             {([['all', 'All'], ['github', 'GitHub'], ['resume', 'Resume'], ['multiple', 'Multiple sources']] as const).map(([value, label]) => <Button key={value} type="button" size="sm" variant={sourceFilter === value ? "primary" : "secondary"} onClick={() => setSourceFilter(value)} aria-pressed={sourceFilter === value}>{label}</Button>)}
