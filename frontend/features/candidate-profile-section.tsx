@@ -2,8 +2,12 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 
-import { ApiClientError } from "@/lib/api/error";
+import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { ApiClientError } from "@/lib/api/error";
 import type {
   CandidateProfilePatchRequest,
   CandidateProfileResponse
@@ -57,9 +61,6 @@ const textFields: ReadonlyArray<{
   { name: "portfolio_url", label: "Portfolio URL", type: "url" },
   { name: "linkedin_url", label: "LinkedIn URL", type: "url" }
 ];
-
-const inputClassName =
-  "min-h-control w-full rounded-input border border-border bg-surface/90 px-3 text-ink shadow-sm outline-none transition-all duration-200 hover:border-border-strong focus:border-primary focus:ring-4 focus:ring-primary/15 disabled:bg-background";
 
 function toBooleanInput(value: boolean | null): NullableBooleanInput {
   if (value === null) {
@@ -170,7 +171,7 @@ export function CandidateProfileSection({ enabled }: Readonly<{ enabled: boolean
         className="section-panel"
         aria-labelledby="profile-section-title"
       >
-        <h2 id="profile-section-title" className="flex items-center gap-3 text-xl font-semibold tracking-tight text-ink"><span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><Icon name="profile" className="h-[18px] w-[18px]" /></span>Candidate Profile</h2>
+        <h2 id="profile-section-title" className="flex items-center gap-3 text-xl font-semibold tracking-tight text-ink"><span className="inline-flex h-9 w-9 items-center justify-center rounded-card bg-primary/10 text-primary"><Icon name="profile" className="h-[18px] w-[18px]" /></span>Candidate Profile</h2>
         <p className="mt-3 text-sm leading-6 text-secondary">
           Candidate profile management is available only to candidate accounts.
         </p>
@@ -184,7 +185,7 @@ export function CandidateProfileSection({ enabled }: Readonly<{ enabled: boolean
         className="section-panel"
         aria-labelledby="profile-section-title"
       >
-        <h2 id="profile-section-title" className="flex items-center gap-3 text-xl font-semibold tracking-tight text-ink"><span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><Icon name="profile" className="h-[18px] w-[18px]" /></span>Candidate Profile</h2>
+        <h2 id="profile-section-title" className="flex items-center gap-3 text-xl font-semibold tracking-tight text-ink"><span className="inline-flex h-9 w-9 items-center justify-center rounded-card bg-primary/10 text-primary"><Icon name="profile" className="h-[18px] w-[18px]" /></span>Candidate Profile</h2>
         <p className="mt-4 text-sm text-secondary" role="status">
           Loading profile…
         </p>
@@ -198,7 +199,7 @@ export function CandidateProfileSection({ enabled }: Readonly<{ enabled: boolean
         className="section-panel"
         aria-labelledby="profile-section-title"
       >
-        <h2 id="profile-section-title" className="flex items-center gap-3 text-xl font-semibold tracking-tight text-ink"><span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><Icon name="profile" className="h-[18px] w-[18px]" /></span>Candidate Profile</h2>
+        <h2 id="profile-section-title" className="flex items-center gap-3 text-xl font-semibold tracking-tight text-ink"><span className="inline-flex h-9 w-9 items-center justify-center rounded-card bg-primary/10 text-primary"><Icon name="profile" className="h-[18px] w-[18px]" /></span>Candidate Profile</h2>
         <p className="mt-4 text-sm text-danger" role="alert">
           {errorMessage(profileQuery.error)}
         </p>
@@ -243,7 +244,7 @@ export function CandidateProfileSection({ enabled }: Readonly<{ enabled: boolean
       aria-labelledby="profile-section-title"
     >
       <div>
-        <h2 id="profile-section-title" className="flex items-center gap-3 text-xl font-semibold tracking-tight text-ink"><span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><Icon name="profile" className="h-[18px] w-[18px]" /></span>Candidate Profile</h2>
+        <h2 id="profile-section-title" className="flex items-center gap-3 text-xl font-semibold tracking-tight text-ink"><span className="inline-flex h-9 w-9 items-center justify-center rounded-card bg-primary/10 text-primary"><Icon name="profile" className="h-[18px] w-[18px]" /></span>Candidate Profile</h2>
         <p className="mt-2 text-sm text-secondary">
           Onboarding status:{" "}
           <span className="capitalize">
@@ -259,7 +260,7 @@ export function CandidateProfileSection({ enabled }: Readonly<{ enabled: boolean
               <label htmlFor={`profile-${name}`} className="block text-sm font-medium text-ink">
                 {label}
               </label>
-              <input
+              <Input
                 id={`profile-${name}`}
                 name={name}
                 type={type}
@@ -267,7 +268,6 @@ export function CandidateProfileSection({ enabled }: Readonly<{ enabled: boolean
                 value={formValues[name]}
                 onChange={(event) => updateStringField(name, event.target.value)}
                 disabled={isSaving}
-                className={inputClassName}
               />
             </div>
           ))}
@@ -277,14 +277,13 @@ export function CandidateProfileSection({ enabled }: Readonly<{ enabled: boolean
           <label htmlFor="profile-summary" className="block text-sm font-medium text-ink">
             Summary
           </label>
-          <textarea
+          <Textarea
             id="profile-summary"
             name="summary"
             rows={5}
             value={formValues.summary}
             onChange={(event) => updateStringField("summary", event.target.value)}
             disabled={isSaving}
-            className={`${inputClassName} py-3`}
           />
         </div>
 
@@ -296,7 +295,7 @@ export function CandidateProfileSection({ enabled }: Readonly<{ enabled: boolean
             >
               Data processing consent
             </label>
-            <select
+            <Select
               id="profile-data-processing-consent"
               name="data_processing_consent"
               value={formValues.data_processing_consent}
@@ -307,12 +306,11 @@ export function CandidateProfileSection({ enabled }: Readonly<{ enabled: boolean
                 )
               }
               disabled={isSaving}
-              className={inputClassName}
             >
               <option value="">Not specified</option>
               <option value="true">Granted</option>
               <option value="false">Not granted</option>
-            </select>
+            </Select>
           </div>
 
           <div className="space-y-2">
@@ -322,7 +320,7 @@ export function CandidateProfileSection({ enabled }: Readonly<{ enabled: boolean
             >
               Relocation readiness
             </label>
-            <select
+            <Select
               id="profile-relocation-readiness"
               name="relocation_readiness"
               value={formValues.relocation_readiness}
@@ -333,12 +331,11 @@ export function CandidateProfileSection({ enabled }: Readonly<{ enabled: boolean
                 )
               }
               disabled={isSaving}
-              className={inputClassName}
             >
               <option value="">Not specified</option>
               <option value="true">Yes</option>
               <option value="false">No</option>
-            </select>
+            </Select>
           </div>
         </div>
 
@@ -354,13 +351,9 @@ export function CandidateProfileSection({ enabled }: Readonly<{ enabled: boolean
           </p>
         ) : null}
 
-        <button
-          type="submit"
-          disabled={!isDirty || isSaving}
-          className="min-h-control rounded-button bg-primary px-6 text-sm font-medium text-white disabled:opacity-60"
-        >
-          {isSaving ? "Saving…" : "Save profile"}
-        </button>
+        <Button type="submit" variant="primary" disabled={!isDirty || isSaving} loading={isSaving}>
+          Save profile
+        </Button>
       </form>
     </section>
   );

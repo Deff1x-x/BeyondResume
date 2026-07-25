@@ -78,7 +78,7 @@ export function RoadmapSection({ enabled }: Readonly<{ enabled: boolean }>) {
         className="section-panel lg:col-span-2"
         aria-labelledby="roadmap-section-title"
       >
-        <h2 id="roadmap-section-title" className="flex items-center gap-3 text-xl font-semibold tracking-tight text-ink"><span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><Icon name="roadmap" className="h-[18px] w-[18px]" /></span>Roadmap</h2>
+        <h2 id="roadmap-section-title" className="flex items-center gap-3 text-xl font-semibold tracking-tight text-ink"><span className="inline-flex h-9 w-9 items-center justify-center rounded-card bg-primary/10 text-primary"><Icon name="roadmap" className="h-[18px] w-[18px]" /></span>Roadmap</h2>
         <p className="mt-3 text-sm leading-6 text-secondary">
           The roadmap is available only to candidate accounts.
         </p>
@@ -93,7 +93,7 @@ export function RoadmapSection({ enabled }: Readonly<{ enabled: boolean }>) {
       className="section-panel lg:col-span-2"
       aria-labelledby="roadmap-section-title"
     >
-      <h2 id="roadmap-section-title" className="flex items-center gap-3 text-xl font-semibold tracking-tight text-ink"><span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><Icon name="roadmap" className="h-[18px] w-[18px]" /></span>Roadmap</h2>
+      <h2 id="roadmap-section-title" className="flex items-center gap-3 text-xl font-semibold tracking-tight text-ink"><span className="inline-flex h-9 w-9 items-center justify-center rounded-card bg-primary/10 text-primary"><Icon name="roadmap" className="h-[18px] w-[18px]" /></span>Roadmap</h2>
       <p className="mt-2 text-sm text-secondary">
         Deterministic next-step recommendations based on your Skill Passport.
       </p>

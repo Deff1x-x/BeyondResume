@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { primaryActionClass, secondaryActionClass } from "@/components/ui/button";
 import type { ReactNode } from "react";
 
 import { Badge } from "@/components/ui/badge";
@@ -90,9 +91,7 @@ export function VacancyMatchCard({
     selection != null || pipelineActions != null || notes != null;
 
   const reviewClassName =
-    reviewVariant === "primary"
-      ? "inline-flex min-h-control items-center rounded-button border border-primary bg-primary px-4 text-sm font-medium text-white shadow-sm shadow-primary/25 transition duration-200 hover:-translate-y-px hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2"
-      : "inline-flex min-h-control items-center rounded-button border border-border bg-surface px-4 text-sm font-medium text-ink shadow-sm transition duration-200 hover:-translate-y-px hover:border-border-strong hover:bg-surface-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2";
+    reviewVariant === "primary" ? primaryActionClass : secondaryActionClass;
 
   return (
     <li
@@ -163,7 +162,7 @@ export function VacancyMatchCard({
           />
         </div>
         <dl className="grid gap-4 sm:grid-cols-2">
-          <div className="flex min-h-[5.25rem] flex-col rounded-xl border border-border bg-surface-subtle/70 p-4">
+          <div className="flex min-h-[5.25rem] flex-col rounded-card border border-border bg-surface-subtle/70 p-4">
             <dt className="text-xs font-medium uppercase tracking-[0.1em] text-secondary">
               Required skills
             </dt>
@@ -181,7 +180,7 @@ export function VacancyMatchCard({
               <p className="mt-1 text-xs leading-5 text-muted">None listed</p>
             )}
           </div>
-          <div className="flex min-h-[5.25rem] flex-col rounded-xl border border-border bg-surface-subtle/70 p-4">
+          <div className="flex min-h-[5.25rem] flex-col rounded-card border border-border bg-surface-subtle/70 p-4">
             <dt className="text-xs font-medium uppercase tracking-[0.1em] text-secondary">
               Preferred skills
             </dt>
@@ -211,7 +210,7 @@ export function VacancyMatchCard({
         {selection ? (
           <label
             className={cn(
-              "flex min-h-control cursor-pointer items-center gap-3 rounded-xl border px-4 py-3 text-sm transition duration-200",
+              "flex min-h-control cursor-pointer items-center gap-3 rounded-card border px-4 py-3 text-sm transition duration-200",
               selection.disabled && !selection.checked
                 ? "cursor-not-allowed opacity-60"
                 : "hover:border-border-strong",

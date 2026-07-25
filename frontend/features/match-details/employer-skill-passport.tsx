@@ -35,7 +35,7 @@ function SkillPassportFallback({ skills }: Readonly<{ skills: string[] }>) {
   return (
     <ul className="mt-5 space-y-3" aria-label="Candidate skills">
       {skills.map((skill) => (
-        <li key={skill} className="rounded-xl border border-border bg-background px-4 py-3">
+        <li key={skill} className="rounded-card border border-border bg-background px-4 py-3">
           <p className="font-medium text-ink">{skill}</p>
           <p className="mt-1 text-sm text-secondary">Confidence unavailable</p>
         </li>

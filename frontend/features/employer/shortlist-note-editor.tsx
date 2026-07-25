@@ -3,10 +3,9 @@
 import { useId, useState } from "react";
 
 import { Button } from "@/components/ui/button";
-import { controlClassName } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { ApiClientError } from "@/lib/api/error";
 import { useUpdateEmployerShortlistNote } from "@/lib/employer/hooks";
-import { cn } from "@/lib/cn";
 
 const NOTE_MAX_LENGTH = 5000;
 
@@ -68,14 +67,14 @@ export function ShortlistNoteEditor({
       <label htmlFor={textareaId} className="block text-sm font-medium text-ink">
         Private note for {labelTarget}
       </label>
-      <textarea
+      <Textarea
         id={textareaId}
         value={draft}
         rows={3}
         maxLength={NOTE_MAX_LENGTH}
         disabled={pendingThis}
         aria-busy={pendingThis || undefined}
-        className={cn(controlClassName, "min-h-24 px-3 py-3")}
+        className="min-h-24"
         onChange={(event) => setDraft(event.target.value)}
       />
       <div className="flex flex-wrap items-center gap-3">

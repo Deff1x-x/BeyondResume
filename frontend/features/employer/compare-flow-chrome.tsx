@@ -41,8 +41,8 @@ export function CompareFlowSteps({ active, className }: CompareFlowStepsProps) {
               ) : null}
               <span
                 className={cn(
-                  "inline-flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm transition duration-200",
-                  isActive && "bg-primary/10 font-semibold text-primary ring-1 ring-primary/20",
+                  "inline-flex items-center gap-2.5 rounded-card px-3 py-2 text-sm transition duration-200",
+                  isActive && "bg-ai/10 font-semibold text-ai-muted ring-1 ring-ai/25",
                   isComplete && "font-medium text-ink",
                   !isActive && !isComplete && "text-secondary"
                 )}
@@ -51,8 +51,8 @@ export function CompareFlowSteps({ active, className }: CompareFlowStepsProps) {
                 <span
                   className={cn(
                     "inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold",
-                    isActive && "bg-primary text-white",
-                    isComplete && "bg-primary/15 text-primary",
+                    isActive && "bg-accent text-accent-foreground",
+                    isComplete && "bg-primary/10 text-primary",
                     !isActive && !isComplete && "bg-surface-subtle text-secondary ring-1 ring-border"
                   )}
                 >
@@ -83,7 +83,7 @@ export function CompareValueProps({ className }: Readonly<{ className?: string }
       {items.map((item) => (
         <li
           key={item}
-          className="flex min-h-[4.75rem] items-start gap-3 rounded-xl border border-border bg-surface-subtle/70 px-4 py-3.5 text-sm leading-6 text-ink"
+          className="flex min-h-[4.75rem] items-start gap-3 rounded-card border border-border bg-surface-subtle/70 px-4 py-3.5 text-sm leading-6 text-ink"
         >
           <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-success/15 text-success">
             <Icon name="check" className="h-3 w-3" />

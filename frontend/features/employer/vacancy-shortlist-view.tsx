@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
-import { Button } from "@/components/ui/button";
+import { Button, primaryActionClass } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Icon } from "@/components/ui/icon";
 import { PageHeader } from "@/components/ui/page-header";
@@ -105,7 +105,7 @@ function ShortlistRemoveButton({
 }
 
 function filterButtonClass(active: boolean): string {
-  return `rounded-lg px-3 py-2 text-sm font-medium transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 ${
+  return `rounded-control px-3 py-2 text-sm font-medium transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 ${
     active
       ? "bg-surface text-ink shadow-sm"
       : "text-secondary hover:bg-surface/80 hover:text-ink"
@@ -295,7 +295,7 @@ export function VacancyShortlistView({ vacancyId, enabled }: VacancyShortlistVie
               }
             />
             <div
-              className="flex w-fit max-w-full flex-wrap rounded-xl border border-border bg-surface-subtle p-1"
+              className="flex w-fit max-w-full flex-wrap rounded-card border border-border bg-surface-subtle p-1"
               role="group"
               aria-label="Filter shortlist by hiring stage"
             >
@@ -332,7 +332,7 @@ export function VacancyShortlistView({ vacancyId, enabled }: VacancyShortlistVie
               {canCompare ? (
                 <Link
                   href={compareHref}
-                  className="inline-flex min-h-control items-center gap-2 rounded-button border border-primary bg-primary px-5 text-sm font-semibold text-white shadow-sm shadow-primary/25 transition duration-200 hover:-translate-y-px hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2"
+                  className={primaryActionClass}
                   aria-label="Compare selected candidates"
                 >
                   Compare selected

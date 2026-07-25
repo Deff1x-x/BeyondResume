@@ -36,7 +36,7 @@ export function SectionHeader({
       )}
     >
       <div className="flex min-w-0 gap-3">
-        {icon ? <span className="mt-0.5 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/10"><Icon name={icon} className="h-[18px] w-[18px]" /></span> : null}
+        {icon ? <span className="mt-0.5 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-card bg-primary/10 text-primary ring-1 ring-primary/10"><Icon name={icon} className="h-[18px] w-[18px]" /></span> : null}
         <div className="min-w-0">
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
           <TitleTag

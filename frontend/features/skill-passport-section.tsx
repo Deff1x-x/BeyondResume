@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, primaryActionClass } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Icon } from "@/components/ui/icon";
@@ -137,7 +137,7 @@ function SkillEvidenceDialog({ skill, onClose }: Readonly<{ skill: SkillPassport
           {skill.github_repositories.length > 0 ? (
             <section className="mt-6" aria-labelledby={`repository-evidence-${skill.id}`}>
               <h3 id={`repository-evidence-${skill.id}`} className="text-sm font-semibold text-ink">GitHub repositories</h3>
-              <ul className="mt-3 divide-y divide-border rounded-xl border border-border bg-background px-4">
+              <ul className="mt-3 divide-y divide-border rounded-card border border-border bg-background px-4">
                 {skill.github_repositories.map((repository) => (
                   <li key={repository.repository_url} className="py-4 first:pt-4">
                     <a href={repository.repository_url} target="_blank" rel="noreferrer" className="app-link break-all text-sm">{repository.repository_name}</a>
@@ -215,7 +215,7 @@ function PassportEmptyState() {
       icon={<Icon name="passport" className="h-7 w-7" />}
       title="No skills in your Skill Passport yet"
       description="Connect GitHub or upload evidence to begin building your Skill Passport."
-      primaryAction={<Link href="/#github-section-title" className="inline-flex min-h-control items-center rounded-button bg-primary px-4 text-sm font-medium text-white shadow-sm shadow-primary/25 transition hover:-translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2">Connect GitHub</Link>}
+      primaryAction={<Link href="/#github-section-title" className={primaryActionClass}>Connect GitHub</Link>}
       secondaryAction={<Link href="/#resume-section-title" className="inline-flex min-h-control items-center rounded-button border border-border bg-surface px-4 text-sm font-medium text-ink transition hover:bg-surface-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2">Upload resume</Link>}
     />
   );

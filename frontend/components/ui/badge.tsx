@@ -2,15 +2,25 @@ import type { HTMLAttributes, ReactNode } from "react";
 
 import { cn } from "@/lib/cn";
 
-type BadgeVariant = "neutral" | "primary" | "accent" | "success" | "warning" | "danger";
+type BadgeVariant =
+  | "neutral"
+  | "primary"
+  | "accent"
+  | "verified"
+  | "ai"
+  | "success"
+  | "warning"
+  | "danger";
 
 const badgeVariantClass: Record<BadgeVariant, string> = {
   neutral: "border-border bg-surface-subtle text-secondary",
-  primary: "border-primary/15 bg-primary/10 text-primary",
-  accent: "border-accent/20 bg-accent/10 text-cyan-700",
-  success: "border-success/20 bg-success/10 text-success",
-  warning: "border-warning/20 bg-warning/10 text-warning",
-  danger: "border-danger/20 bg-danger/10 text-danger"
+  primary: "border-primary/15 bg-primary/5 text-primary",
+  accent: "border-accent/40 bg-accent/20 text-accent-muted",
+  verified: "border-verified/40 bg-verified/20 text-verified-muted",
+  ai: "border-ai/40 bg-ai/15 text-ai-muted",
+  success: "border-success/25 bg-success/10 text-success-muted",
+  warning: "border-warning/30 bg-warning/10 text-warning-muted",
+  danger: "border-danger/20 bg-danger/10 text-danger-muted"
 };
 
 export type BadgeProps = HTMLAttributes<HTMLSpanElement> & {
@@ -27,7 +37,7 @@ export function Badge({
   return (
     <span
       className={cn(
-        "inline-flex max-w-full items-center truncate rounded-full border px-2.5 py-1 text-xs font-semibold tracking-wide",
+        "inline-flex max-w-full items-center truncate rounded-badge border px-2.5 py-1 text-xs font-semibold tracking-wide",
         badgeVariantClass[variant],
         className
       )}

@@ -5,11 +5,13 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useQueries } from "@tanstack/react-query";
 
 import { Badge, StatusBadge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, primaryActionClass } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Icon } from "@/components/ui/icon";
-import { Input, controlClassName } from "@/components/ui/input";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { SkeletonCard, SkeletonListRow } from "@/components/ui/skeleton";
 import { VacancyMatchCard } from "@/features/employer/vacancy-match-card";
 import { cn } from "@/lib/cn";
@@ -183,7 +185,7 @@ function VacancyRequirements({ vacancyId }: Readonly<{ vacancyId: string }>) {
         </div>
       ) : null}
 
-      <form className="space-y-3 rounded-xl border border-border bg-surface-subtle/60 p-4" onSubmit={onAdd}>
+      <form className="space-y-3 rounded-card border border-border bg-surface-subtle/60 p-4" onSubmit={onAdd}>
         <div>
           <h4 className="text-sm font-medium text-ink">Add a requirement</h4>
           <p className="mt-1 text-sm text-secondary">Use the existing skills catalog for this vacancy.</p>
@@ -196,13 +198,12 @@ function VacancyRequirements({ vacancyId }: Readonly<{ vacancyId: string }>) {
             >
               Skill
             </label>
-            <select
+            <Select
               id={`vacancy-skill-${vacancyId}`}
               value={skillId}
               onChange={(event) => setSkillId(event.target.value)}
               disabled={addRequirement.isPending || availableSkills.length === 0}
               required
-              className={cn(controlClassName, "min-h-control px-3")}
             >
               <option value="">Select a skill</option>
               {availableSkills.map((skill) => (
@@ -210,7 +211,7 @@ function VacancyRequirements({ vacancyId }: Readonly<{ vacancyId: string }>) {
                   {skill.name} ({skill.category})
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
           <div className="space-y-2">
             <label
@@ -219,16 +220,15 @@ function VacancyRequirements({ vacancyId }: Readonly<{ vacancyId: string }>) {
             >
               Type
             </label>
-            <select
+            <Select
               id={`vacancy-requirement-type-${vacancyId}`}
               value={requirementType}
               onChange={(event) => setRequirementType(parseRequirementType(event.target.value))}
               disabled={addRequirement.isPending}
-              className={cn(controlClassName, "min-h-control px-3")}
             >
               <option value="required">Required</option>
               <option value="preferred">Preferred</option>
-            </select>
+            </Select>
           </div>
         </div>
 
@@ -310,14 +310,14 @@ function VacancyDetail({
 
   return (
     <section id={`vacancy-details-${vacancyId}`} aria-labelledby={`vacancy-context-title-${vacancyId}`} className="mt-5 space-y-7 border-t border-border pt-5">
-      <header className="flex flex-col gap-4 rounded-xl border border-border bg-surface-subtle/60 p-4 sm:flex-row sm:items-start sm:justify-between">
+      <header className="flex flex-col gap-4 rounded-card border border-border bg-surface-subtle/60 p-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0"><p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">Vacancy workspace</p><h3 id={`vacancy-context-title-${vacancyId}`} className="mt-1 break-words text-xl font-semibold tracking-tight text-ink">{vacancy.title}</h3><p className="mt-2 max-w-2xl text-sm leading-6 text-secondary">{vacancy.description?.trim() ? vacancy.description : "No description provided."}</p></div>
         <div className="flex shrink-0 flex-wrap items-center gap-2"><StatusBadge status={vacancyStatusTone(vacancy.status)} label={statusLabel(vacancy.status)} /><span className="text-sm text-secondary">Created {formatDate(vacancy.created_at)}</span></div>
       </header>
 
       <section
         aria-labelledby={`delete-vacancy-title-${vacancyId}`}
-        className="rounded-xl border border-border bg-background p-4"
+        className="rounded-card border border-border bg-background p-4"
       >
         <p
           id={`delete-vacancy-title-${vacancyId}`}
@@ -329,7 +329,7 @@ function VacancyDetail({
           Remove this vacancy and its employer-side hiring data for this opening.
         </p>
         {confirmDelete ? (
-          <div className="mt-4 space-y-3 rounded-xl border border-danger/20 bg-danger/[0.04] p-4" role="group" aria-label="Confirm vacancy deletion">
+          <div className="mt-4 space-y-3 rounded-card border border-danger/20 bg-danger/[0.04] p-4" role="group" aria-label="Confirm vacancy deletion">
             <p className="text-sm font-medium text-ink">Delete vacancy?</p>
             <p className="text-sm leading-6 text-secondary">This action cannot be undone.</p>
             <div className="flex flex-wrap gap-2">
@@ -444,7 +444,7 @@ function VacancyMatches({ vacancyId }: Readonly<{ vacancyId: string }>) {
         <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0 space-y-3">
             <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="accent" aria-label="AI Hiring Analysis available">
+              <Badge variant="ai" aria-label="AI Hiring Analysis available">
                 AI Hiring Analysis
               </Badge>
               <span className="text-xs font-medium uppercase tracking-[0.12em] text-secondary">
@@ -461,7 +461,7 @@ function VacancyMatches({ vacancyId }: Readonly<{ vacancyId: string }>) {
           </div>
           <Link
             href={shortlistHref}
-            className="inline-flex min-h-control shrink-0 items-center justify-center gap-2 rounded-button border border-primary bg-primary px-5 text-sm font-semibold text-white shadow-sm shadow-primary/25 transition duration-200 hover:-translate-y-px hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2"
+            className={cn(primaryActionClass, "shrink-0 px-5 font-semibold")}
           >
             <Icon name="spark" className="h-4 w-4" aria-hidden="true" />
             Open shortlist
@@ -471,14 +471,14 @@ function VacancyMatches({ vacancyId }: Readonly<{ vacancyId: string }>) {
       </div>
 
       <div
-        className="flex w-fit rounded-xl border border-border bg-surface-subtle p-1"
+        className="flex w-fit rounded-card border border-border bg-surface-subtle p-1"
         role="group"
         aria-label="Filter candidate matches"
       >
         <button
           type="button"
           aria-pressed={filter === "all"}
-          className={`rounded-lg px-3 py-2 text-sm font-medium transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 ${filter === "all" ? "bg-surface text-ink shadow-sm" : "text-secondary hover:bg-surface/80 hover:text-ink"}`}
+          className={`rounded-control px-3 py-2 text-sm font-medium transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 ${filter === "all" ? "bg-surface text-ink shadow-sm" : "text-secondary hover:bg-surface/80 hover:text-ink"}`}
           onClick={() => setFilter("all")}
         >
           All
@@ -486,7 +486,7 @@ function VacancyMatches({ vacancyId }: Readonly<{ vacancyId: string }>) {
         <button
           type="button"
           aria-pressed={filter === "saved"}
-          className={`rounded-lg px-3 py-2 text-sm font-medium transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 ${filter === "saved" ? "bg-surface text-ink shadow-sm" : "text-secondary hover:bg-surface/80 hover:text-ink"}`}
+          className={`rounded-control px-3 py-2 text-sm font-medium transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 ${filter === "saved" ? "bg-surface text-ink shadow-sm" : "text-secondary hover:bg-surface/80 hover:text-ink"}`}
           onClick={() => setFilter("saved")}
         >
           Saved
@@ -587,7 +587,7 @@ function VacancyCard({
               ) : null}
             </div>
           </div>
-          <dl className="mt-5 grid grid-cols-3 divide-x divide-border rounded-xl border border-border bg-surface-subtle/70 text-center">
+          <dl className="mt-5 grid grid-cols-3 divide-x divide-border rounded-card border border-border bg-surface-subtle/70 text-center">
             <div className="p-3"><dt className="text-xs text-secondary">Requirements</dt><dd className="mt-1 text-lg font-semibold tabular-nums text-ink">{requirementsCount}</dd></div>
             <div className="p-3"><dt className="text-xs text-secondary">Matches</dt><dd className="mt-1 text-lg font-semibold tabular-nums text-ink">{matches.length}</dd></div>
             <div className="p-3"><dt className="text-xs text-secondary">Top match</dt><dd className="mt-1 text-lg font-semibold tabular-nums text-ink">{topMatch}%</dd></div>
@@ -735,7 +735,7 @@ function EmployerDashboard({ enabled }: Readonly<{ enabled: boolean }>) {
             <p className="mt-2 max-w-2xl text-sm leading-6 text-secondary">Review current vacancy setup and available candidate matches using the existing hiring data.</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <a href="#create-vacancy" className="inline-flex min-h-control items-center rounded-button bg-primary px-4 text-sm font-medium text-white shadow-sm shadow-primary/25 transition hover:-translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2">Create vacancy</a>
+            <a href="#create-vacancy" className={primaryActionClass}>Create vacancy</a>
             <a href="#top-matches-by-vacancy" className="inline-flex min-h-control items-center rounded-button border border-border bg-background px-4 text-sm font-medium text-ink transition hover:bg-surface-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2">Review matches</a>
           </div>
         </div>
@@ -744,7 +744,7 @@ function EmployerDashboard({ enabled }: Readonly<{ enabled: boolean }>) {
           {attentionItems.length > 0 ? (
             <ul className="mt-4 grid gap-3 lg:grid-cols-2">
               {attentionItems.map((item) => (
-                <li key={item.id} className="flex flex-col justify-between gap-4 rounded-xl border border-border bg-background p-4 sm:flex-row sm:items-center">
+                <li key={item.id} className="flex flex-col justify-between gap-4 rounded-card border border-border bg-background p-4 sm:flex-row sm:items-center">
                   <div><p className="text-sm font-medium text-ink">{item.title}</p><p className="mt-1 text-sm leading-5 text-secondary">{item.description}</p></div>
                   <Button type="button" variant="secondary" size="sm" onClick={() => openMatches(item.vacancyId)}>{item.action}</Button>
                 </li>
@@ -761,7 +761,7 @@ function EmployerDashboard({ enabled }: Readonly<{ enabled: boolean }>) {
           </p>
         ) : null}
         {vacancies.length === 0 ? (
-          <EmptyState icon={<Icon name="employer" className="h-8 w-8" />} title="Create your first vacancy" description="Add an opening and its requirements to start discovering candidates through verified skills and evidence." primaryAction={<a href="#create-vacancy" className="inline-flex min-h-control items-center rounded-button bg-primary px-4 text-sm font-medium text-white shadow-sm shadow-primary/25 transition hover:-translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2">Create your first vacancy</a>} className="py-12" />
+          <EmptyState icon={<Icon name="employer" className="h-8 w-8" />} title="Create your first vacancy" description="Add an opening and its requirements to start discovering candidates through verified skills and evidence." primaryAction={<a href="#create-vacancy" className={primaryActionClass}>Create your first vacancy</a>} className="py-12" />
         ) : (
           <div className="space-y-12">
             <section aria-labelledby="vacancies-title">
@@ -930,7 +930,7 @@ function CompanyPanel({ enabled }: Readonly<{ enabled: boolean }>) {
               >
                 Description
               </label>
-              <textarea
+              <Textarea
                 id="employer-company-edit-description"
                 value={editDescription}
                 onChange={(event) => {
@@ -940,7 +940,6 @@ function CompanyPanel({ enabled }: Readonly<{ enabled: boolean }>) {
                 disabled={updateCompany.isPending}
                 rows={3}
                 maxLength={5000}
-                className={cn(controlClassName, "px-3 py-2")}
               />
             </div>
             {updateCompany.isError ? (
@@ -1010,14 +1009,13 @@ function CompanyPanel({ enabled }: Readonly<{ enabled: boolean }>) {
             >
               Description
             </label>
-            <textarea
+            <Textarea
               id="employer-company-description"
               value={description}
               onChange={(event) => setDescription(event.target.value)}
               disabled={createCompany.isPending}
               rows={3}
               maxLength={5000}
-              className={cn(controlClassName, "px-3 py-2")}
             />
           </div>
           {createCompany.isError ? (
@@ -1097,14 +1095,13 @@ function VacanciesPanel({ enabled }: Readonly<{ enabled: boolean }>) {
               >
                 Short description
               </label>
-              <textarea
+              <Textarea
                 id="employer-vacancy-description"
                 value={description}
                 onChange={(event) => setDescription(event.target.value)}
                 disabled={createVacancy.isPending}
                 rows={3}
                 maxLength={5000}
-                className={cn(controlClassName, "px-3 py-2")}
               />
             </div>
             {createVacancy.isError ? (
@@ -1140,7 +1137,7 @@ export function EmployerSection({ enabled }: Readonly<{ enabled: boolean }>) {
       <Card className="lg:col-span-2" aria-labelledby="employer-section-title">
         <CardContent className="p-6">
           <div className="flex gap-3">
-            <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/10" aria-hidden="true"><Icon name="employer" className="h-[18px] w-[18px]" /></span>
+            <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-card bg-primary/10 text-primary ring-1 ring-primary/10" aria-hidden="true"><Icon name="employer" className="h-[18px] w-[18px]" /></span>
             <div><h2 id="employer-section-title" className="text-xl font-semibold text-ink">Employer</h2><p className="mt-2 text-sm leading-6 text-secondary">The employer workspace is available only to employer accounts.</p></div>
           </div>
         </CardContent>
@@ -1155,7 +1152,7 @@ export function EmployerSection({ enabled }: Readonly<{ enabled: boolean }>) {
       {companyMissing ? (
         <section aria-labelledby="company-attention-title" className="rounded-card border border-primary/15 bg-primary/[0.04] p-5 shadow-card sm:p-6">
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">Needs attention</p>
-          <div className="mt-2 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><h2 id="company-attention-title" className="text-2xl font-semibold tracking-tight text-ink">Set up your company profile</h2><p className="mt-2 max-w-2xl text-sm leading-6 text-secondary">Add your company details before posting vacancies and reviewing candidate matches.</p></div><a href="#employer-company" className="inline-flex min-h-control items-center rounded-button bg-primary px-4 text-sm font-medium text-white shadow-sm shadow-primary/25 transition hover:-translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2">Set up company</a></div>
+          <div className="mt-2 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><h2 id="company-attention-title" className="text-2xl font-semibold tracking-tight text-ink">Set up your company profile</h2><p className="mt-2 max-w-2xl text-sm leading-6 text-secondary">Add your company details before posting vacancies and reviewing candidate matches.</p></div><a href="#employer-company" className={primaryActionClass}>Set up company</a></div>
         </section>
       ) : null}
 

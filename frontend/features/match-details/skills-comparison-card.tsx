@@ -108,7 +108,7 @@ function SupportingEvidenceList({
         return (
           <li
             key={item.id}
-            className="rounded-lg border border-border bg-background px-3 py-3"
+            className="rounded-control border border-border bg-background px-3 py-3"
           >
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant="neutral">{getEvidenceSourceTypeLabel(item.source_type)}</Badge>
@@ -347,7 +347,7 @@ function GroupSummary({
   variant: "success" | "primary" | "neutral";
 }>) {
   return (
-    <div className="rounded-xl border border-border bg-surface/70 p-3">
+    <div className="rounded-card border border-border bg-surface/70 p-3">
       <Badge variant={variant}>{label}</Badge>
       <p className="mt-2 text-xl font-semibold tabular-nums text-ink">{count}</p>
     </div>

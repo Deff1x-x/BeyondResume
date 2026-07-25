@@ -1,7 +1,7 @@
 "use client";
 
 import { Badge } from "@/components/ui/badge";
-import { controlClassName } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { ApiClientError } from "@/lib/api/error";
 import type { EmployerCandidateStage } from "@/lib/api/types/employer";
 import {
@@ -65,12 +65,12 @@ export function ShortlistStageControl({
             {EMPLOYER_CANDIDATE_STAGE_LABELS[stage]}
           </Badge>
         ) : null}
-        <select
+        <Select
           value={stage}
           disabled={pendingThis}
           aria-busy={pendingThis || undefined}
           aria-label={`Hiring stage for ${labelTarget}`}
-          className={cn(controlClassName, "min-h-control max-w-[12rem] px-3")}
+          className="max-w-[12rem]"
           onChange={(event) => {
             const nextStage = event.target.value as EmployerCandidateStage;
             if (nextStage === stage || pendingThis) {
@@ -85,7 +85,7 @@ export function ShortlistStageControl({
               {EMPLOYER_CANDIDATE_STAGE_LABELS[option]}
             </option>
           ))}
-        </select>
+        </Select>
       </div>
       {updateMutation.isError &&
       updateMutation.variables?.candidateId === candidateId ? (

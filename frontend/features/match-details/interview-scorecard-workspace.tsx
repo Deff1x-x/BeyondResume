@@ -6,7 +6,8 @@ import { useEffect, useId, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
-import { controlClassName } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { PageHeader } from "@/components/ui/page-header";
 import { SkeletonCard } from "@/components/ui/skeleton";
 import { MatchReviewNavigation } from "@/features/match-details/match-review-navigation";
@@ -25,7 +26,6 @@ import {
   useInterviewScorecardQuery,
   useSaveInterviewScorecardMutation
 } from "@/lib/interview-scorecard/hooks";
-import { cn } from "@/lib/cn";
 
 const SUMMARY_MAX_LENGTH = 1200;
 const NOTES_MAX_LENGTH = 5000;
@@ -141,11 +141,10 @@ function ScoreSelect({
       <label htmlFor={id} className="block text-sm font-medium text-ink">
         {label}
       </label>
-      <select
+      <Select
         id={id}
         value={value ?? ""}
         disabled={disabled}
-        className={cn(controlClassName, "px-3")}
         onChange={(event) => onChange(Number(event.target.value))}
       >
         <option value="" disabled>
@@ -156,7 +155,7 @@ function ScoreSelect({
             {score}
           </option>
         ))}
-      </select>
+      </Select>
     </div>
   );
 }
@@ -364,13 +363,13 @@ export function EmployerInterviewScorecardWorkspace({
                 <p className="text-sm text-secondary">
                   Concise final assessment from the interview
                 </p>
-                <textarea
+                <Textarea
                   id={`${formId}-summary`}
                   value={form.interview_summary}
                   rows={3}
                   maxLength={SUMMARY_MAX_LENGTH}
                   disabled={saveMutation.isPending}
-                  className={cn(controlClassName, "min-h-20 px-3 py-2")}
+                  className="min-h-20"
                   onChange={(event) => {
                     setSavedNotice(false);
                     setForm((current) => ({
@@ -391,13 +390,13 @@ export function EmployerInterviewScorecardWorkspace({
                 <p className="text-sm text-secondary">
                   Detailed notes captured during or after the interview
                 </p>
-                <textarea
+                <Textarea
                   id={`${formId}-notes`}
                   value={form.interview_notes}
                   rows={4}
                   maxLength={NOTES_MAX_LENGTH}
                   disabled={saveMutation.isPending}
-                  className={cn(controlClassName, "min-h-24 px-3 py-2")}
+                  className="min-h-24"
                   onChange={(event) => {
                     setSavedNotice(false);
                     setForm((current) => ({
@@ -421,7 +420,7 @@ export function EmployerInterviewScorecardWorkspace({
                       <label
                         key={option}
                         htmlFor={optionId}
-                        className="flex items-center gap-2 rounded-lg border border-border bg-surface-subtle/50 px-3 py-2 text-sm text-ink"
+                        className="flex items-center gap-2 rounded-control border border-border bg-surface-subtle/50 px-3 py-2 text-sm text-ink"
                       >
                         <input
                           id={optionId}

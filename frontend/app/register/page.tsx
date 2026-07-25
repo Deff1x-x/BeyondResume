@@ -14,20 +14,312 @@ import { isTokenResponse } from "@/lib/api/auth";
 import { ApiClientError } from "@/lib/api/error";
 import type { Role } from "@/lib/api/types/auth";
 import { useRegister } from "@/lib/auth/hooks";
+import { cn } from "@/lib/cn";
 
 const VERIFICATION_MESSAGE = "Check your email to verify your account before signing in.";
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD_LENGTH = 8;
 
+const roles: Array<{ value: Role; title: string; description: string }> = [
+  {
+    value: "candidate",
+    title: "Candidate",
+    description: "Build an evidence-backed professional profile."
+  },
+  {
+    value: "employer",
+    title: "Employer",
+    description: "Compare candidates using skills, evidence, and grounded AI insights."
+  }
+];
+
 export default function RegisterPage() {
-  const router = useRouter(); const registerMutation = useRegister();
-  const [email, setEmail] = useState(""); const [password, setPassword] = useState(""); const [passwordConfirmation, setPasswordConfirmation] = useState(""); const [role, setRole] = useState<Role | null>(null);
-  const [termsAccepted, setTermsAccepted] = useState(false); const [privacyAccepted, setPrivacyAccepted] = useState(false); const [submitted, setSubmitted] = useState(false); const [errorMessage, setErrorMessage] = useState<string | null>(null); const [infoMessage, setInfoMessage] = useState<string | null>(null);
-  const emailValid = emailPattern.test(email); const passwordValid = password.length >= MIN_PASSWORD_LENGTH; const passwordsMatch = password === passwordConfirmation;
-  const isFormValid = role !== null && emailValid && passwordValid && passwordConfirmation.length > 0 && passwordsMatch && termsAccepted && privacyAccepted;
+  const router = useRouter();
+  const registerMutation = useRegister();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [passwordConfirmation, setPasswordConfirmation] = useState("");
+  const [role, setRole] = useState<Role | null>(null);
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [privacyAccepted, setPrivacyAccepted] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [infoMessage, setInfoMessage] = useState<string | null>(null);
+
+  const emailValid = emailPattern.test(email);
+  const passwordValid = password.length >= MIN_PASSWORD_LENGTH;
+  const passwordsMatch = password === passwordConfirmation;
+  const isFormValid =
+    role !== null &&
+    emailValid &&
+    passwordValid &&
+    passwordConfirmation.length > 0 &&
+    passwordsMatch &&
+    termsAccepted &&
+    privacyAccepted;
   const isSubmitting = registerMutation.isPending;
-  const showEmailError = email.length > 0 && !emailValid; const showPasswordError = password.length > 0 && !passwordValid; const showMatchError = passwordConfirmation.length > 0 && !passwordsMatch;
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) { event.preventDefault(); setSubmitted(true); setErrorMessage(null); setInfoMessage(null); if (!isFormValid || isSubmitting || !role) return; try { const result = await registerMutation.mutateAsync({ email, password, password_confirmation: passwordConfirmation, role, terms_accepted: termsAccepted, privacy_accepted: privacyAccepted }); if (!isTokenResponse(result)) { setInfoMessage(VERIFICATION_MESSAGE); return; } router.push("/"); } catch (error) { setErrorMessage(error instanceof ApiClientError ? error.message : "Something went wrong. Please try again."); } }
-  const roles: Array<{ value: Role; title: string; description: string }> = [{ value: "candidate", title: "Candidate", description: "Build a verified professional profile. Connect résumé, GitHub and evidence." }, { value: "employer", title: "Employer", description: "Create vacancies. Discover candidates by proven skills." }];
-  return <AuthShell><div className="mb-7 flex items-center justify-between"><Link href="/" className="inline-flex items-center gap-2 text-sm font-medium text-secondary transition hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"><span aria-hidden="true">←</span> Back to landing</Link><div className="flex items-center gap-2 lg:hidden"><BrandMark className="h-8 w-8 rounded-lg" /><span className="text-sm font-semibold">BeyondResume</span></div></div><Card className="border-white/80 bg-surface/90 shadow-float backdrop-blur"><CardContent className="p-6 sm:p-8"><p className="text-sm font-semibold uppercase tracking-[.12em] text-primary">Start your profile</p><h1 className="mt-3 text-3xl font-semibold tracking-tight text-ink">Create an account</h1><p className="mt-3 text-sm leading-6 text-secondary">Choose how you want to use BeyondResume.</p><form className="mt-7 space-y-5" onSubmit={handleSubmit} noValidate><fieldset disabled={isSubmitting} aria-describedby={submitted && !role ? "role-error" : undefined}><legend className="text-sm font-medium text-ink">Account type</legend><div className="mt-3 grid gap-3 sm:grid-cols-2">{roles.map((item) => <label key={item.value} className={`relative block cursor-pointer rounded-xl border p-4 transition ${role === item.value ? "border-primary bg-primary/5 shadow-sm" : "border-border bg-white hover:border-border-strong"} focus-within:ring-2 focus-within:ring-focus-ring focus-within:ring-offset-2`}><input type="radio" name="role" value={item.value} checked={role === item.value} onChange={() => setRole(item.value)} className="sr-only" /><span className="flex items-center justify-between font-semibold text-ink">{item.title}{role === item.value ? <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-primary text-xs text-white">✓</span> : null}</span><span className="mt-2 block text-xs leading-5 text-secondary">{item.description}</span></label>)}</div>{submitted && !role ? <p id="role-error" className="mt-2 text-xs text-danger">Select an account type.</p> : null}</fieldset><div className="space-y-2"><label htmlFor="email" className="block text-sm font-medium text-ink">Email</label><Input id="email" name="email" type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} disabled={isSubmitting} aria-invalid={showEmailError} aria-describedby={showEmailError ? "email-error" : undefined} className={showEmailError ? "border-danger focus-visible:border-danger" : undefined} />{showEmailError ? <p id="email-error" className="text-xs text-danger">Enter a valid email address.</p> : null}</div><div className="space-y-2"><label htmlFor="password" className="block text-sm font-medium text-ink">Password</label><PasswordInput id="password" name="password" autoComplete="new-password" required value={password} onChange={(event) => setPassword(event.target.value)} disabled={isSubmitting} aria-invalid={showPasswordError} aria-describedby="password-hint" className={showPasswordError ? "border-danger focus-visible:border-danger" : undefined} /><p id="password-hint" className={`text-xs ${showPasswordError ? "text-danger" : "text-secondary"}`}>Use at least {MIN_PASSWORD_LENGTH} characters.</p></div><div className="space-y-2"><label htmlFor="password_confirmation" className="block text-sm font-medium text-ink">Confirm password</label><PasswordInput id="password_confirmation" name="password_confirmation" autoComplete="new-password" required value={passwordConfirmation} onChange={(event) => setPasswordConfirmation(event.target.value)} disabled={isSubmitting} aria-invalid={showMatchError} aria-describedby={showMatchError ? "match-error" : undefined} className={showMatchError ? "border-danger focus-visible:border-danger" : undefined} />{showMatchError ? <p id="match-error" className="text-xs text-danger">Passwords do not match.</p> : null}</div><div className="space-y-2">{[["terms", termsAccepted, setTermsAccepted, "Terms of Service"], ["privacy", privacyAccepted, setPrivacyAccepted, "Privacy Policy"]].map(([id, checked, setChecked, label]) => <label key={id as string} className="flex cursor-pointer items-start gap-3 rounded-lg px-2 py-2 text-sm text-ink transition hover:bg-primary/5"><input id={id as string} type="checkbox" checked={checked as boolean} onChange={(event) => (setChecked as (value: boolean) => void)(event.target.checked)} disabled={isSubmitting} className="mt-0.5 h-4 w-4 shrink-0" /><span>I agree to the <span className="font-medium text-primary underline decoration-primary/30 underline-offset-2">{label as string}</span></span></label>)}{submitted && (!termsAccepted || !privacyAccepted) ? <p className="text-xs text-danger">Accept the Terms of Service and Privacy Policy to continue.</p> : null}</div>{errorMessage ? <p role="alert" className="rounded-xl border border-danger/20 bg-danger/5 px-3 py-3 text-sm text-danger">{errorMessage}</p> : null}{infoMessage ? <p role="status" className="rounded-xl border border-primary/20 bg-primary/5 px-3 py-3 text-sm text-primary">{infoMessage}</p> : null}<Button type="submit" variant="primary" className="w-full" loading={isSubmitting} disabled={!isFormValid}>Create account</Button></form><p className="mt-6 text-center text-sm text-secondary">Already have an account? <Link href="/login" className="font-semibold text-primary hover:underline">Sign in</Link></p></CardContent></Card></AuthShell>;
+  const showEmailError = email.length > 0 && !emailValid;
+  const showPasswordError = password.length > 0 && !passwordValid;
+  const showMatchError = passwordConfirmation.length > 0 && !passwordsMatch;
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSubmitted(true);
+    setErrorMessage(null);
+    setInfoMessage(null);
+    if (!isFormValid || isSubmitting || !role) return;
+    try {
+      const result = await registerMutation.mutateAsync({
+        email,
+        password,
+        password_confirmation: passwordConfirmation,
+        role,
+        terms_accepted: termsAccepted,
+        privacy_accepted: privacyAccepted
+      });
+      if (!isTokenResponse(result)) {
+        setInfoMessage(VERIFICATION_MESSAGE);
+        return;
+      }
+      router.push("/");
+    } catch (error) {
+      setErrorMessage(
+        error instanceof ApiClientError
+          ? error.message
+          : "Something went wrong. Please try again."
+      );
+    }
+  }
+
+  return (
+    <AuthShell>
+      <div className="mb-7 flex items-center justify-between gap-3">
+        <Link
+          href="/"
+          className="inline-flex items-center gap-2 text-sm font-medium text-secondary transition-colors duration-fast hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
+        >
+          <span aria-hidden="true">←</span> Back to landing
+        </Link>
+        <div className="flex items-center gap-2 lg:hidden">
+          <BrandMark className="h-8 w-8 rounded-control" />
+          <span className="font-display text-sm font-semibold text-ink">BeyondResume</span>
+        </div>
+      </div>
+
+      <Card className="border-border bg-surface shadow-float">
+        <CardContent className="p-6 sm:p-8">
+          <p className="text-xs font-semibold tracking-wide text-accent-muted">Start your profile</p>
+          <h1 className="mt-3 font-display text-3xl font-semibold tracking-tight text-ink">
+            Create an account
+          </h1>
+          <p className="mt-3 text-sm leading-6 text-secondary">
+            Choose how you want to use BeyondResume.
+          </p>
+
+          <form className="mt-7 space-y-5" onSubmit={handleSubmit} noValidate>
+            <fieldset
+              disabled={isSubmitting}
+              aria-describedby={submitted && !role ? "role-error" : undefined}
+            >
+              <legend className="text-sm font-medium text-ink">Account type</legend>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                {roles.map((item) => {
+                  const selected = role === item.value;
+                  return (
+                    <label
+                      key={item.value}
+                      className={cn(
+                        "relative block cursor-pointer rounded-card border p-4 transition duration-fast",
+                        selected
+                          ? "border-accent bg-accent/10 shadow-sm ring-1 ring-accent/30"
+                          : "border-border bg-surface hover:border-border-strong",
+                        "focus-within:ring-2 focus-within:ring-focus-ring focus-within:ring-offset-2"
+                      )}
+                    >
+                      <input
+                        type="radio"
+                        name="role"
+                        value={item.value}
+                        checked={selected}
+                        onChange={() => setRole(item.value)}
+                        className="sr-only"
+                      />
+                      <span className="flex items-center justify-between font-semibold text-ink">
+                        {item.title}
+                        {selected ? (
+                          <span
+                            className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-accent text-xs text-accent-foreground"
+                            aria-hidden="true"
+                          >
+                            ✓
+                          </span>
+                        ) : (
+                          <span
+                            className="inline-flex h-5 w-5 rounded-full border border-border-strong"
+                            aria-hidden="true"
+                          />
+                        )}
+                      </span>
+                      <span className="mt-2 block text-xs leading-5 text-secondary">
+                        {item.description}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+              {submitted && !role ? (
+                <p id="role-error" className="mt-2 text-xs text-danger-muted">
+                  Select an account type.
+                </p>
+              ) : null}
+            </fieldset>
+
+            <div className="space-y-2">
+              <label htmlFor="email" className="block text-sm font-medium text-ink">
+                Email
+              </label>
+              <Input
+                id="email"
+                name="email"
+                type="email"
+                autoComplete="email"
+                required
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                disabled={isSubmitting}
+                aria-invalid={showEmailError}
+                aria-describedby={showEmailError ? "email-error" : undefined}
+                className={showEmailError ? "border-danger focus-visible:border-danger" : undefined}
+              />
+              {showEmailError ? (
+                <p id="email-error" className="text-xs text-danger-muted">
+                  Enter a valid email address.
+                </p>
+              ) : null}
+            </div>
+
+            <div className="space-y-2">
+              <label htmlFor="password" className="block text-sm font-medium text-ink">
+                Password
+              </label>
+              <PasswordInput
+                id="password"
+                name="password"
+                autoComplete="new-password"
+                required
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                disabled={isSubmitting}
+                aria-invalid={showPasswordError}
+                aria-describedby="password-hint"
+                className={
+                  showPasswordError ? "border-danger focus-visible:border-danger" : undefined
+                }
+              />
+              <p
+                id="password-hint"
+                className={cn("text-xs", showPasswordError ? "text-danger-muted" : "text-secondary")}
+              >
+                Use at least {MIN_PASSWORD_LENGTH} characters.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <label htmlFor="password_confirmation" className="block text-sm font-medium text-ink">
+                Confirm password
+              </label>
+              <PasswordInput
+                id="password_confirmation"
+                name="password_confirmation"
+                autoComplete="new-password"
+                required
+                value={passwordConfirmation}
+                onChange={(event) => setPasswordConfirmation(event.target.value)}
+                disabled={isSubmitting}
+                aria-invalid={showMatchError}
+                aria-describedby={showMatchError ? "match-error" : undefined}
+                className={showMatchError ? "border-danger focus-visible:border-danger" : undefined}
+              />
+              {showMatchError ? (
+                <p id="match-error" className="text-xs text-danger-muted">
+                  Passwords do not match.
+                </p>
+              ) : null}
+            </div>
+
+            <div className="space-y-2">
+              {(
+                [
+                  ["terms", termsAccepted, setTermsAccepted, "Terms of Service"],
+                  ["privacy", privacyAccepted, setPrivacyAccepted, "Privacy Policy"]
+                ] as const
+              ).map(([id, checked, setChecked, label]) => (
+                <label
+                  key={id}
+                  className="flex cursor-pointer items-start gap-3 rounded-control px-2 py-2 text-sm text-ink transition-colors duration-fast hover:bg-surface-subtle"
+                >
+                  <input
+                    id={id}
+                    type="checkbox"
+                    checked={checked}
+                    onChange={(event) => setChecked(event.target.checked)}
+                    disabled={isSubmitting}
+                    className="mt-0.5 h-4 w-4 shrink-0"
+                  />
+                  <span>
+                    I agree to the{" "}
+                    <span className="font-medium text-ink underline decoration-border-strong underline-offset-2">
+                      {label}
+                    </span>
+                  </span>
+                </label>
+              ))}
+              {submitted && (!termsAccepted || !privacyAccepted) ? (
+                <p className="text-xs text-danger-muted">
+                  Accept the Terms of Service and Privacy Policy to continue.
+                </p>
+              ) : null}
+            </div>
+
+            {errorMessage ? (
+              <p
+                role="alert"
+                className="rounded-card border border-danger/20 bg-danger/5 px-3 py-3 text-sm text-danger-muted"
+              >
+                {errorMessage}
+              </p>
+            ) : null}
+            {infoMessage ? (
+              <p
+                role="status"
+                className="rounded-card border border-ai/25 bg-ai/10 px-3 py-3 text-sm text-ai-muted"
+              >
+                {infoMessage}
+              </p>
+            ) : null}
+
+            <Button
+              type="submit"
+              variant="accent"
+              className="w-full"
+              loading={isSubmitting}
+              disabled={!isFormValid}
+            >
+              Create account
+            </Button>
+          </form>
+
+          <p className="mt-6 text-center text-sm text-secondary">
+            Already have an account?{" "}
+            <Link
+              href="/login"
+              className="font-semibold text-ink transition-colors duration-fast hover:text-accent-muted"
+            >
+              Sign in
+            </Link>
+          </p>
+        </CardContent>
+      </Card>
+    </AuthShell>
+  );
 }

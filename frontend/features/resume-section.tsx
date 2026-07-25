@@ -324,7 +324,7 @@ export function ResumeSection({ enabled }: Readonly<{ enabled: boolean }>) {
                 onChange={onFileChange}
                 disabled={isBusy}
                 aria-describedby="resume-file-help"
-                className="block min-h-control w-full rounded-input border border-border bg-surface px-3 py-2 text-sm text-ink file:mr-4 file:rounded-button file:border-0 file:bg-primary file:px-4 file:py-2 file:text-sm file:font-medium file:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 disabled:bg-background"
+                className="block min-h-control w-full rounded-input border border-border bg-surface px-3 py-2 text-sm text-ink file:mr-4 file:rounded-button file:border-0 file:bg-primary file:px-4 file:py-2 file:text-sm file:font-medium file:text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 disabled:bg-background"
               />
               <p id="resume-file-help" className="text-sm text-secondary">
                 PDF only · Maximum file size: 8 MiB

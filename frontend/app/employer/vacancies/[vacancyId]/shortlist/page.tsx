@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { primaryActionClass } from "@/components/ui/button";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect } from "react";
 
@@ -48,7 +49,7 @@ function VacancyShortlistContent() {
         primaryAction={
           <Link
             href="/login"
-            className="inline-flex min-h-control items-center rounded-button border border-primary bg-primary px-4 text-sm font-medium text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2"
+            className={primaryActionClass}
           >
             Go to login
           </Link>

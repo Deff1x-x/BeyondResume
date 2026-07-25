@@ -6,7 +6,7 @@ import { useMemo } from "react";
 import { AiCandidateCompareSection } from "@/features/employer/ai-candidate-compare-section";
 import { CompareFlowSteps } from "@/features/employer/compare-flow-chrome";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, primaryActionClass } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Icon } from "@/components/ui/icon";
 import { PageHeader } from "@/components/ui/page-header";
@@ -257,7 +257,7 @@ export function CandidateComparisonView({
           primaryAction={
             <Link
               href={shortlistHref}
-              className="inline-flex min-h-control items-center rounded-button border border-primary bg-primary px-4 text-sm font-medium text-white shadow-sm shadow-primary/25 transition duration-200 hover:-translate-y-px hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2"
+              className={primaryActionClass}
             >
               Back to shortlist
             </Link>
@@ -279,7 +279,7 @@ export function CandidateComparisonView({
             href="#ai-hiring-analysis"
             className="inline-flex min-h-control items-center gap-2 rounded-button border border-border bg-surface px-4 text-sm font-medium text-ink shadow-sm transition duration-200 hover:-translate-y-px hover:border-border-strong hover:bg-surface-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2"
           >
-            <Icon name="spark" className="h-4 w-4 text-primary" aria-hidden="true" />
+            <Icon name="spark" className="h-4 w-4 text-ai-muted" aria-hidden="true" />
             Jump to AI Hiring Analysis
           </a>
         }

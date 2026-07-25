@@ -80,12 +80,12 @@ export function AiHiringIntelligenceSection({
           <div className="flex items-start gap-3">
             <span
               aria-hidden="true"
-              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/10"
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-card bg-ai/10 text-ai-muted ring-1 ring-ai/20"
             >
               <Icon name="spark" className="h-[18px] w-[18px]" />
             </span>
             <div className="min-w-0">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">
+              <p className="text-xs font-semibold tracking-wide text-ai-muted">
                 AI-generated analysis
               </p>
               <h2
@@ -183,7 +183,7 @@ export function AiHiringIntelligenceSection({
         <CardContent className="flex gap-4 p-6 sm:p-7">
           <span
             aria-hidden="true"
-            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"
+            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-card bg-ai/10 text-ai-muted"
           >
             <Icon name="arrow-right" className="h-[18px] w-[18px]" />
           </span>
@@ -224,7 +224,7 @@ function InsightCard({
           <span
             aria-hidden="true"
             className={cn(
-              "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg",
+              "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-control",
               TONE_CLASS[tone]
             )}
           >

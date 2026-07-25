@@ -79,13 +79,11 @@ function NavigationGroups({ role, mobile = false }: Readonly<{ role: WorkspaceRo
             {group.items.map((item) => {
               const active = isActiveRoute(pathname, item);
               const className = cn(
-                "flex min-h-10 items-center rounded-lg px-3 text-sm font-medium transition-colors",
+                "relative flex min-h-10 items-center rounded-control px-3 text-sm font-medium transition-colors duration-fast ease-standard",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2",
                 active
-                  ? "bg-primary/10 text-primary"
-                  : item.kind === "anchor"
-                    ? "text-secondary hover:bg-surface-subtle hover:text-ink"
-                    : "text-secondary hover:bg-surface-subtle hover:text-ink"
+                  ? "bg-surface text-ink shadow-sm before:absolute before:inset-y-1.5 before:left-0 before:w-[3px] before:rounded-full before:bg-accent"
+                  : "text-secondary hover:bg-surface hover:text-ink"
               );
               return (
                 <li key={item.href}>
@@ -120,13 +118,13 @@ export function WorkspaceNavigation({ role, email }: Readonly<{ role: WorkspaceR
 
   return (
     <>
-      <aside className="hidden min-h-screen border-r border-border/80 bg-surface/80 px-4 py-6 lg:flex lg:h-screen lg:w-72 lg:shrink-0 lg:sticky lg:top-0 lg:flex-col lg:overflow-y-auto">
-        <Link href="/" className="flex items-center gap-3 rounded-lg px-2 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2">
+      <aside className="hidden min-h-screen border-r border-border bg-background px-4 py-6 lg:flex lg:h-screen lg:w-72 lg:shrink-0 lg:sticky lg:top-0 lg:flex-col lg:overflow-y-auto">
+        <Link href="/" className="flex items-center gap-3 rounded-control px-2 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2">
           <BrandMark />
           <span className="text-sm font-semibold text-ink">BeyondResume</span>
         </Link>
-        <div className="mx-2 mt-8 rounded-xl border border-border bg-background px-3 py-3">
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-primary">{role}</p>
+        <div className="mx-2 mt-8 rounded-card border border-border bg-surface px-3 py-3 shadow-sm">
+          <p className="text-xs font-semibold tracking-wide text-accent-muted">{role}</p>
           <p className="mt-1 text-sm font-medium text-ink">{workspaceName}</p>
         </div>
         <nav className="mt-8 flex-1" aria-label={`${workspaceName} navigation`}>
@@ -140,17 +138,17 @@ export function WorkspaceNavigation({ role, email }: Readonly<{ role: WorkspaceR
         </div>
       </aside>
 
-      <header className="sticky top-0 z-20 border-b border-border/80 bg-background/95 px-4 py-3 backdrop-blur lg:hidden">
+      <header className="sticky top-0 z-20 border-b border-border bg-background/95 px-4 py-3 backdrop-blur lg:hidden">
         <div className="flex items-center justify-between gap-3">
-          <Link href="/" className="flex min-w-0 items-center gap-2 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2">
+          <Link href="/" className="flex min-w-0 items-center gap-2 rounded-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2">
             <BrandMark />
             <span className="truncate text-sm font-semibold text-ink">{workspaceName}</span>
           </Link>
           <details className="group relative">
-            <summary className="flex min-h-10 cursor-pointer list-none items-center rounded-lg border border-border bg-surface px-3 text-sm font-medium text-ink marker:content-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2">
+            <summary className="flex min-h-10 cursor-pointer list-none items-center rounded-control border border-border bg-surface px-3 text-sm font-medium text-ink marker:content-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2">
               Menu
             </summary>
-            <div className="absolute right-0 mt-2 max-h-[calc(100vh-5rem)] w-[min(22rem,calc(100vw-2rem))] overflow-y-auto rounded-xl border border-border bg-background p-4 shadow-lg">
+            <div className="absolute right-0 mt-2 max-h-[calc(100vh-5rem)] w-[min(22rem,calc(100vw-2rem))] overflow-y-auto rounded-card border border-border bg-surface p-4 shadow-card">
               <nav aria-label={`${workspaceName} navigation`}>
                 <NavigationGroups role={role} mobile />
               </nav>

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { primaryActionClass, secondaryActionClass } from "@/components/ui/button";
 
 import { Badge, StatusBadge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -13,11 +14,8 @@ import type { CandidateDashboardResponse } from "@/lib/api/types/dashboard";
 import { useCandidateDashboardQuery } from "@/lib/dashboard/hooks";
 import { useCurrentResumeQuery } from "@/lib/resume/hooks";
 
-const primaryLinkClass =
-  "inline-flex min-h-control items-center justify-center rounded-button border border-primary bg-gradient-to-b from-indigo-500 to-primary px-4 text-sm font-medium text-white shadow-sm shadow-primary/25 transition hover:-translate-y-px hover:from-indigo-400 hover:to-primary hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2";
-
-const secondaryLinkClass =
-  "inline-flex min-h-control items-center justify-center rounded-button border border-border bg-surface px-4 text-sm font-medium text-ink transition hover:border-border-strong hover:bg-surface-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2";
+const primaryLinkClass = primaryActionClass;
+const secondaryLinkClass = secondaryActionClass;
 
 function isResumeMissing(error: unknown): boolean {
   return error instanceof ApiClientError && error.code === "RESUME_NOT_FOUND";
@@ -44,8 +42,8 @@ function SetupItem({ label, description, complete, optional = false, icon }: Rea
   const labelText = complete === null ? "Checking" : complete ? "Complete" : optional ? "Optional" : "Not started";
 
   return (
-    <li className="flex min-w-0 items-start gap-3 rounded-xl bg-background/70 p-3">
-      <span className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+    <li className="flex min-w-0 items-start gap-3 rounded-card bg-background/70 p-3">
+      <span className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-control bg-primary/10 text-primary">
         <Icon name={icon} className="h-4 w-4" />
       </span>
       <div className="min-w-0 flex-1">
@@ -144,7 +142,7 @@ function EvidenceHealth({
         {sources.map((source) => (
           <Card key={source.label} className="bg-surface/90">
             <CardContent className="flex items-start gap-3 p-4">
-              <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-card bg-primary/10 text-primary">
                 <Icon name={source.icon} className="h-[18px] w-[18px]" />
               </span>
               <div className="min-w-0">
@@ -211,7 +209,7 @@ function SetupProgress({
 
   return (
     <section aria-labelledby="setup-progress-title">
-      <Card className="border-primary/15 bg-gradient-to-br from-primary/10 via-surface to-cyan-50/60">
+      <Card className="border-primary/15 bg-primary/5">
         <CardContent className="p-5 sm:p-6">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
@@ -219,7 +217,7 @@ function SetupProgress({
               <h2 id="setup-progress-title" className="mt-1 text-xl font-semibold tracking-tight text-ink">Strengthen your evidence profile</h2>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-secondary">Complete the available evidence sources at your own pace. Resume evidence remains optional.</p>
             </div>
-            <div className="min-w-40 rounded-xl border border-primary/15 bg-surface/80 px-4 py-3">
+            <div className="min-w-40 rounded-card border border-primary/15 bg-surface/80 px-4 py-3">
               <p className="text-2xl font-semibold tabular-nums text-ink">{completed}/{requiredItems.length}</p>
               <p className="mt-1 text-xs font-medium text-secondary">core setup items complete</p>
             </div>
@@ -268,7 +266,7 @@ export function CandidateOverviewSection({ enabled }: Readonly<{ enabled: boolea
         <Card className="overflow-hidden border-primary/20 bg-surface">
           <CardContent className="grid gap-6 p-6 sm:p-7 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
             <div className="flex min-w-0 gap-4">
-              <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary text-white shadow-sm shadow-primary/25"><Icon name={nextStep.icon} className="h-5 w-5" /></span>
+              <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-card bg-primary text-primary-foreground shadow-sm shadow-primary/25"><Icon name={nextStep.icon} className="h-5 w-5" /></span>
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">{nextStep.eyebrow}</p>
                 <h2 id="recommended-next-step-title" className="mt-1 text-2xl font-semibold tracking-tight text-ink">{nextStep.title}</h2>

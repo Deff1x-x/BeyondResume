@@ -109,7 +109,7 @@ function MatchHero({
               </div>
             </div>
           </div>
-          <div className="w-full max-w-sm shrink-0 rounded-xl border border-border bg-surface-subtle/70 px-5 py-5">
+          <div className="w-full max-w-sm shrink-0 rounded-card border border-border bg-surface-subtle/70 px-5 py-5">
             <div className="flex items-center gap-4">
               <div
                 className="flex h-14 w-14 items-center justify-center rounded-full border border-success/20 bg-success/10 text-lg font-semibold tabular-nums text-success"

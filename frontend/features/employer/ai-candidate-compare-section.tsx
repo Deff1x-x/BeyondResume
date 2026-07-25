@@ -90,10 +90,10 @@ export function AiCandidateCompareSection({
       <div className="flex flex-wrap items-start justify-between gap-5">
         <div className="min-w-0 max-w-2xl">
           <div className="flex flex-wrap items-center gap-3">
-            <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/10">
+            <span className="inline-flex h-10 w-10 items-center justify-center rounded-card bg-ai/10 text-ai-muted ring-1 ring-ai/20">
               <Icon name="spark" className="h-[18px] w-[18px]" aria-hidden="true" />
             </span>
-            <Badge variant="accent" aria-label="AI analysis">
+            <Badge variant="ai" aria-label="AI analysis">
               AI
             </Badge>
             <h2
@@ -137,7 +137,7 @@ export function AiCandidateCompareSection({
       ) : null}
 
       {showUnavailable ? (
-        <div className="rounded-xl border border-border bg-surface-subtle/70 p-5" role="alert">
+        <div className="rounded-card border border-border bg-surface-subtle/70 p-5" role="alert">
           <p className="font-medium text-ink">AI comparison is temporarily unavailable.</p>
           <p className="mt-2 text-sm leading-6 text-secondary">
             {unavailableMessage(mutation.error)}
@@ -160,7 +160,7 @@ export function AiCandidateCompareSection({
       ) : null}
 
       {!display && !showLoading && !showUnavailable ? (
-        <div className="rounded-xl border border-dashed border-border bg-surface-subtle/50 px-5 py-6">
+        <div className="rounded-card border border-dashed border-border bg-surface-subtle/50 px-5 py-6">
           <p className="text-sm font-medium text-ink">Ready when you are</p>
           <p className="mt-2 text-sm leading-6 text-secondary">
             Generate to surface hiring risks, onboarding insights, and interview focus that are
@@ -171,7 +171,7 @@ export function AiCandidateCompareSection({
 
       {display ? (
         <div className="space-y-5 border-t border-border pt-6">
-          <div className="rounded-xl border border-border bg-surface-subtle/70 p-5">
+          <div className="rounded-card border border-border bg-surface-subtle/70 p-5">
             <h3 className="text-sm font-semibold tracking-tight text-ink">Summary</h3>
             <p className="mt-3 text-sm leading-6 text-ink">{display.summary}</p>
           </div>
@@ -184,7 +184,7 @@ export function AiCandidateCompareSection({
                 return (
                   <div
                     key={assessment.candidate_id}
-                    className="rounded-xl border border-border bg-surface p-5"
+                    className="rounded-card border border-border bg-surface p-5"
                     aria-label={`Assessment for ${name}`}
                   >
                     <h4 className="font-medium text-ink">{name}</h4>
@@ -219,7 +219,7 @@ export function AiCandidateCompareSection({
             </div>
           ) : null}
 
-          <div className="rounded-xl border border-border bg-surface-subtle/70 p-5">
+          <div className="rounded-card border border-border bg-surface-subtle/70 p-5">
             <h3 className="text-sm font-semibold tracking-tight text-ink">Recommendation</h3>
             {display.recommended_candidate_id ? (
               <div className="mt-3 space-y-2 text-sm leading-6 text-ink">

@@ -247,12 +247,12 @@ export function InterviewQuestionsWorkspace({
               <div className="flex min-w-0 gap-3">
                 <span
                   aria-hidden="true"
-                  className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/10"
+                  className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-card bg-ai/10 text-ai-muted ring-1 ring-ai/20"
                 >
                   <Icon name="spark" className="h-[18px] w-[18px]" />
                 </span>
                 <div className="min-w-0">
-                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">
+                  <p className="text-xs font-semibold tracking-wide text-ai-muted">
                     Interview preparation
                   </p>
                   <p className="mt-1.5 max-w-xl text-sm leading-6 text-secondary">
@@ -312,7 +312,7 @@ export function InterviewQuestionsWorkspace({
                   <div className="flex items-center gap-3">
                     <span
                       aria-hidden="true"
-                      className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"
+                      className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-control bg-primary/10 text-primary"
                     >
                       <Icon name={CATEGORY_ICONS[group.category]} className="h-4 w-4" />
                     </span>

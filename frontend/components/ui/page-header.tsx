@@ -30,8 +30,10 @@ export function PageHeader({
     >
       <div className="min-w-0 space-y-2">
         {breadcrumb ? <div className="text-sm text-secondary">{breadcrumb}</div> : null}
-        {eyebrow ? <p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">{eyebrow}</p> : null}
-        <h1 id={titleId} className="text-3xl font-semibold tracking-[-0.04em] text-ink sm:text-4xl">
+        {eyebrow ? (
+          <p className="text-xs font-semibold tracking-wide text-ai-muted">{eyebrow}</p>
+        ) : null}
+        <h1 id={titleId} className="type-page-title sm:text-[2.25rem]">
           {title}
         </h1>
         {description ? (
