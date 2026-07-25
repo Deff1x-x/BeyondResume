@@ -3,7 +3,7 @@ import Link from "next/link";
 type MatchReviewNavigationProps = Readonly<{
   candidateId: string;
   vacancyId: string;
-  active: "review" | "ai" | "scorecard";
+  active: "review" | "ai" | "questions" | "scorecard";
 }>;
 
 export function MatchReviewNavigation({
@@ -14,6 +14,7 @@ export function MatchReviewNavigation({
   const query = `vacancy_id=${encodeURIComponent(vacancyId)}`;
   const reviewHref = `/employer/matches/${encodeURIComponent(candidateId)}?${query}`;
   const aiHref = `/employer/matches/${encodeURIComponent(candidateId)}/ai-hiring?${query}`;
+  const questionsHref = `/employer/matches/${encodeURIComponent(candidateId)}/interview-questions?${query}`;
   const scorecardHref = `/employer/matches/${encodeURIComponent(candidateId)}/scorecard?${query}`;
 
   const tabClass = (isActive: boolean) =>
@@ -41,6 +42,13 @@ export function MatchReviewNavigation({
         className={tabClass(active === "ai")}
       >
         AI Hiring
+      </Link>
+      <Link
+        href={questionsHref}
+        aria-current={active === "questions" ? "page" : undefined}
+        className={tabClass(active === "questions")}
+      >
+        Questions
       </Link>
       <Link
         href={scorecardHref}

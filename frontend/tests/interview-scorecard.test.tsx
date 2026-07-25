@@ -539,6 +539,10 @@ describe("MatchReviewNavigation scorecard tab", () => {
       "href",
       "/employer/matches/candidate-1/ai-hiring?vacancy_id=vacancy-1"
     );
+    expect(screen.getByRole("link", { name: "Questions" })).toHaveAttribute(
+      "href",
+      "/employer/matches/candidate-1/interview-questions?vacancy_id=vacancy-1"
+    );
 
     rerender(
       <MatchReviewNavigation candidateId="candidate-1" vacancyId="vacancy-1" active="review" />
@@ -550,6 +554,11 @@ describe("MatchReviewNavigation scorecard tab", () => {
 
     rerender(<MatchReviewNavigation candidateId="candidate-1" vacancyId="vacancy-1" active="ai" />);
     expect(screen.getByRole("link", { name: "AI Hiring" })).toHaveAttribute("aria-current", "page");
+
+    rerender(
+      <MatchReviewNavigation candidateId="candidate-1" vacancyId="vacancy-1" active="questions" />
+    );
+    expect(screen.getByRole("link", { name: "Questions" })).toHaveAttribute("aria-current", "page");
   });
 });
 

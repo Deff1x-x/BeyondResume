@@ -41,6 +41,7 @@ from app.services.ai_hiring_intelligence import (
     get_hiring_intelligence,
 )
 from app.schemas.ai_hiring_intelligence import AiHiringIntelligenceResponse
+from app.schemas.interview_questions import InterviewQuestionsResponse
 from app.schemas.interview_scorecard import (
     InterviewScorecardResponse,
     InterviewScorecardUpsertRequest,
@@ -74,6 +75,11 @@ from app.services.employer_shortlist import (
     save_candidate_to_shortlist,
     update_candidate_note,
     update_candidate_stage,
+)
+from app.services.interview_questions import (
+    InterviewQuestionsUnavailableError,
+    build_interview_questions_context,
+    get_interview_questions,
 )
 from app.services.interview_scorecard import (
     ScorecardCandidateNotFoundError,
@@ -526,6 +532,40 @@ def get_match_details(
         raise api_error(404, "CANDIDATE_NOT_FOUND", "Candidate not found") from None
     except SQLAlchemyError:
         raise api_error(500, "DATABASE_ERROR", "Database operation failed") from None
+
+
+@router.get(
+    "/matches/{candidate_id}/interview-questions",
+    response_model=InterviewQuestionsResponse,
+)
+def get_match_interview_questions(
+    candidate_id: UUID,
+    vacancy_id: Annotated[UUID, Query()],
+    current_user: Annotated[User, Depends(require_employer)],
+    session: Annotated[Session, Depends(get_db)],
+    refresh: Annotated[bool, Query()] = False,
+) -> InterviewQuestionsResponse:
+    """Employer-only interview preparation questions for one match."""
+    company = _require_owned_vacancy(session, current_user.id, vacancy_id)
+    try:
+        details = build_match_details(session, vacancy_id=vacancy_id, candidate_id=candidate_id)
+    except MatchDetailsCandidateNotFoundError:
+        raise api_error(404, "CANDIDATE_NOT_FOUND", "Candidate not found") from None
+    try:
+        context = build_interview_questions_context(
+            session,
+            employer_id=company.id,
+            vacancy_id=vacancy_id,
+            candidate_id=candidate_id,
+            details=details,
+        )
+        return get_interview_questions(context, refresh=refresh)
+    except InterviewQuestionsUnavailableError:
+        raise api_error(
+            503,
+            "INTERVIEW_QUESTIONS_UNAVAILABLE",
+            "Interview questions are temporarily unavailable.",
+        ) from None
 
 
 @router.get(
