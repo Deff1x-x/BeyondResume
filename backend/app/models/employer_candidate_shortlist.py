@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import CheckConstraint, ForeignKey, String, UniqueConstraint, text
+from sqlalchemy import CheckConstraint, ForeignKey, String, Text, UniqueConstraint, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -40,3 +40,4 @@ class EmployerCandidateShortlist(TimestampMixin, Base):
     stage: Mapped[str] = mapped_column(
         String(20), nullable=False, server_default=text("'shortlisted'")
     )
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)

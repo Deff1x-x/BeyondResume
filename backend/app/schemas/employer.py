@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Annotated, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator
 
 
 class EmployerCompanyCreateRequest(BaseModel):
@@ -141,6 +141,26 @@ class EmployerShortlistStageUpdateRequest(BaseModel):
     stage: EmployerCandidateStage
 
 
+class EmployerShortlistNoteUpdateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    note: str | None
+
+    @field_validator("note", mode="before")
+    @classmethod
+    def normalize_note(cls, value: object) -> str | None:
+        if value is None:
+            return None
+        if not isinstance(value, str):
+            raise ValueError("Input should be a valid string")
+        stripped = value.strip()
+        if stripped == "":
+            return None
+        if len(stripped) > 5000:
+            raise ValueError("String should have at most 5000 characters")
+        return stripped
+
+
 class EmployerShortlistEntryResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -148,6 +168,7 @@ class EmployerShortlistEntryResponse(BaseModel):
     vacancy_id: UUID
     candidate_id: UUID
     stage: EmployerCandidateStage
+    note: str | None
     created_at: datetime
     updated_at: datetime
 

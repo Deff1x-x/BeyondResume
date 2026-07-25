@@ -144,3 +144,34 @@ def update_candidate_stage(
         raise
     session.refresh(entry)
     return entry
+
+
+def update_candidate_note(
+    session: Session,
+    *,
+    vacancy: Vacancy,
+    candidate_id: UUID,
+    note: str | None,
+) -> EmployerCandidateShortlist:
+    """Update private employer note for an existing shortlist entry."""
+    entry = session.execute(
+        select(EmployerCandidateShortlist).where(
+            EmployerCandidateShortlist.employer_id == vacancy.employer_id,
+            EmployerCandidateShortlist.vacancy_id == vacancy.id,
+            EmployerCandidateShortlist.candidate_id == candidate_id,
+        )
+    ).scalar_one_or_none()
+    if entry is None:
+        raise ShortlistEntryNotFoundError
+
+    if entry.note == note:
+        return entry
+
+    entry.note = note
+    try:
+        session.commit()
+    except SQLAlchemyError:
+        session.rollback()
+        raise
+    session.refresh(entry)
+    return entry

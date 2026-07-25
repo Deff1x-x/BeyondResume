@@ -17,6 +17,7 @@ from app.schemas.employer import (
     EmployerCompanyResponse,
     EmployerShortlistEntryResponse,
     EmployerShortlistListResponse,
+    EmployerShortlistNoteUpdateRequest,
     EmployerShortlistStageUpdateRequest,
     MatchDetailsResponse,
     MatchSkillGroupResponse,
@@ -67,6 +68,7 @@ from app.services.employer_shortlist import (
     list_shortlisted_candidates,
     remove_candidate_from_shortlist,
     save_candidate_to_shortlist,
+    update_candidate_note,
     update_candidate_stage,
 )
 from app.services.skill_passport import build_passport
@@ -367,6 +369,34 @@ def patch_shortlisted_candidate_stage(
             vacancy=vacancy,
             candidate_id=candidate_id,
             stage=body.stage,
+        )
+    except ShortlistEntryNotFoundError:
+        raise api_error(
+            404, "SHORTLIST_ENTRY_NOT_FOUND", "Shortlist entry not found"
+        ) from None
+    except SQLAlchemyError:
+        raise api_error(500, "DATABASE_ERROR", "Database operation failed") from None
+    return EmployerShortlistEntryResponse.model_validate(entry)
+
+
+@router.patch(
+    "/vacancies/{vacancy_id}/shortlist/{candidate_id}/note",
+    response_model=EmployerShortlistEntryResponse,
+)
+def patch_shortlisted_candidate_note(
+    vacancy_id: UUID,
+    candidate_id: UUID,
+    body: EmployerShortlistNoteUpdateRequest,
+    current_user: Annotated[User, Depends(require_employer)],
+    session: Annotated[Session, Depends(get_db)],
+) -> EmployerShortlistEntryResponse:
+    vacancy = _owned_vacancy(session, current_user.id, vacancy_id)
+    try:
+        entry = update_candidate_note(
+            session,
+            vacancy=vacancy,
+            candidate_id=candidate_id,
+            note=body.note,
         )
     except ShortlistEntryNotFoundError:
         raise api_error(
