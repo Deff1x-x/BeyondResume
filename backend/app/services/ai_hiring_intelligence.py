@@ -24,7 +24,7 @@ class HiringIntelligenceUnavailableError(Exception):
 
 
 CONTEXT_VERSION = "candidate-hiring-context-v1"
-RESPONSE_SCHEMA_VERSION = "ai-hiring-response-v1"
+RESPONSE_SCHEMA_VERSION = "ai-hiring-response-v2"
 SERVICE_VERSION = "ai-hiring-intelligence-service-v1"
 ELIGIBLE_SKILL_CONFIDENCE = 50
 MAX_CONTEXT_SKILLS = 20
@@ -42,7 +42,11 @@ class CandidateHiringContext:
             "context_version": CONTEXT_VERSION,
             "skills": list(self.skills),
             "evidence_sources": list(self.evidence_sources),
-            "eligible_skills": [item["name"] for item in self.skills if item["confidence"] >= ELIGIBLE_SKILL_CONFIDENCE],
+            "eligible_skills": [
+                item["name"]
+                for item in self.skills
+                if item["confidence"] >= ELIGIBLE_SKILL_CONFIDENCE
+            ],
         }
 
 
@@ -78,7 +82,9 @@ class _Cache:
 _cache = _Cache()
 
 
-def build_hiring_context(*, candidate_name: str | None, passport: SkillPassportResponse) -> CandidateHiringContext:
+def build_hiring_context(
+    *, candidate_name: str | None, passport: SkillPassportResponse
+) -> CandidateHiringContext:
     del candidate_name  # Candidate identity is not needed by the AI interpretation layer.
     skills = [
         {
@@ -86,7 +92,11 @@ def build_hiring_context(*, candidate_name: str | None, passport: SkillPassportR
             "confidence": round(skill.evidence_confidence * 100),
             "evidence_count": skill.evidence_count,
             "github_repositories": [
-                {"name": item.repository_name, "evidence_count": item.evidence_count, "confidence": item.repository_confidence}
+                {
+                    "name": item.repository_name,
+                    "evidence_count": item.evidence_count,
+                    "confidence": item.repository_confidence,
+                }
                 for item in skill.github_repositories
             ],
             "sources": sorted({item.source_type for item in skill.evidence}),
@@ -96,7 +106,15 @@ def build_hiring_context(*, candidate_name: str | None, passport: SkillPassportR
     skills.sort(key=lambda item: (-int(item["confidence"]), str(item["name"]).lower()))
     return CandidateHiringContext(
         skills=tuple(skills[:MAX_CONTEXT_SKILLS]),
-        evidence_sources=tuple(sorted({source for skill in passport.skills for source in {item.source_type for item in skill.evidence}})),
+        evidence_sources=tuple(
+            sorted(
+                {
+                    source
+                    for skill in passport.skills
+                    for source in {item.source_type for item in skill.evidence}
+                }
+            )
+        ),
     )
 
 
@@ -107,14 +125,20 @@ def build_hiring_prompt(context: CandidateHiringContext) -> str:
 def get_hiring_intelligence(context: CandidateHiringContext) -> AiHiringIntelligenceResponse:
     if not any(int(item["confidence"]) >= ELIGIBLE_SKILL_CONFIDENCE for item in context.skills):
         return AiHiringIntelligenceResponse(
-            verdict={
-                "technical_interview_recommendation": "insufficient_evidence",
-                "confidence": 0,
-                "summary": "There is not enough confirmed technical evidence to form a technical interview recommendation.",
-                "strengths": [],
-                "concerns": ["Add verified technical evidence before generating interview questions."],
-            },
-            interview_questions=[],
+            verdict="insufficient_evidence",
+            confidence=0,
+            executive_summary=(
+                "There is not enough confirmed technical evidence to form a hiring recommendation."
+            ),
+            strengths=[],
+            hiring_risks=["Add verified technical evidence before making a hiring decision."],
+            confidence_explanation=[
+                "Confidence is low because no skills meet the evidence confidence threshold."
+            ],
+            first_90_days_focus=[],
+            recommended_next_action=(
+                "Request stronger verified technical evidence before proceeding."
+            ),
         )
     cache_material = {
         "context": context.as_payload(),
@@ -124,7 +148,11 @@ def get_hiring_intelligence(context: CandidateHiringContext) -> AiHiringIntellig
         "provider": settings.llm_provider,
         "model": settings.llm_model,
     }
-    key = sha256(json.dumps(cache_material, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+    key = sha256(
+        json.dumps(
+            cache_material, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+        ).encode()
+    ).hexdigest()
     cached = _cache.get(key)
     if cached is not None:
         return cached
@@ -149,7 +177,7 @@ def get_hiring_intelligence(context: CandidateHiringContext) -> AiHiringIntellig
         _log_failure(error, "during_dto_validation")
         raise HiringIntelligenceUnavailableError from error
     try:
-        _validate_semantics(result, context)
+        _validate_semantics(result)
     except Exception as error:
         _log_failure(error, "during_semantic_validation")
         raise HiringIntelligenceUnavailableError from error
@@ -165,16 +193,17 @@ def _parse_json_object(content: str) -> object:
     return json.loads(normalized)
 
 
-def _validate_semantics(response: AiHiringIntelligenceResponse, context: CandidateHiringContext) -> None:
-    eligible = {str(item["name"]) for item in context.skills if int(item["confidence"]) >= ELIGIBLE_SKILL_CONFIDENCE}
-    seen: set[tuple[str, str]] = set()
-    for question in response.interview_questions:
-        if question.skill not in eligible:
-            raise HiringIntelligenceUnavailableError("Question skill is not eligible")
-        identity = (question.skill.lower(), question.question.strip().lower())
-        if identity in seen:
-            raise HiringIntelligenceUnavailableError("Duplicate interview question")
-        seen.add(identity)
+def _validate_semantics(response: AiHiringIntelligenceResponse) -> None:
+    """Reject empty list items that whitespace stripping did not already remove."""
+    for field_name in (
+        "strengths",
+        "hiring_risks",
+        "confidence_explanation",
+        "first_90_days_focus",
+    ):
+        values: list[str] = getattr(response, field_name)
+        if any(not item.strip() for item in values):
+            raise HiringIntelligenceUnavailableError(f"{field_name} contains an empty item")
 
 
 def _log_failure(error: Exception, stage: str) -> None:

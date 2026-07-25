@@ -37,22 +37,42 @@ def test_mock_provider_returns_deterministic_schema_valid_json() -> None:
 
     assert first == second
     assert json.loads(first)
-    assert len(result.interview_questions) == 3
-    assert len(result.interview_questions) <= 3
-    assert {question.skill for question in result.interview_questions} <= {
-        "Python",
-        "FastAPI",
-        "SQL",
-        "Git",
+    assert result.verdict == "hire"
+    assert result.confidence == 75
+    assert result.executive_summary
+    assert len(result.strengths) == 3
+    assert result.hiring_risks == []
+    assert result.confidence_explanation
+    assert result.first_90_days_focus
+    assert result.recommended_next_action == "Proceed to the next hiring stage."
+    dumped = result.model_dump()
+    assert set(dumped) == {
+        "verdict",
+        "confidence",
+        "executive_summary",
+        "strengths",
+        "hiring_risks",
+        "confidence_explanation",
+        "first_90_days_focus",
+        "recommended_next_action",
     }
-    identities = {
-        (question.skill.casefold(), question.question.casefold())
-        for question in result.interview_questions
-    }
-    assert len(identities) == len(result.interview_questions)
-    assert len({question.skill.casefold() for question in result.interview_questions}) == len(
-        result.interview_questions
-    )
+    assert "interview_questions" not in dumped
+    assert "questions" not in dumped
+    assert "concerns" not in dumped
+    serialized = json.dumps(dumped).lower()
+    assert "interview" not in serialized
+    assert "question" not in serialized
+
+
+def test_mock_provider_uses_consider_for_single_eligible_skill() -> None:
+    content = MockHiringIntelligenceProvider().generate(_prompt(("Python", 90)))
+    result = AiHiringIntelligenceResponse.model_validate_json(content)
+
+    assert result.verdict == "consider"
+    assert result.confidence == 55
+    assert result.hiring_risks
+    assert "consideration" in result.recommended_next_action.lower()
+    assert "proceed to the next hiring stage" not in result.recommended_next_action.lower()
 
 
 @pytest.mark.parametrize(
@@ -74,8 +94,12 @@ def test_mock_provider_handles_empty_eligible_skills() -> None:
     content = MockHiringIntelligenceProvider().generate(_prompt(("Unconfirmed", 49)))
     result = AiHiringIntelligenceResponse.model_validate_json(content)
 
-    assert result.verdict.technical_interview_recommendation == "insufficient_evidence"
-    assert result.interview_questions == []
+    assert result.verdict == "insufficient_evidence"
+    assert result.confidence == 0
+    assert result.strengths == []
+    assert result.hiring_risks
+    assert result.first_90_days_focus == []
+    assert "interview_questions" not in result.model_dump()
 
 
 def test_mock_provider_ignores_blank_and_duplicate_skill_names() -> None:
@@ -85,4 +109,7 @@ def test_mock_provider_ignores_blank_and_duplicate_skill_names() -> None:
     content = MockHiringIntelligenceProvider().generate(f"rules\nINPUT:\n{payload}")
     result = AiHiringIntelligenceResponse.model_validate_json(content)
 
-    assert [question.skill for question in result.interview_questions] == ["Python", "Go"]
+    assert [item for item in result.strengths if "Python" in item or "Go" in item] == [
+        "Eligible evidence is available for Python.",
+        "Eligible evidence is available for Go.",
+    ]

@@ -6,7 +6,7 @@ import json
 
 from app.schemas.ai_hiring_intelligence import AiHiringIntelligenceResponse
 
-_MAX_QUESTION_SKILL_LENGTH = 120
+_MAX_SKILL_NAME_LENGTH = 120
 
 
 class MockHiringIntelligenceProviderError(Exception):
@@ -51,7 +51,7 @@ class MockHiringIntelligenceProvider:
                 )
             skill = value.strip()
             # Skip names the response schema cannot carry instead of failing.
-            if not skill or len(skill) > _MAX_QUESTION_SKILL_LENGTH:
+            if not skill or len(skill) > _MAX_SKILL_NAME_LENGTH:
                 continue
             identity = skill.casefold()
             if identity not in seen_skills:
@@ -61,45 +61,64 @@ class MockHiringIntelligenceProvider:
         payload: dict[str, object]
         if not eligible_skills:
             payload = {
-                "verdict": {
-                    "technical_interview_recommendation": "insufficient_evidence",
-                    "confidence": 0,
-                    "summary": (
-                        "There is not enough eligible technical evidence to recommend "
-                        "an interview."
-                    ),
-                    "strengths": [],
-                    "concerns": ["No eligible skills are present in the supplied context."],
-                },
-                "interview_questions": [],
+                "verdict": "insufficient_evidence",
+                "confidence": 0,
+                "executive_summary": (
+                    "There is not enough eligible technical evidence to form a hiring "
+                    "recommendation."
+                ),
+                "strengths": [],
+                "hiring_risks": ["No eligible skills are present in the supplied context."],
+                "confidence_explanation": [
+                    "Confidence is low because no skills meet the evidence threshold."
+                ],
+                "first_90_days_focus": [],
+                "recommended_next_action": (
+                    "Request stronger verified technical evidence before proceeding."
+                ),
             }
         else:
             selected_skills = eligible_skills[:3]
+            focus_skills = selected_skills[:2]
+            if len(eligible_skills) == 1:
+                verdict = "consider"
+                confidence = 55
+                executive_summary = (
+                    "Limited eligible technical evidence is available. Keep the candidate "
+                    "in consideration while gathering stronger confirmation."
+                )
+                recommended_next_action = (
+                    "Keep the candidate in consideration while reviewing alternatives."
+                )
+            else:
+                verdict = "hire"
+                confidence = 75
+                executive_summary = (
+                    "The supplied technical evidence supports moving forward with this "
+                    "candidate based on confirmed eligible skills."
+                )
+                recommended_next_action = "Proceed to the next hiring stage."
             payload = {
-                "verdict": {
-                    "technical_interview_recommendation": "recommended",
-                    "confidence": 75,
-                    "summary": (
-                        "The supplied technical evidence supports proceeding with "
-                        "a focused interview."
-                    ),
-                    "strengths": [
-                        f"Eligible evidence is available for {skill}." for skill in selected_skills
-                    ],
-                    "concerns": [],
-                },
-                "interview_questions": [
-                    {
-                        "skill": skill,
-                        "difficulty": "medium",
-                        "question": (
-                            f"Describe a technically challenging use of {skill} "
-                            "and explain your key design decisions."
-                        ),
-                        "reason": f"{skill} is an eligible skill in the supplied context.",
-                    }
-                    for skill in selected_skills
+                "verdict": verdict,
+                "confidence": confidence,
+                "executive_summary": executive_summary,
+                "strengths": [
+                    f"Eligible evidence is available for {skill}." for skill in selected_skills
                 ],
+                "hiring_risks": (
+                    []
+                    if len(eligible_skills) > 1
+                    else ["Evidence coverage is limited to a single eligible skill."]
+                ),
+                "confidence_explanation": [
+                    f"{skill} meets the evidence confidence threshold for a hiring recommendation."
+                    for skill in focus_skills
+                ],
+                "first_90_days_focus": [
+                    f"Build familiarity with day-to-day use of {skill} on the team."
+                    for skill in focus_skills
+                ],
+                "recommended_next_action": recommended_next_action,
             }
 
         # Local schema validation only guarantees the transport payload shape;

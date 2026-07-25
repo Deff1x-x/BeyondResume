@@ -1,32 +1,31 @@
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
 
-TechnicalInterviewRecommendation = Literal[
-    "strongly_recommended", "recommended", "conditional", "insufficient_evidence", "not_recommended"
+HiringVerdict = Literal[
+    "strong_hire",
+    "hire",
+    "consider",
+    "insufficient_evidence",
+    "do_not_hire",
 ]
-InterviewDifficulty = Literal["easy", "medium", "hard"]
 
-
-class HiringVerdictResponse(BaseModel):
-    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
-    technical_interview_recommendation: TechnicalInterviewRecommendation
-    confidence: int = Field(ge=0, le=100)
-    summary: str = Field(min_length=1, max_length=1200)
-    strengths: list[str] = Field(default_factory=list, max_length=5)
-    concerns: list[str] = Field(default_factory=list, max_length=5)
-
-
-class InterviewQuestionResponse(BaseModel):
-    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
-    skill: str = Field(min_length=1, max_length=120)
-    difficulty: InterviewDifficulty
-    question: str = Field(min_length=1, max_length=600)
-    reason: str = Field(min_length=1, max_length=400)
+NonEmptyText = Annotated[str, Field(min_length=1, max_length=400)]
+SummaryText = Annotated[str, Field(min_length=1, max_length=1200)]
+NextActionText = Annotated[str, Field(min_length=1, max_length=400)]
 
 
 class AiHiringIntelligenceResponse(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    verdict: HiringVerdictResponse
-    interview_questions: list[InterviewQuestionResponse] = Field(default_factory=list, max_length=8)
+    """Executive hiring decision report for a hiring manager."""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    verdict: HiringVerdict
+    confidence: int = Field(ge=0, le=100)
+    executive_summary: SummaryText
+    strengths: list[NonEmptyText] = Field(default_factory=list, max_length=5)
+    hiring_risks: list[NonEmptyText] = Field(default_factory=list, max_length=5)
+    confidence_explanation: list[NonEmptyText] = Field(default_factory=list, max_length=5)
+    first_90_days_focus: list[NonEmptyText] = Field(default_factory=list, max_length=5)
+    recommended_next_action: NextActionText

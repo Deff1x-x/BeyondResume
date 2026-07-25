@@ -21,30 +21,71 @@ const details = {
   roadmap: []
 };
 
-afterEach(() => { cleanup(); vi.clearAllMocks(); });
+const intelligence = {
+  verdict: "hire",
+  confidence: 81,
+  executive_summary: "The supplied evidence supports moving forward with this candidate.",
+  strengths: ["Python evidence"],
+  hiring_risks: ["Limited Redis evidence"],
+  confidence_explanation: ["Python experience is supported by verified evidence"],
+  first_90_days_focus: ["Build familiarity with the existing service architecture"],
+  recommended_next_action: "Proceed to the next hiring stage."
+};
+
+afterEach(() => {
+  cleanup();
+  vi.clearAllMocks();
+});
 
 describe("AiHiringWorkspace", () => {
   it("renders AI Hiring in the preserved candidate and vacancy context", () => {
     detailsQuery.mockReturnValue({ data: details, isLoading: false, isError: false });
-    intelligenceQuery.mockReturnValue({ isLoading: false, isError: false, data: { verdict: { technical_interview_recommendation: "recommended", confidence: 81, summary: "Evidence supports a technical interview.", strengths: ["Python evidence"], concerns: ["Limited Redis evidence"] }, interview_questions: [{ skill: "Python", difficulty: "medium", question: "Explain dependency injection.", reason: "Confirmed evidence." }] } });
+    intelligenceQuery.mockReturnValue({
+      isLoading: false,
+      isError: false,
+      data: intelligence
+    });
 
     render(<AiHiringWorkspace candidateId="candidate-1" vacancyId="vacancy-1" enabled />);
 
     expect(screen.getByText("Alex Morgan")).toBeInTheDocument();
     expect(screen.getByText("Vacancy match 82%")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Candidate Review" })).toHaveAttribute("href", "/employer/matches/candidate-1?vacancy_id=vacancy-1");
-    expect(screen.getByRole("link", { name: "AI Hiring" })).toHaveAttribute("href", "/employer/matches/candidate-1/ai-hiring?vacancy_id=vacancy-1");
-    expect(screen.getByRole("link", { name: "AI Hiring" })).toHaveAttribute("aria-current", "page");
-    expect(screen.getByText("Technical Interview Recommendation")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Candidate Review" })).toHaveAttribute(
+      "href",
+      "/employer/matches/candidate-1?vacancy_id=vacancy-1"
+    );
+    expect(screen.getByRole("link", { name: "AI Hiring" })).toHaveAttribute(
+      "href",
+      "/employer/matches/candidate-1/ai-hiring?vacancy_id=vacancy-1"
+    );
+    expect(screen.getByRole("link", { name: "AI Hiring" })).toHaveAttribute(
+      "aria-current",
+      "page"
+    );
+    expect(screen.getByRole("heading", { name: "AI Hiring Intelligence" })).toBeInTheDocument();
     expect(screen.getByText("AI-generated analysis")).toBeInTheDocument();
+    expect(screen.getByText("Hire")).toBeInTheDocument();
+    expect(screen.getByText("Limited Redis evidence")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Interview Questions" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Explain dependency injection/i)).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "AI Explanation" })).not.toBeInTheDocument();
-    expect(screen.getByText("Use this analysis as supporting information, not as the sole basis for a hiring decision.")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Use this analysis as supporting information, not as the sole basis for a hiring decision."
+      )
+    ).toBeInTheDocument();
     expect(intelligenceQuery).toHaveBeenCalledTimes(1);
   });
 
   it("keeps a failed AI request separate from candidate context", () => {
     detailsQuery.mockReturnValue({ data: details, isLoading: false, isError: false });
-    intelligenceQuery.mockReturnValue({ isLoading: false, isError: true, data: undefined, error: { status: 503 }, refetch: vi.fn() });
+    intelligenceQuery.mockReturnValue({
+      isLoading: false,
+      isError: true,
+      data: undefined,
+      error: { status: 503 },
+      refetch: vi.fn()
+    });
 
     render(<AiHiringWorkspace candidateId="candidate-1" vacancyId="vacancy-1" enabled />);
     expect(screen.getByText("Alex Morgan")).toBeInTheDocument();
