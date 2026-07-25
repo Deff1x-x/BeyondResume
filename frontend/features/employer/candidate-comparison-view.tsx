@@ -3,10 +3,14 @@
 import Link from "next/link";
 import { useMemo } from "react";
 
+import { AiCandidateCompareSection } from "@/features/employer/ai-candidate-compare-section";
+import { CompareFlowSteps } from "@/features/employer/compare-flow-chrome";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Icon } from "@/components/ui/icon";
 import { PageHeader } from "@/components/ui/page-header";
+import { SectionHeader } from "@/components/ui/section-header";
 import { SkeletonCard, SkeletonListRow } from "@/components/ui/skeleton";
 import { ApiClientError } from "@/lib/api/error";
 import type {
@@ -43,12 +47,18 @@ function errorMessage(error: unknown): string {
 
 function stageBadgeVariant(
   stage: EmployerShortlistEntry["stage"]
-): "neutral" | "success" | "danger" {
+): "neutral" | "success" | "danger" | "primary" | "warning" {
   if (stage === "hired") {
     return "success";
   }
   if (stage === "rejected") {
     return "danger";
+  }
+  if (stage === "interview" || stage === "offer") {
+    return "primary";
+  }
+  if (stage === "screening") {
+    return "warning";
   }
   return "neutral";
 }
@@ -95,7 +105,7 @@ function SkillList({
     return <p className="text-sm text-secondary">None</p>;
   }
   return (
-    <ul className="list-disc space-y-1 pl-4 text-sm text-ink">
+    <ul className="list-disc space-y-1.5 pl-4 text-sm leading-6 text-ink">
       {skills.map((skill) => (
         <li key={skill} className="break-words">
           {skill}
@@ -171,6 +181,19 @@ export function CandidateComparisonView({
     };
   }, [matchesByCandidate, selectedCandidateIds, shortlistByCandidate]);
 
+  const candidateNamesById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const row of rows) {
+      map.set(row.candidateId, row.match?.candidate_name?.trim() || row.candidateId);
+    }
+    return map;
+  }, [rows]);
+
+  const compareCandidateIds = useMemo(
+    () => rows.map((row) => row.candidateId),
+    [rows]
+  );
+
   if (!enabled) {
     return (
       <EmptyState
@@ -183,10 +206,11 @@ export function CandidateComparisonView({
   if (shortlistQuery.isLoading || matchesQuery.isLoading) {
     return (
       <div className="space-y-8">
-        <PageHeader title="Compare candidates" breadcrumb={breadcrumb} />
-        <div role="status" aria-label="Loading candidate comparison" className="space-y-4">
+        <PageHeader title="Candidate comparison" breadcrumb={breadcrumb} />
+        <div role="status" aria-label="Loading candidate comparison" className="space-y-5">
+          <SkeletonCard className="min-h-24" />
           <SkeletonListRow />
-          <SkeletonCard className="min-h-40" />
+          <SkeletonCard className="min-h-56" />
         </div>
       </div>
     );
@@ -195,11 +219,12 @@ export function CandidateComparisonView({
   if (shortlistQuery.isError || matchesQuery.isError) {
     return (
       <div className="space-y-8">
-        <PageHeader title="Compare candidates" breadcrumb={breadcrumb} />
+        <PageHeader title="Candidate comparison" breadcrumb={breadcrumb} />
         <EmptyState
           role="alert"
           title="Comparison unavailable"
           description={errorMessage(shortlistQuery.error ?? matchesQuery.error)}
+          className="bg-surface py-10"
           primaryAction={
             <Button
               variant="secondary"
@@ -224,14 +249,15 @@ export function CandidateComparisonView({
   if (rows.length < MIN_COMPARE_CANDIDATES) {
     return (
       <div className="space-y-8">
-        <PageHeader title="Compare candidates" breadcrumb={breadcrumb} />
+        <PageHeader title="Candidate comparison" breadcrumb={breadcrumb} />
         <EmptyState
           title="Select at least two shortlisted candidates to compare."
           description="Choose candidates from this vacancy shortlist, then open Compare selected."
+          className="bg-surface py-10"
           primaryAction={
             <Link
               href={shortlistHref}
-              className="inline-flex min-h-control items-center rounded-button border border-primary bg-primary px-4 text-sm font-medium text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2"
+              className="inline-flex min-h-control items-center rounded-button border border-primary bg-primary px-4 text-sm font-medium text-white shadow-sm shadow-primary/25 transition duration-200 hover:-translate-y-px hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2"
             >
               Back to shortlist
             </Link>
@@ -244,10 +270,22 @@ export function CandidateComparisonView({
   return (
     <div className="space-y-8">
       <PageHeader
-        title="Compare candidates"
-        description="Side-by-side comparison of shortlisted candidates for this vacancy."
+        eyebrow="Hiring workspace"
+        title="Candidate comparison"
+        description="Deterministic side-by-side facts first — then AI Hiring Analysis as a second opinion for this vacancy."
         breadcrumb={breadcrumb}
+        actions={
+          <a
+            href="#ai-hiring-analysis"
+            className="inline-flex min-h-control items-center gap-2 rounded-button border border-border bg-surface px-4 text-sm font-medium text-ink shadow-sm transition duration-200 hover:-translate-y-px hover:border-border-strong hover:bg-surface-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2"
+          >
+            <Icon name="spark" className="h-4 w-4 text-primary" aria-hidden="true" />
+            Jump to AI Hiring Analysis
+          </a>
+        }
       />
+
+      <CompareFlowSteps active="compare" />
 
       {truncated ? (
         <p className="text-sm text-secondary" role="status">
@@ -255,8 +293,22 @@ export function CandidateComparisonView({
         </p>
       ) : null}
 
+      <section className="space-y-5" aria-labelledby="deterministic-comparison-heading">
+        <SectionHeader
+          titleId="deterministic-comparison-heading"
+          title="Deterministic comparison"
+          description="Source-of-truth match scores, skills, stage, and notes. This table is not generated by AI."
+          icon="gauge"
+          size="md"
+          count={
+            <Badge variant="neutral">
+              {rows.length} candidates
+            </Badge>
+          }
+        />
+
       <div
-        className="overflow-x-auto rounded-xl border border-border"
+        className="overflow-x-auto rounded-card border border-border bg-surface shadow-card"
         role="region"
         aria-label="Candidate comparison table"
         tabIndex={0}
@@ -266,7 +318,7 @@ export function CandidateComparisonView({
             <tr className="border-b border-border bg-surface-subtle/70">
               <th
                 scope="col"
-                className="sticky left-0 z-10 min-w-[9rem] bg-surface-subtle/95 px-4 py-3 text-sm font-semibold text-secondary backdrop-blur-sm"
+                className="sticky left-0 z-10 min-w-[9rem] bg-surface-subtle/95 px-5 py-4 text-xs font-semibold uppercase tracking-[0.1em] text-secondary"
               >
                 Criteria
               </th>
@@ -276,9 +328,9 @@ export function CandidateComparisonView({
                   <th
                     key={row.candidateId}
                     scope="col"
-                    className="min-w-[14rem] max-w-[18rem] border-l border-border px-4 py-3 align-bottom"
+                    className="min-w-[14rem] max-w-[18rem] border-l border-border px-5 py-4 align-bottom"
                   >
-                    <h2 className="break-words text-base font-semibold text-ink">{name}</h2>
+                    <h2 className="break-words text-base font-semibold tracking-tight text-ink">{name}</h2>
                   </th>
                 );
               })}
@@ -288,17 +340,17 @@ export function CandidateComparisonView({
             <tr className="border-b border-border align-top">
               <th
                 scope="row"
-                className="sticky left-0 z-10 bg-background px-4 py-3 text-sm font-medium text-secondary"
+                className="sticky left-0 z-10 bg-surface px-5 py-4 text-sm font-medium text-secondary"
               >
                 Match score
               </th>
               {rows.map((row) => (
                 <td
                   key={`${row.candidateId}-score`}
-                  className="border-l border-border px-4 py-3 text-sm text-ink"
+                  className="border-l border-border px-5 py-4 text-sm text-ink"
                 >
                   {row.match ? (
-                    <span className="text-lg font-semibold tabular-nums">{row.match.score}%</span>
+                    <span className="text-lg font-semibold tabular-nums tracking-tight">{row.match.score}%</span>
                   ) : (
                     <span className="text-secondary">Unavailable</span>
                   )}
@@ -309,14 +361,14 @@ export function CandidateComparisonView({
             <tr className="border-b border-border align-top">
               <th
                 scope="row"
-                className="sticky left-0 z-10 bg-background px-4 py-3 text-sm font-medium text-secondary"
+                className="sticky left-0 z-10 bg-surface px-5 py-4 text-sm font-medium text-secondary"
               >
                 Required skills matched
               </th>
               {rows.map((row) => (
                 <td
                   key={`${row.candidateId}-req-matched`}
-                  className="border-l border-border px-4 py-3"
+                  className="border-l border-border px-5 py-4"
                 >
                   <SkillList
                     skills={row.match?.required.matched ?? null}
@@ -329,14 +381,14 @@ export function CandidateComparisonView({
             <tr className="border-b border-border align-top">
               <th
                 scope="row"
-                className="sticky left-0 z-10 bg-background px-4 py-3 text-sm font-medium text-secondary"
+                className="sticky left-0 z-10 bg-surface px-5 py-4 text-sm font-medium text-secondary"
               >
                 Required skills missing
               </th>
               {rows.map((row) => (
                 <td
                   key={`${row.candidateId}-req-missing`}
-                  className="border-l border-border px-4 py-3"
+                  className="border-l border-border px-5 py-4"
                 >
                   <SkillList
                     skills={row.match?.required.missing ?? null}
@@ -349,14 +401,14 @@ export function CandidateComparisonView({
             <tr className="border-b border-border align-top">
               <th
                 scope="row"
-                className="sticky left-0 z-10 bg-background px-4 py-3 text-sm font-medium text-secondary"
+                className="sticky left-0 z-10 bg-surface px-5 py-4 text-sm font-medium text-secondary"
               >
                 Preferred skills matched
               </th>
               {rows.map((row) => (
                 <td
                   key={`${row.candidateId}-pref-matched`}
-                  className="border-l border-border px-4 py-3"
+                  className="border-l border-border px-5 py-4"
                 >
                   <SkillList
                     skills={row.match?.preferred.matched ?? null}
@@ -369,14 +421,14 @@ export function CandidateComparisonView({
             <tr className="border-b border-border align-top">
               <th
                 scope="row"
-                className="sticky left-0 z-10 bg-background px-4 py-3 text-sm font-medium text-secondary"
+                className="sticky left-0 z-10 bg-surface px-5 py-4 text-sm font-medium text-secondary"
               >
                 Preferred skills missing
               </th>
               {rows.map((row) => (
                 <td
                   key={`${row.candidateId}-pref-missing`}
-                  className="border-l border-border px-4 py-3"
+                  className="border-l border-border px-5 py-4"
                 >
                   <SkillList
                     skills={row.match?.preferred.missing ?? null}
@@ -389,14 +441,14 @@ export function CandidateComparisonView({
             <tr className="border-b border-border align-top">
               <th
                 scope="row"
-                className="sticky left-0 z-10 bg-background px-4 py-3 text-sm font-medium text-secondary"
+                className="sticky left-0 z-10 bg-surface px-5 py-4 text-sm font-medium text-secondary"
               >
                 Pipeline stage
               </th>
               {rows.map((row) => (
                 <td
                   key={`${row.candidateId}-stage`}
-                  className="border-l border-border px-4 py-3"
+                  className="border-l border-border px-5 py-4"
                 >
                   <Badge variant={stageBadgeVariant(row.entry.stage)}>
                     {EMPLOYER_CANDIDATE_STAGE_LABELS[row.entry.stage]}
@@ -408,7 +460,7 @@ export function CandidateComparisonView({
             <tr className="border-b border-border align-top">
               <th
                 scope="row"
-                className="sticky left-0 z-10 bg-background px-4 py-3 text-sm font-medium text-secondary"
+                className="sticky left-0 z-10 bg-surface px-5 py-4 text-sm font-medium text-secondary"
               >
                 Private note
               </th>
@@ -418,7 +470,7 @@ export function CandidateComparisonView({
                 return (
                   <td
                     key={`${row.candidateId}-note`}
-                    className="max-w-[18rem] border-l border-border px-4 py-3"
+                    className="max-w-[18rem] border-l border-border px-5 py-4"
                   >
                     <p
                       className={`whitespace-pre-wrap break-words text-sm ${
@@ -435,7 +487,7 @@ export function CandidateComparisonView({
             <tr className="align-top">
               <th
                 scope="row"
-                className="sticky left-0 z-10 bg-background px-4 py-3 text-sm font-medium text-secondary"
+                className="sticky left-0 z-10 bg-surface px-5 py-4 text-sm font-medium text-secondary"
               >
                 Candidate Review
               </th>
@@ -445,7 +497,7 @@ export function CandidateComparisonView({
                 return (
                   <td
                     key={`${row.candidateId}-review`}
-                    className="border-l border-border px-4 py-3"
+                    className="border-l border-border px-5 py-4"
                   >
                     <Link
                       href={href}
@@ -461,6 +513,14 @@ export function CandidateComparisonView({
           </tbody>
         </table>
       </div>
+      </section>
+
+      <AiCandidateCompareSection
+        vacancyId={vacancyId}
+        candidateIds={compareCandidateIds}
+        candidateNamesById={candidateNamesById}
+        enabled={enabled}
+      />
     </div>
   );
 }

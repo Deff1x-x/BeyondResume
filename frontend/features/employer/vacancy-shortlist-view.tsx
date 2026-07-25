@@ -5,9 +5,15 @@ import { useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Icon } from "@/components/ui/icon";
 import { PageHeader } from "@/components/ui/page-header";
+import { SectionHeader } from "@/components/ui/section-header";
 import { SkeletonCard, SkeletonListRow } from "@/components/ui/skeleton";
 import { buildCompareHref } from "@/features/employer/candidate-comparison-view";
+import {
+  CompareFlowSteps,
+  CompareValueProps
+} from "@/features/employer/compare-flow-chrome";
 import { ShortlistNoteEditor } from "@/features/employer/shortlist-note-editor";
 import { ShortlistStageControl } from "@/features/employer/shortlist-stage-control";
 import { VacancyMatchCard } from "@/features/employer/vacancy-match-card";
@@ -73,10 +79,11 @@ function ShortlistRemoveButton({
     <div className="space-y-2">
       <Button
         type="button"
-        variant="secondary"
+        variant="ghost"
         size="sm"
         loading={removingThis}
         disabled={removingThis}
+        className="min-h-control text-secondary hover:bg-danger/5 hover:text-danger"
         aria-label={`Remove ${candidateName} from shortlist`}
         onClick={() => {
           if (removingThis) {
@@ -98,10 +105,10 @@ function ShortlistRemoveButton({
 }
 
 function filterButtonClass(active: boolean): string {
-  return `rounded-lg px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 ${
+  return `rounded-lg px-3 py-2 text-sm font-medium transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 ${
     active
-      ? "bg-background text-ink shadow-sm"
-      : "text-secondary hover:bg-background/70 hover:text-ink"
+      ? "bg-surface text-ink shadow-sm"
+      : "text-secondary hover:bg-surface/80 hover:text-ink"
   }`;
 }
 
@@ -196,9 +203,11 @@ export function VacancyShortlistView({ vacancyId, enabled }: VacancyShortlistVie
     return (
       <div className="space-y-8">
         <PageHeader title="Shortlist" breadcrumb={breadcrumb} />
-        <div role="status" aria-label="Loading shortlist" className="space-y-4">
+        <div role="status" aria-label="Loading shortlist" className="space-y-5">
+          <SkeletonCard className="min-h-24" />
           <SkeletonListRow />
-          <SkeletonCard className="min-h-40" />
+          <SkeletonCard className="min-h-48" />
+          <SkeletonCard className="min-h-48" />
         </div>
       </div>
     );
@@ -212,6 +221,7 @@ export function VacancyShortlistView({ vacancyId, enabled }: VacancyShortlistVie
           role="alert"
           title="Shortlist unavailable"
           description={errorMessage(vacancyQuery.error ?? shortlistQuery.error)}
+          className="py-10"
           primaryAction={
             <Button
               variant="secondary"
@@ -231,14 +241,23 @@ export function VacancyShortlistView({ vacancyId, enabled }: VacancyShortlistVie
   }
 
   const vacancyTitle = vacancyQuery.data?.title ?? "Vacancy";
+  const selectionHint =
+    selectionCount < MIN_COMPARE_SELECTION
+      ? `Select ${MIN_COMPARE_SELECTION - selectionCount} more to compare`
+      : selectionAtMax
+        ? `Maximum ${MAX_COMPARE_SELECTION} candidates selected`
+        : `${selectionCount} of up to ${MAX_COMPARE_SELECTION} selected`;
 
   return (
     <div className="space-y-8">
       <PageHeader
-        title="Shortlist"
-        description={`Saved candidates for ${vacancyTitle}.`}
+        eyebrow="Hiring workspace"
+        title="Select candidates to compare"
+        description={`Choose 2–4 shortlisted people for ${vacancyTitle}. Next you will get a side-by-side match table and AI Hiring Analysis.`}
         breadcrumb={breadcrumb}
       />
+
+      <CompareFlowSteps active="select" />
 
       {matchesQuery.isError ? (
         <p className="text-sm text-danger" role="alert">
@@ -247,135 +266,175 @@ export function VacancyShortlistView({ vacancyId, enabled }: VacancyShortlistVie
       ) : null}
 
       {entries.length > 0 ? (
-        <div
-          className="flex w-fit max-w-full flex-wrap rounded-xl border border-border bg-surface-subtle p-1"
-          role="group"
-          aria-label="Filter shortlist by hiring stage"
+        <section
+          className="space-y-5 rounded-card border border-border bg-surface p-5 shadow-card sm:p-6"
+          aria-labelledby="compare-value-heading"
         >
-          <button
-            type="button"
-            aria-pressed={stageFilter === "all"}
-            className={filterButtonClass(stageFilter === "all")}
-            onClick={() => setStageFilter("all")}
-          >
-            All
-          </button>
-          {EMPLOYER_CANDIDATE_STAGES.map((stage) => (
-            <button
-              key={stage}
-              type="button"
-              aria-pressed={stageFilter === stage}
-              className={filterButtonClass(stageFilter === stage)}
-              onClick={() => setStageFilter(stage)}
+          <SectionHeader
+            titleId="compare-value-heading"
+            title="What you will get"
+            description="Comparison is not just a table — it prepares a hiring decision workspace."
+            size="md"
+          />
+          <CompareValueProps />
+        </section>
+      ) : null}
+
+      {entries.length > 0 ? (
+        <section className="space-y-5" aria-labelledby="shortlist-candidates-heading">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between sm:gap-6">
+            <SectionHeader
+              titleId="shortlist-candidates-heading"
+              title="Shortlisted candidates"
+              description="Select cards to build a compare set, then continue from the bar below."
+              size="md"
+              count={
+                <span className="text-sm text-secondary">
+                  {visibleEntries.length} shown
+                </span>
+              }
+            />
+            <div
+              className="flex w-fit max-w-full flex-wrap rounded-xl border border-border bg-surface-subtle p-1"
+              role="group"
+              aria-label="Filter shortlist by hiring stage"
             >
-              {EMPLOYER_CANDIDATE_STAGE_LABELS[stage]}
-            </button>
-          ))}
-        </div>
+              <button
+                type="button"
+                aria-pressed={stageFilter === "all"}
+                className={filterButtonClass(stageFilter === "all")}
+                onClick={() => setStageFilter("all")}
+              >
+                All
+              </button>
+              {EMPLOYER_CANDIDATE_STAGES.map((stage) => (
+                <button
+                  key={stage}
+                  type="button"
+                  aria-pressed={stageFilter === stage}
+                  className={filterButtonClass(stageFilter === stage)}
+                  onClick={() => setStageFilter(stage)}
+                >
+                  {EMPLOYER_CANDIDATE_STAGE_LABELS[stage]}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="sticky top-3 z-20 rounded-card border border-border bg-surface p-5 shadow-card">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-ink" aria-live="polite">
+                  {selectionCount} selected
+                </p>
+                <p className="mt-1 text-sm leading-6 text-secondary">{selectionHint}</p>
+              </div>
+              {canCompare ? (
+                <Link
+                  href={compareHref}
+                  className="inline-flex min-h-control items-center gap-2 rounded-button border border-primary bg-primary px-5 text-sm font-semibold text-white shadow-sm shadow-primary/25 transition duration-200 hover:-translate-y-px hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2"
+                  aria-label="Compare selected candidates"
+                >
+                  Compare selected
+                  <Icon name="arrow-right" className="h-4 w-4" aria-hidden="true" />
+                </Link>
+              ) : (
+                <Button
+                  type="button"
+                  variant="primary"
+                  className="min-h-control px-5 font-semibold"
+                  disabled
+                  aria-label="Compare selected candidates"
+                >
+                  Compare selected
+                </Button>
+              )}
+            </div>
+            {canCompare ? (
+              <p className="mt-3 text-xs leading-5 text-muted">
+                Continues to deterministic comparison and AI Hiring Analysis for the selected
+                candidates.
+              </p>
+            ) : null}
+          </div>
+
+          {visibleEntries.length === 0 && stageFilter !== "all" ? (
+            <EmptyState
+              title={`No candidates in ${EMPLOYER_CANDIDATE_STAGE_LABELS[stageFilter]}.`}
+              description="Choose another stage filter or move a saved candidate into this stage."
+              className="bg-surface py-10"
+            />
+          ) : null}
+
+          {visibleEntries.length > 0 ? (
+            <ul className="space-y-5">
+              {visibleEntries.map((entry) => {
+                const match =
+                  matchesByCandidate.get(entry.candidate_id) ??
+                  fallbackMatch(entry.candidate_id);
+                const selected = selectedCandidateIds.includes(entry.candidate_id);
+                const checkboxDisabled = selectionAtMax && !selected;
+                return (
+                  <VacancyMatchCard
+                    key={entry.id}
+                    match={match}
+                    vacancyId={vacancyId}
+                    saved
+                    selected={selected}
+                    stage={entry.stage}
+                    reviewVariant="secondary"
+                    selection={{
+                      checked: selected,
+                      disabled: checkboxDisabled,
+                      onChange: () => toggleCompareSelection(entry.candidate_id)
+                    }}
+                    pipelineActions={
+                      <>
+                        <ShortlistStageControl
+                          vacancyId={vacancyId}
+                          candidateId={entry.candidate_id}
+                          stage={entry.stage}
+                          candidateLabel={match.candidate_name}
+                          compact
+                        />
+                        {entry.stage === "interview" ? (
+                          <Link
+                            href={`/employer/matches/${encodeURIComponent(entry.candidate_id)}/scorecard?vacancy_id=${encodeURIComponent(vacancyId)}`}
+                            className="inline-flex min-h-control items-center rounded-button border border-border bg-surface px-4 text-sm font-medium text-ink shadow-sm transition duration-200 hover:-translate-y-px hover:border-border-strong hover:bg-surface-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2"
+                          >
+                            Open interview scorecard
+                          </Link>
+                        ) : null}
+                        <ShortlistRemoveButton
+                          vacancyId={vacancyId}
+                          candidateId={entry.candidate_id}
+                          candidateName={match.candidate_name}
+                          onRemoved={removeFromSelection}
+                        />
+                      </>
+                    }
+                    notes={
+                      <ShortlistNoteEditor
+                        vacancyId={vacancyId}
+                        candidateId={entry.candidate_id}
+                        note={entry.note}
+                        candidateLabel={match.candidate_name}
+                      />
+                    }
+                  />
+                );
+              })}
+            </ul>
+          ) : null}
+        </section>
       ) : null}
 
       {entries.length === 0 ? (
         <EmptyState
           title="No saved candidates yet."
-          description="Save a candidate from Candidate Review to see them here."
-          className="py-8"
+          description="Save candidates from Candidate Review, then return here to start Compare and AI Hiring Analysis."
+          className="bg-surface py-10"
         />
-      ) : null}
-
-      {entries.length > 0 ? (
-        <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-surface-subtle/60 px-4 py-3">
-          <p className="text-sm text-secondary" aria-live="polite">
-            {selectionCount} selected
-          </p>
-          {canCompare ? (
-            <Link
-              href={compareHref}
-              className="inline-flex min-h-control items-center rounded-button border border-primary bg-primary px-4 text-sm font-medium text-white shadow-sm shadow-primary/25 transition hover:-translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2"
-              aria-label="Compare selected candidates"
-            >
-              Compare selected
-            </Link>
-          ) : (
-            <Button
-              type="button"
-              variant="primary"
-              disabled
-              aria-label="Compare selected candidates"
-            >
-              Compare selected
-            </Button>
-          )}
-        </div>
-      ) : null}
-
-      {entries.length > 0 && visibleEntries.length === 0 && stageFilter !== "all" ? (
-        <EmptyState
-          title={`No candidates in ${EMPLOYER_CANDIDATE_STAGE_LABELS[stageFilter]}.`}
-          description="Choose another stage filter or move a saved candidate into this stage."
-          className="py-8"
-        />
-      ) : null}
-
-      {visibleEntries.length > 0 ? (
-        <ul className="space-y-3">
-          {visibleEntries.map((entry) => {
-            const match =
-              matchesByCandidate.get(entry.candidate_id) ??
-              fallbackMatch(entry.candidate_id);
-            const selected = selectedCandidateIds.includes(entry.candidate_id);
-            const checkboxDisabled = selectionAtMax && !selected;
-            return (
-              <VacancyMatchCard
-                key={entry.id}
-                match={match}
-                vacancyId={vacancyId}
-                actions={
-                  <div className="w-full space-y-4 sm:w-auto">
-                    <label className="flex items-center gap-2 text-sm text-ink">
-                      <input
-                        type="checkbox"
-                        className="h-4 w-4 rounded border-border text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
-                        checked={selected}
-                        disabled={checkboxDisabled}
-                        aria-label={`Select ${match.candidate_name} for comparison`}
-                        onChange={() => toggleCompareSelection(entry.candidate_id)}
-                      />
-                      <span>Compare</span>
-                    </label>
-                    <div className="flex w-full flex-wrap items-start gap-3 sm:w-auto">
-                      <ShortlistStageControl
-                        vacancyId={vacancyId}
-                        candidateId={entry.candidate_id}
-                        stage={entry.stage}
-                        candidateLabel={match.candidate_name}
-                      />
-                      {entry.stage === "interview" ? (
-                        <Link
-                          href={`/employer/matches/${encodeURIComponent(entry.candidate_id)}/scorecard?vacancy_id=${encodeURIComponent(vacancyId)}`}
-                          className="inline-flex min-h-control items-center rounded-button border border-border bg-surface px-3 text-sm font-medium text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2"
-                        >
-                          Open interview scorecard
-                        </Link>
-                      ) : null}
-                      <ShortlistRemoveButton
-                        vacancyId={vacancyId}
-                        candidateId={entry.candidate_id}
-                        candidateName={match.candidate_name}
-                        onRemoved={removeFromSelection}
-                      />
-                    </div>
-                    <ShortlistNoteEditor
-                      vacancyId={vacancyId}
-                      candidateId={entry.candidate_id}
-                      note={entry.note}
-                      candidateLabel={match.candidate_name}
-                    />
-                  </div>
-                }
-              />
-            );
-          })}
-        </ul>
       ) : null}
     </div>
   );

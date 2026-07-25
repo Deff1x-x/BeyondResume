@@ -41,7 +41,18 @@ from app.services.ai_hiring_intelligence import (
     build_hiring_context,
     get_hiring_intelligence,
 )
+from app.services.ai_candidate_compare import (
+    AiCandidateCompareCandidateNotFoundError,
+    AiCandidateCompareUnavailableError,
+    AiCandidateCompareVacancyNotFoundError,
+    build_ai_candidate_compare_context,
+    get_ai_candidate_compare,
+)
 from app.schemas.ai_hiring_intelligence import AiHiringIntelligenceResponse
+from app.schemas.ai_candidate_compare import (
+    AiCandidateCompareRequest,
+    AiCandidateCompareResponse,
+)
 from app.schemas.interview_questions import InterviewQuestionsResponse
 from app.schemas.interview_scorecard import (
     InterviewScorecardResponse,
@@ -231,6 +242,42 @@ def remove_vacancy(
     except SQLAlchemyError:
         raise api_error(500, "DATABASE_ERROR", "Database operation failed") from None
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post(
+    "/vacancies/{vacancy_id}/ai-compare",
+    response_model=AiCandidateCompareResponse,
+)
+def post_vacancy_ai_compare(
+    vacancy_id: UUID,
+    body: AiCandidateCompareRequest,
+    current_user: Annotated[User, Depends(require_employer)],
+    session: Annotated[Session, Depends(get_db)],
+) -> AiCandidateCompareResponse:
+    """Advisory AI comparison over deterministic shortlist match facts."""
+    company = _require_company(session, current_user.id)
+    try:
+        context = build_ai_candidate_compare_context(
+            session,
+            employer_id=company.id,
+            vacancy_id=vacancy_id,
+            candidate_ids=body.candidate_ids,
+        )
+        return get_ai_candidate_compare(context)
+    except AiCandidateCompareVacancyNotFoundError:
+        raise api_error(404, "VACANCY_NOT_FOUND", "Vacancy not found") from None
+    except AiCandidateCompareCandidateNotFoundError:
+        raise api_error(
+            404, "CANDIDATE_NOT_FOUND", "Candidate not found or unavailable"
+        ) from None
+    except AiCandidateCompareUnavailableError:
+        raise api_error(
+            503,
+            "AI_CANDIDATE_COMPARE_UNAVAILABLE",
+            "AI candidate comparison is temporarily unavailable.",
+        ) from None
+    except SQLAlchemyError:
+        raise api_error(500, "DATABASE_ERROR", "Database operation failed") from None
 
 
 def _require_owned_vacancy(session: Session, user_id: UUID, vacancy_id: UUID) -> EmployerProfile:

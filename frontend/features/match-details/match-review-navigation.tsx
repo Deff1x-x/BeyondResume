@@ -18,16 +18,16 @@ export function MatchReviewNavigation({
   const scorecardHref = `/employer/matches/${encodeURIComponent(candidateId)}/scorecard?${query}`;
 
   const tabClass = (isActive: boolean) =>
-    `rounded-lg px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 ${
+    `rounded-lg px-3 py-2 text-sm font-medium transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 ${
       isActive
-        ? "bg-background text-ink shadow-sm"
-        : "text-secondary hover:bg-background/70 hover:text-ink"
+        ? "bg-surface text-ink shadow-sm"
+        : "text-secondary hover:bg-surface/80 hover:text-ink"
     }`;
 
   return (
     <nav
       aria-label="Candidate workspace"
-      className="flex w-fit flex-wrap rounded-xl border border-border bg-surface-subtle p-1"
+      className="flex w-fit max-w-full flex-wrap rounded-xl border border-border bg-surface-subtle p-1"
     >
       <Link
         href={reviewHref}

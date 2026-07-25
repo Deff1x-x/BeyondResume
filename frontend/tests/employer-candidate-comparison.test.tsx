@@ -14,6 +14,12 @@ import type {
   VacancyMatch
 } from "@/lib/api/types/employer";
 
+vi.mock("@/features/employer/ai-candidate-compare-section", () => ({
+  AiCandidateCompareSection: () => (
+    <div data-testid="ai-candidate-compare-section-stub">AI Candidate Compare stub</div>
+  )
+}));
+
 const hooksSpies = vi.hoisted(() => ({
   shortlistQuery: vi.fn(),
   matchesQuery: vi.fn(),
@@ -494,9 +500,15 @@ describe("CandidateComparisonView", () => {
       />
     );
 
-    expect(screen.getByRole("heading", { name: "Compare candidates" })).toBeInTheDocument();
-    const headings = screen.getAllByRole("heading", { level: 2 }).map((node) => node.textContent);
-    expect(headings).toEqual(["Bea Chen", "Alex Morgan"]);
+    expect(screen.getByRole("heading", { name: "Candidate comparison" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Deterministic comparison" })
+    ).toBeInTheDocument();
+    const candidateHeadings = screen
+      .getAllByRole("heading", { level: 2 })
+      .map((node) => node.textContent)
+      .filter((text) => text === "Bea Chen" || text === "Alex Morgan");
+    expect(candidateHeadings).toEqual(["Bea Chen", "Alex Morgan"]);
 
     expect(screen.getByText("74%")).toBeInTheDocument();
     expect(screen.getByText("82%")).toBeInTheDocument();
@@ -557,7 +569,10 @@ describe("CandidateComparisonView", () => {
       />
     );
 
-    const headings = screen.getAllByRole("heading", { level: 2 }).map((node) => node.textContent);
+    const headings = screen
+      .getAllByRole("heading", { level: 2 })
+      .map((node) => node.textContent)
+      .filter((text) => text !== "Deterministic comparison");
     expect(headings).toEqual(["Alex Morgan", "Bea Chen", "Chris Diaz", "Dana Lee"]);
     expect(
       screen.queryByText("Only the first four shortlisted candidates are shown.")
@@ -583,7 +598,10 @@ describe("CandidateComparisonView", () => {
     );
 
     expect(screen.getByText("Only the first four shortlisted candidates are shown.")).toBeInTheDocument();
-    const headings = screen.getAllByRole("heading", { level: 2 }).map((node) => node.textContent);
+    const headings = screen
+      .getAllByRole("heading", { level: 2 })
+      .map((node) => node.textContent)
+      .filter((text) => text !== "Deterministic comparison");
     expect(headings).toEqual(["Evan Park", "Alex Morgan", "Bea Chen", "Chris Diaz"]);
     expect(screen.queryByRole("heading", { name: "Dana Lee" })).not.toBeInTheDocument();
   });
@@ -726,11 +744,11 @@ describe("CandidateComparisonView", () => {
     expect(
       screen.getByRole("region", { name: "Candidate comparison table" })
     ).toBeInTheDocument();
-    expect(screen.getByRole("heading", { level: 1, name: "Compare candidates" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "Candidate comparison" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { level: 2, name: "Alex Morgan" })).toBeInTheDocument();
   });
 
-  it("does not invoke match-details or AI explanation hooks", () => {
+  it("does not invoke match-details or legacy AI explanation hooks", () => {
     readyQueries({ shortlistEntries: fiveEntries.slice(0, 2) });
     render(
       <CandidateComparisonView
@@ -744,7 +762,7 @@ describe("CandidateComparisonView", () => {
     expect(matchesQuery).toHaveBeenCalled();
     expect(matchDetailsQuery).not.toHaveBeenCalled();
     expect(matchExplanationQuery).not.toHaveBeenCalled();
-    expect(screen.queryByText(/AI/i)).not.toBeInTheDocument();
+    expect(screen.getByTestId("ai-candidate-compare-section-stub")).toBeInTheDocument();
     expect(screen.queryByText(/explanation/i)).not.toBeInTheDocument();
   });
 });

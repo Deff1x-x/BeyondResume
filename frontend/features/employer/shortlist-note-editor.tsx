@@ -64,11 +64,8 @@ export function ShortlistNoteEditor({
     noteMutation.isError && noteMutation.variables?.candidateId === candidateId;
 
   return (
-    <div className="w-full space-y-2">
-      <label
-        htmlFor={textareaId}
-        className="block text-sm font-medium text-ink"
-      >
+    <div className="w-full space-y-3">
+      <label htmlFor={textareaId} className="block text-sm font-medium text-ink">
         Private note for {labelTarget}
       </label>
       <textarea
@@ -78,7 +75,7 @@ export function ShortlistNoteEditor({
         maxLength={NOTE_MAX_LENGTH}
         disabled={pendingThis}
         aria-busy={pendingThis || undefined}
-        className={cn(controlClassName, "min-h-20 px-3 py-2")}
+        className={cn(controlClassName, "min-h-24 px-3 py-3")}
         onChange={(event) => setDraft(event.target.value)}
       />
       <div className="flex flex-wrap items-center gap-3">
@@ -99,7 +96,7 @@ export function ShortlistNoteEditor({
         >
           {pendingThis ? "Saving..." : "Save note"}
         </Button>
-        <p className="text-xs text-muted">
+        <p className="text-xs leading-5 text-muted">
           Visible only to your team. {draft.length}/{NOTE_MAX_LENGTH}
         </p>
       </div>

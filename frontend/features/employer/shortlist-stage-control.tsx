@@ -16,6 +16,8 @@ type ShortlistStageControlProps = Readonly<{
   candidateId: string;
   stage: EmployerCandidateStage;
   candidateLabel?: string;
+  /** Hide status badge when the parent card already shows stage. */
+  compact?: boolean;
 }>;
 
 function errorMessage(error: unknown): string {
@@ -27,12 +29,18 @@ function errorMessage(error: unknown): string {
 
 function stageBadgeVariant(
   stage: EmployerCandidateStage
-): "neutral" | "success" | "danger" {
+): "neutral" | "success" | "danger" | "primary" | "warning" {
   if (stage === "hired") {
     return "success";
   }
   if (stage === "rejected") {
     return "danger";
+  }
+  if (stage === "interview" || stage === "offer") {
+    return "primary";
+  }
+  if (stage === "screening") {
+    return "warning";
   }
   return "neutral";
 }
@@ -41,7 +49,8 @@ export function ShortlistStageControl({
   vacancyId,
   candidateId,
   stage,
-  candidateLabel
+  candidateLabel,
+  compact = false
 }: ShortlistStageControlProps) {
   const updateMutation = useUpdateEmployerShortlistStage(vacancyId);
   const pendingThis =
@@ -50,10 +59,12 @@ export function ShortlistStageControl({
 
   return (
     <div className="space-y-2">
-      <div className="flex flex-wrap items-center gap-2">
-        <Badge variant={stageBadgeVariant(stage)}>
-          {EMPLOYER_CANDIDATE_STAGE_LABELS[stage]}
-        </Badge>
+      <div className={cn("flex flex-wrap items-center gap-2", compact && "min-h-control")}>
+        {!compact ? (
+          <Badge variant={stageBadgeVariant(stage)}>
+            {EMPLOYER_CANDIDATE_STAGE_LABELS[stage]}
+          </Badge>
+        ) : null}
         <select
           value={stage}
           disabled={pendingThis}

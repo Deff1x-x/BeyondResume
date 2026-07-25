@@ -73,7 +73,7 @@ export function AiHiringWorkspace({ candidateId, vacancyId, enabled }: AiHiringW
 
   if (detailsQuery.isLoading) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-8">
         <PageHeader
           eyebrow="AI Hiring"
           title="AI Hiring"
@@ -87,7 +87,7 @@ export function AiHiringWorkspace({ candidateId, vacancyId, enabled }: AiHiringW
 
   if (detailsQuery.isError || !detailsQuery.data) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-8">
         <PageHeader
           eyebrow="AI Hiring"
           title="AI Hiring"
@@ -98,6 +98,7 @@ export function AiHiringWorkspace({ candidateId, vacancyId, enabled }: AiHiringW
           role="alert"
           title="Candidate context unavailable"
           description={detailsErrorMessage(detailsQuery.error)}
+          className="bg-surface py-10"
         />
       </div>
     );
@@ -109,7 +110,7 @@ export function AiHiringWorkspace({ candidateId, vacancyId, enabled }: AiHiringW
   );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <PageHeader
         eyebrow="AI Hiring"
         title="AI Hiring"
@@ -117,15 +118,15 @@ export function AiHiringWorkspace({ candidateId, vacancyId, enabled }: AiHiringW
         breadcrumb={breadcrumb}
       />
       <MatchReviewNavigation candidateId={candidateId} vacancyId={vacancyId} active="ai" />
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_20rem] xl:gap-8">
         <main>
           <AiHiringIntelligenceSection candidateId={candidateId} vacancyId={vacancyId} enabled />
         </main>
 
         <aside className="space-y-6">
           <Card aria-labelledby="ai-context-title">
-            <CardContent className="p-6">
-              <p className="text-xs font-medium uppercase tracking-[0.12em] text-secondary">
+            <CardContent className="p-5 sm:p-6">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-secondary">
                 Candidate
               </p>
               <h2
@@ -138,8 +139,8 @@ export function AiHiringWorkspace({ candidateId, vacancyId, enabled }: AiHiringW
                 {details.candidate.headline?.trim() || "Candidate review for the selected vacancy."}
               </p>
               {topSkills.length > 0 ? (
-                <div className="mt-5 border-t border-border pt-4">
-                  <p className="text-xs font-medium uppercase tracking-[0.12em] text-secondary">
+                <div className="mt-5 border-t border-border pt-5">
+                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-secondary">
                     Top skills
                   </p>
                   <ul className="mt-3 flex flex-wrap gap-2" aria-label="Top skills">

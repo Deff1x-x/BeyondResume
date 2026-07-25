@@ -402,26 +402,28 @@ function VacancyMatches({ vacancyId }: Readonly<{ vacancyId: string }>) {
   const visibleMatches =
     filter === "saved" ? matches.filter((match) => savedIds.has(match.candidate_id)) : matches;
   const shortlistHref = `/employer/vacancies/${encodeURIComponent(vacancyId)}/shortlist`;
+  const shortlistCount = shortlistQuery.data?.entries.length ?? 0;
+  const shortlistReady = !shortlistQuery.isError && shortlistQuery.isSuccess;
 
   return (
     <section
       id={`vacancy-matches-${vacancyId}`}
       aria-labelledby={`vacancy-matches-title-${vacancyId}`}
-      className="space-y-5 border-t border-border pt-5"
+      className="space-y-6 border-t border-border pt-6"
     >
-      <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">
             Candidate review
           </p>
           <h3
             id={`vacancy-matches-title-${vacancyId}`}
-            className="mt-1 text-lg font-semibold tracking-tight text-ink"
+            className="mt-2 text-lg font-semibold tracking-tight text-ink"
           >
             Candidate matches
           </h3>
-          <p className="mt-1 text-sm leading-6 text-secondary">
-            Results are shown in the existing match order for this vacancy.
+          <p className="mt-2 text-sm leading-6 text-secondary">
+            Review matches, save a shortlist, then compare candidates with AI Hiring Analysis.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -430,11 +432,40 @@ function VacancyMatches({ vacancyId }: Readonly<{ vacancyId: string }>) {
               {matches.length} {matches.length === 1 ? "candidate" : "candidates"}
             </Badge>
           ) : null}
+          {shortlistReady ? (
+            <Badge variant="primary">
+              {shortlistCount} shortlisted
+            </Badge>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="rounded-card border border-border bg-surface p-5 shadow-card sm:p-6">
+        <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0 space-y-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="accent" aria-label="AI Hiring Analysis available">
+                AI Hiring Analysis
+              </Badge>
+              <span className="text-xs font-medium uppercase tracking-[0.12em] text-secondary">
+                Shortlist → Compare → AI
+              </span>
+            </div>
+            <p className="text-base font-semibold tracking-tight text-ink">
+              Compare shortlisted candidates
+            </p>
+            <p className="max-w-xl text-sm leading-6 text-secondary">
+              Open the shortlist to select 2–4 candidates for a side-by-side match table and an
+              AI hiring second opinion grounded in deterministic evidence.
+            </p>
+          </div>
           <Link
             href={shortlistHref}
-            className="inline-flex min-h-9 items-center rounded-button border border-border bg-surface px-3 text-sm font-medium text-ink transition hover:border-border-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2"
+            className="inline-flex min-h-control shrink-0 items-center justify-center gap-2 rounded-button border border-primary bg-primary px-5 text-sm font-semibold text-white shadow-sm shadow-primary/25 transition duration-200 hover:-translate-y-px hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2"
           >
+            <Icon name="spark" className="h-4 w-4" aria-hidden="true" />
             Open shortlist
+            <Icon name="arrow-right" className="h-4 w-4" aria-hidden="true" />
           </Link>
         </div>
       </div>
@@ -447,7 +478,7 @@ function VacancyMatches({ vacancyId }: Readonly<{ vacancyId: string }>) {
         <button
           type="button"
           aria-pressed={filter === "all"}
-          className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 ${filter === "all" ? "bg-background text-ink shadow-sm" : "text-secondary hover:bg-background/70 hover:text-ink"}`}
+          className={`rounded-lg px-3 py-2 text-sm font-medium transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 ${filter === "all" ? "bg-surface text-ink shadow-sm" : "text-secondary hover:bg-surface/80 hover:text-ink"}`}
           onClick={() => setFilter("all")}
         >
           All
@@ -455,7 +486,7 @@ function VacancyMatches({ vacancyId }: Readonly<{ vacancyId: string }>) {
         <button
           type="button"
           aria-pressed={filter === "saved"}
-          className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 ${filter === "saved" ? "bg-background text-ink shadow-sm" : "text-secondary hover:bg-background/70 hover:text-ink"}`}
+          className={`rounded-lg px-3 py-2 text-sm font-medium transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 ${filter === "saved" ? "bg-surface text-ink shadow-sm" : "text-secondary hover:bg-surface/80 hover:text-ink"}`}
           onClick={() => setFilter("saved")}
         >
           Saved
@@ -478,7 +509,7 @@ function VacancyMatches({ vacancyId }: Readonly<{ vacancyId: string }>) {
               Try again
             </Button>
           }
-          className="py-4"
+          className="bg-surface py-10"
         />
       ) : null}
 
@@ -486,7 +517,7 @@ function VacancyMatches({ vacancyId }: Readonly<{ vacancyId: string }>) {
         <EmptyState
           title="No candidate matches yet"
           description="No candidates currently match this vacancy."
-          className="py-6"
+          className="bg-surface py-10"
         />
       ) : null}
 
@@ -503,12 +534,12 @@ function VacancyMatches({ vacancyId }: Readonly<{ vacancyId: string }>) {
         <EmptyState
           title="No saved candidates in this vacancy."
           description="Save a candidate from Candidate Review to filter by Saved."
-          className="py-6"
+          className="bg-surface py-10"
         />
       ) : null}
 
       {visibleMatches.length > 0 ? (
-        <ul className="space-y-3">
+        <ul className="space-y-5">
           {visibleMatches.map((match) => (
             <MatchCard
               key={match.candidate_id}
@@ -539,8 +570,8 @@ function VacancyCard({
   const topMatch = matches.reduce((highest, match) => Math.max(highest, match.score), 0);
 
   return (
-    <Card className={cn("overflow-hidden bg-background", selected && "border-primary/40 ring-1 ring-primary/15")}>
-        <CardContent className="p-5">
+    <Card className={cn("overflow-hidden", selected && "border-primary/40 ring-1 ring-primary/15")}>
+        <CardContent className="p-5 sm:p-6">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0 space-y-2">
               <p className="break-words text-lg font-semibold tracking-tight text-ink">{vacancy.title}</p>
@@ -732,7 +763,7 @@ function EmployerDashboard({ enabled }: Readonly<{ enabled: boolean }>) {
         {vacancies.length === 0 ? (
           <EmptyState icon={<Icon name="employer" className="h-8 w-8" />} title="Create your first vacancy" description="Add an opening and its requirements to start discovering candidates through verified skills and evidence." primaryAction={<a href="#create-vacancy" className="inline-flex min-h-control items-center rounded-button bg-primary px-4 text-sm font-medium text-white shadow-sm shadow-primary/25 transition hover:-translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2">Create your first vacancy</a>} className="py-12" />
         ) : (
-          <>
+          <div className="space-y-12">
             <section aria-labelledby="vacancies-title">
               <div className="flex flex-wrap items-end justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">Hiring pipeline</p><h2 id="vacancies-title" className="mt-1 text-2xl font-semibold tracking-tight text-ink">Active vacancies</h2><p className="mt-2 text-sm leading-6 text-secondary">Review vacancy status, requirements, and current candidate matches.</p></div><Badge variant="primary">{activeVacancies} open</Badge></div>
               <ul className="mt-5 grid items-start gap-4 xl:grid-cols-2">{vacancies.map((vacancy, index) => <li id={`vacancy-card-${vacancy.id}`} key={vacancy.id}><VacancyCard vacancy={vacancy} requirementsCount={requirementQueries[index]?.data?.length ?? 0} matches={matchQueries[index]?.data?.matches ?? []} selected={selectedVacancyId === vacancy.id} onSelect={() => openMatches(vacancy.id)} /></li>)}</ul>
@@ -748,7 +779,7 @@ function EmployerDashboard({ enabled }: Readonly<{ enabled: boolean }>) {
               ) : null}
             </section>
             <TopMatchesByVacancy vacancies={vacancies} matchesByVacancy={matchQueries.map((query) => query.data?.matches ?? [])} onViewMatches={openMatches} />
-          </>
+          </div>
         )}
       </div>
     </section>

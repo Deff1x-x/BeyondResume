@@ -59,7 +59,9 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       )}
       {...props}
     >
-      <span className={cn(loading && "invisible")}>{children}</span>
+      <span className={cn("inline-flex items-center gap-2", loading && "invisible")}>
+        {children}
+      </span>
       {loading ? (
         <span
           className="absolute inset-0 flex items-center justify-center"

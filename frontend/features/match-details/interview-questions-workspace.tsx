@@ -66,8 +66,8 @@ function questionsErrorMessage(error: unknown): string {
 
 function QuestionsSkeleton() {
   return (
-    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]" role="status" aria-label="Loading interview questions">
-      <div className="space-y-6">
+    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_20rem] xl:gap-8" role="status" aria-label="Loading interview questions">
+      <div className="space-y-8">
         <SkeletonCard className="min-h-72" />
         <SkeletonCard className="min-h-52" />
       </div>
@@ -196,7 +196,7 @@ export function InterviewQuestionsWorkspace({
 
   if (detailsQuery.isLoading || (questionsQuery.isLoading && !questionsQuery.data)) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-8">
         <PageHeader
           eyebrow="Interview preparation"
           title="AI Interview Questions"
@@ -210,7 +210,7 @@ export function InterviewQuestionsWorkspace({
 
   if (detailsQuery.isError || !detailsQuery.data) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-8">
         <PageHeader
           eyebrow="Interview preparation"
           title="AI Interview Questions"
@@ -232,7 +232,7 @@ export function InterviewQuestionsWorkspace({
   const questionCount = questionsQuery.data?.questions.length ?? 0;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <PageHeader
         eyebrow="Interview preparation"
         title="AI Interview Questions"
@@ -240,10 +240,10 @@ export function InterviewQuestionsWorkspace({
         breadcrumb={breadcrumb}
       />
       <MatchReviewNavigation candidateId={candidateId} vacancyId={vacancyId} active="questions" />
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_20rem] xl:gap-8">
         <main className="space-y-8">
           <Card>
-            <CardContent className="flex flex-wrap items-start justify-between gap-5 p-6">
+            <CardContent className="flex flex-wrap items-start justify-between gap-5 p-5 sm:p-6">
               <div className="flex min-w-0 gap-3">
                 <span
                   aria-hidden="true"
@@ -278,7 +278,7 @@ export function InterviewQuestionsWorkspace({
           </Card>
 
           {questionsQuery.isError && !questionsQuery.data ? (
-            <div role="status" className="rounded-card border border-border bg-surface p-6 shadow-card">
+            <div role="status" className="rounded-card border border-border bg-surface p-5 shadow-card sm:p-6">
               <p className="font-medium text-ink">Interview questions are temporarily unavailable.</p>
               <p className="mt-2 text-sm leading-6 text-secondary">
                 {questionsErrorMessage(questionsQuery.error)}
@@ -297,7 +297,7 @@ export function InterviewQuestionsWorkspace({
           ) : null}
 
           {refreshMutation.isError ? (
-            <div role="status" className="rounded-card border border-border bg-surface p-6 shadow-card">
+            <div role="status" className="rounded-card border border-border bg-surface p-5 shadow-card sm:p-6">
               <p className="font-medium text-ink">Could not regenerate interview questions.</p>
               <p className="mt-2 text-sm leading-6 text-secondary">
                 {questionsErrorMessage(refreshMutation.error)} Previous suggestions remain available.
@@ -348,9 +348,9 @@ export function InterviewQuestionsWorkspace({
           </div>
         </main>
 
-        <aside className="space-y-6">
+        <aside className="space-y-8">
           <Card aria-labelledby="iq-context-title">
-            <CardContent className="p-6">
+            <CardContent className="p-5 sm:p-6">
               <p className="text-xs font-medium uppercase tracking-[0.12em] text-secondary">
                 Candidate
               </p>
@@ -368,7 +368,7 @@ export function InterviewQuestionsWorkspace({
           </Card>
 
           <Card aria-labelledby="iq-match-title">
-            <CardContent className="p-6">
+            <CardContent className="p-5 sm:p-6">
               <h2
                 id="iq-match-title"
                 className="text-xs font-medium uppercase tracking-[0.12em] text-secondary"
@@ -400,7 +400,7 @@ export function InterviewQuestionsWorkspace({
           </Card>
 
           <Card>
-            <CardContent className="p-6">
+            <CardContent className="p-5 sm:p-6">
               <p className="text-sm font-medium text-ink">Preparation only</p>
               <p className="mt-2 text-sm leading-6 text-secondary">
                 These questions prepare the interview. They do not score the candidate or fill

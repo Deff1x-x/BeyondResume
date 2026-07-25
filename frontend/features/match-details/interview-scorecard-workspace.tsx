@@ -221,7 +221,7 @@ export function EmployerInterviewScorecardWorkspace({
 
   if (detailsQuery.isLoading || scorecardQuery.isLoading) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-8">
         <PageHeader
           eyebrow="Interview Scorecard"
           title="Interview Scorecard"
@@ -237,7 +237,7 @@ export function EmployerInterviewScorecardWorkspace({
 
   if (detailsQuery.isError || !detailsQuery.data) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-8">
         <PageHeader
           eyebrow="Interview Scorecard"
           title="Interview Scorecard"
@@ -252,6 +252,7 @@ export function EmployerInterviewScorecardWorkspace({
               ? detailsQuery.error.message
               : "Candidate context could not be loaded. Please try again."
           }
+          className="bg-surface py-10"
         />
       </div>
     );
@@ -259,7 +260,7 @@ export function EmployerInterviewScorecardWorkspace({
 
   if (scorecardQuery.isError) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-8">
         <PageHeader
           eyebrow="Interview Scorecard"
           title="Interview Scorecard"
@@ -275,6 +276,7 @@ export function EmployerInterviewScorecardWorkspace({
               ? scorecardQuery.error.message
               : "The interview scorecard could not be loaded. Please try again."
           }
+          className="bg-surface py-10"
           primaryAction={
             <Button type="button" variant="secondary" onClick={() => void scorecardQuery.refetch()}>
               Try again
@@ -292,7 +294,7 @@ export function EmployerInterviewScorecardWorkspace({
   const shortlistHref = `/employer/vacancies/${encodeURIComponent(vacancyId)}/shortlist`;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <PageHeader
         eyebrow="Interview Scorecard"
         title="Interview Scorecard"
@@ -304,7 +306,7 @@ export function EmployerInterviewScorecardWorkspace({
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
         <main>
           <Card>
-            <CardContent className="space-y-6 p-5">
+            <CardContent className="space-y-6 p-5 sm:p-6">
               <div>
                 <h2 className="text-lg font-semibold text-ink">Ratings</h2>
                 <p className="mt-1 text-sm text-secondary">
@@ -480,7 +482,7 @@ export function EmployerInterviewScorecardWorkspace({
           </Card>
         </main>
 
-        <aside className="space-y-6">
+        <aside className="space-y-8">
           <Card aria-labelledby="scorecard-context-title">
             <CardContent className="p-5">
               <p className="text-sm font-semibold uppercase tracking-[0.14em] text-primary">
