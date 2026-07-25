@@ -18,6 +18,7 @@ import {
   listVacancyShortlist,
   removeCandidateFromShortlist,
   saveCandidateToShortlist,
+  updateEmployerShortlistNote,
   updateEmployerShortlistStage
 } from "@/lib/api/employer";
 import type {
@@ -281,6 +282,33 @@ export function useUpdateEmployerShortlistStage(vacancyId: string) {
       candidateId: string;
       stage: EmployerCandidateStage;
     }) => updateEmployerShortlistStage(vacancyId, candidateId, stage),
+    onSuccess: (entry) => {
+      queryClient.setQueryData<EmployerShortlistResponse>(
+        vacancyShortlistQueryKey(vacancyId),
+        (current) =>
+          current
+            ? {
+                entries: current.entries.map((item) =>
+                  item.candidate_id === entry.candidate_id ? entry : item
+                )
+              }
+            : current
+      );
+    }
+  });
+}
+
+export function useUpdateEmployerShortlistNote(vacancyId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      candidateId,
+      note
+    }: {
+      candidateId: string;
+      note: string | null;
+    }) => updateEmployerShortlistNote(vacancyId, candidateId, { note }),
     onSuccess: (entry) => {
       queryClient.setQueryData<EmployerShortlistResponse>(
         vacancyShortlistQueryKey(vacancyId),

@@ -9,6 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { SkeletonCard, SkeletonListRow } from "@/components/ui/skeleton";
+import { ShortlistNoteEditor } from "@/features/employer/shortlist-note-editor";
 import { ShortlistSaveButton } from "@/features/employer/shortlist-save-button";
 import { ShortlistStageControl } from "@/features/employer/shortlist-stage-control";
 import { EvidenceCard } from "@/features/match-details/evidence-card";
@@ -92,6 +93,17 @@ function MatchHero({
               />
             ) : null}
           </div>
+          {savedEntry ? (
+            <div className="mt-5 max-w-2xl">
+              <ShortlistNoteEditor
+                key={`${vacancyId}:${candidateId}`}
+                vacancyId={vacancyId}
+                candidateId={candidateId}
+                note={savedEntry.note}
+                candidateLabel={details.candidate.name}
+              />
+            </div>
+          ) : null}
         </div>
         <div className="w-full max-w-sm shrink-0 rounded-2xl border border-primary/15 bg-background/90 px-5 py-4">
           <div className="flex items-center gap-4">

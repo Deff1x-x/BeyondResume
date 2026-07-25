@@ -5,6 +5,7 @@ import type {
   AiMatchExplanation,
   EmployerCandidateStage,
   EmployerShortlistEntry,
+  EmployerShortlistNoteUpdateRequest,
   EmployerShortlistResponse,
   MatchDetailsResponse,
   SkillOption,
@@ -130,6 +131,20 @@ export function updateEmployerShortlistStage(
     {
       method: "PATCH",
       body: { stage }
+    }
+  );
+}
+
+export function updateEmployerShortlistNote(
+  vacancyId: string,
+  candidateId: string,
+  request: EmployerShortlistNoteUpdateRequest
+): Promise<EmployerShortlistEntry> {
+  return apiRequest<EmployerShortlistEntry>(
+    `/employer/vacancies/${vacancyId}/shortlist/${candidateId}/note`,
+    {
+      method: "PATCH",
+      body: { note: request.note }
     }
   );
 }

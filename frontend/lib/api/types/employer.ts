@@ -192,8 +192,13 @@ export type EmployerShortlistEntry = {
   vacancy_id: string;
   candidate_id: string;
   stage: EmployerCandidateStage;
+  note: string | null;
   created_at: string;
   updated_at: string;
+};
+
+export type EmployerShortlistNoteUpdateRequest = {
+  note: string | null;
 };
 
 export type EmployerShortlistResponse = {

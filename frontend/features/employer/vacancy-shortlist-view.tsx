@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { SkeletonCard, SkeletonListRow } from "@/components/ui/skeleton";
+import { ShortlistNoteEditor } from "@/features/employer/shortlist-note-editor";
 import { ShortlistStageControl } from "@/features/employer/shortlist-stage-control";
 import { VacancyMatchCard } from "@/features/employer/vacancy-match-card";
 import { ApiClientError } from "@/lib/api/error";
@@ -244,17 +245,25 @@ export function VacancyShortlistView({ vacancyId, enabled }: VacancyShortlistVie
                 match={match}
                 vacancyId={vacancyId}
                 actions={
-                  <div className="flex w-full flex-wrap items-start gap-3 sm:w-auto">
-                    <ShortlistStageControl
+                  <div className="w-full space-y-4 sm:w-auto">
+                    <div className="flex w-full flex-wrap items-start gap-3 sm:w-auto">
+                      <ShortlistStageControl
+                        vacancyId={vacancyId}
+                        candidateId={entry.candidate_id}
+                        stage={entry.stage}
+                        candidateLabel={match.candidate_name}
+                      />
+                      <ShortlistRemoveButton
+                        vacancyId={vacancyId}
+                        candidateId={entry.candidate_id}
+                        candidateName={match.candidate_name}
+                      />
+                    </div>
+                    <ShortlistNoteEditor
                       vacancyId={vacancyId}
                       candidateId={entry.candidate_id}
-                      stage={entry.stage}
+                      note={entry.note}
                       candidateLabel={match.candidate_name}
-                    />
-                    <ShortlistRemoveButton
-                      vacancyId={vacancyId}
-                      candidateId={entry.candidate_id}
-                      candidateName={match.candidate_name}
                     />
                   </div>
                 }

@@ -60,6 +60,14 @@ vi.mock("@/lib/employer/hooks", () => ({
     variables: undefined,
     reset: vi.fn()
   }),
+  useUpdateEmployerShortlistNote: () => ({
+    mutate: vi.fn(),
+    isPending: false,
+    isError: false,
+    error: null,
+    variables: undefined,
+    reset: vi.fn()
+  }),
   vacancyMatchesQueryKey: (vacancyId: string) => ["employer", "vacancy", vacancyId, "matches"],
   vacancyRequirementsQueryKey: (vacancyId: string) => ["employer", "vacancy", vacancyId, "requirements"]
 }));
