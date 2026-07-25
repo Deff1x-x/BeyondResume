@@ -253,4 +253,8 @@ def test_openapi_contains_stage_three_routes(client: TestClient) -> None:
         "/api/v1/me",
     }.issubset(schema["paths"])
     assert "password_hash" not in str(schema)
-    assert "event_type" not in str(schema)
+    # AuditEvent internals must not leak into OpenAPI. Career Companion progress
+    # events intentionally expose a public `event_type` field.
+    component_names = set((schema.get("components") or {}).get("schemas") or {})
+    assert "AuditEvent" not in component_names
+    assert not any(path.startswith("/api/v1/audit") for path in schema["paths"])

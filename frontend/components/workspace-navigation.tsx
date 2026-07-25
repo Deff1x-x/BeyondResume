@@ -36,7 +36,7 @@ const candidateNavigation: NavigationGroup[] = [
       { href: "/#github-section-title", label: "GitHub", kind: "anchor" },
       { href: "/#resume-section-title", label: "Resume", kind: "anchor" },
       { href: "/#evidence-hub-section-title", label: "Evidence", kind: "anchor" },
-      { href: "/#roadmap-section-title", label: "Roadmap", kind: "anchor" }
+      { href: "/#career-companion-section", label: "Career Companion", kind: "anchor" }
     ]
   },
   {
@@ -79,11 +79,11 @@ function NavigationGroups({ role, mobile = false }: Readonly<{ role: WorkspaceRo
             {group.items.map((item) => {
               const active = isActiveRoute(pathname, item);
               const className = cn(
-                "relative flex min-h-10 items-center rounded-control px-3 text-sm font-medium transition-colors duration-fast ease-standard",
+                "relative flex min-h-10 items-center rounded-control px-3 text-sm font-medium transition-all duration-fast ease-standard",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2",
                 active
                   ? "bg-surface text-ink shadow-sm before:absolute before:inset-y-1.5 before:left-0 before:w-[3px] before:rounded-full before:bg-accent"
-                  : "text-secondary hover:bg-surface hover:text-ink"
+                  : "text-secondary hover:translate-x-0.5 hover:bg-surface hover:text-ink motion-reduce:hover:translate-x-0"
               );
               return (
                 <li key={item.href}>
@@ -148,7 +148,7 @@ export function WorkspaceNavigation({ role, email }: Readonly<{ role: WorkspaceR
             <summary className="flex min-h-10 cursor-pointer list-none items-center rounded-control border border-border bg-surface px-3 text-sm font-medium text-ink marker:content-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2">
               Menu
             </summary>
-            <div className="absolute right-0 mt-2 max-h-[calc(100vh-5rem)] w-[min(22rem,calc(100vw-2rem))] overflow-y-auto rounded-card border border-border bg-surface p-4 shadow-card">
+            <div className="absolute right-0 mt-2 max-h-[calc(100vh-5rem)] w-[min(22rem,calc(100vw-2rem))] overflow-y-auto rounded-card border border-border bg-surface p-4 shadow-card page-enter">
               <nav aria-label={`${workspaceName} navigation`}>
                 <NavigationGroups role={role} mobile />
               </nav>

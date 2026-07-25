@@ -39,9 +39,9 @@ export function RoadmapCard({ items }: RoadmapCardProps) {
     <Card aria-labelledby="roadmap-section-title">
       <CardContent className="space-y-5 p-5 sm:p-6">
         <SectionHeader
-          title="Roadmap"
+          title="Development suggestions"
           titleId="roadmap-section-title"
-          description="Existing development suggestions from the candidate roadmap."
+          description="Deterministic gap suggestions from the candidate match. Career Companion owns the full growth plan on the candidate side."
           size="md"
         />
 
@@ -53,9 +53,9 @@ export function RoadmapCard({ items }: RoadmapCardProps) {
           />
         ) : (
           <>
-          <ol id="roadmap-preview" className="space-y-4">
+          <ol id="roadmap-preview" className="space-y-3">
             {visibleItems.map((item) => (
-              <li key={item.id} className="border-t border-border pt-4 first:border-t-0 first:pt-0">
+              <li key={item.id} className="surface-lift rounded-card border border-border bg-background/60 px-4 py-4 first:mt-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge variant={priorityVariant(item.priority)}>
                     {priorityLabel(item.priority)}

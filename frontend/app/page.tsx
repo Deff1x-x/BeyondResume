@@ -6,11 +6,11 @@ import { PageHeader } from "@/components/ui/page-header";
 import { SkeletonText } from "@/components/ui/skeleton";
 import { WorkspaceShell } from "@/components/workspace-shell";
 import { CandidateOverviewSection } from "@/features/candidate-overview-section";
+import { CareerCompanionSection } from "@/features/career-companion/career-companion-section";
 import { EmployerSection } from "@/features/employer-section";
 import { EvidenceHubSection } from "@/features/evidence-hub/evidence-hub-section";
 import { GitHubSection } from "@/features/github-section";
 import { ResumeSection } from "@/features/resume-section";
-import { RoadmapSection } from "@/features/roadmap-section";
 import { useCurrentUser } from "@/lib/auth/hooks";
 
 export default function HomePage() {
@@ -35,12 +35,14 @@ export default function HomePage() {
           <div className="lg:col-span-2">
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">Manage your evidence</p>
             <h2 className="mt-1 text-2xl font-semibold tracking-tight text-ink">Sources and development</h2>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-secondary">Connect sources, review collected evidence, and use your existing roadmap when you want to go deeper.</p>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-secondary">Connect sources, review collected evidence, and use AI Career Companion when you want a grounded growth plan.</p>
           </div>
           <ResumeSection enabled />
           <GitHubSection enabled />
           <EvidenceHubSection enabled />
-          <RoadmapSection enabled />
+          <div className="lg:col-span-2">
+            <CareerCompanionSection enabled />
+          </div>
         </section>
       </>}
     </WorkspaceShell>

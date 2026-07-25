@@ -106,6 +106,9 @@ def run_github_scan_job(session: Session, job_id: UUID) -> Job:
         session.rollback()
         return fail_running_job(session, job, "GITHUB_ANALYSIS_ERROR", "GitHub repository analysis failed")
 
+    from app.services.career_companion_hooks import maybe_refresh_companion_after_evidence
+
+    maybe_refresh_companion_after_evidence(session, job.candidate_id)
     return complete_running_job(session, job)
 
 

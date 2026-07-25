@@ -92,14 +92,14 @@ function dashboardCards(data: CandidateDashboardResponse): DashboardCardProps[] 
       actionLabel: "Open Skill Passport"
     },
     {
-      title: "Roadmap",
-      summary: `${data.roadmap.items} recommendations`,
+      title: "Career Companion",
+      summary: `${data.roadmap.items} active recommendations`,
       detail:
         data.roadmap.items > 0
-          ? "Deterministic next steps based on your passport."
+          ? "Evidence-guided next steps for your target."
           : "Collect more evidence to unlock recommendations.",
-      href: "#roadmap-section-title",
-      actionLabel: "Open roadmap"
+      href: "#career-companion-section",
+      actionLabel: "Open Companion"
     }
   ];
 }

@@ -502,7 +502,7 @@ describe("Roadmap separation from evidence suggestions", () => {
         ]}
       />
     );
-    const roadmap = screen.getByRole("heading", { name: "Roadmap" }).closest("[aria-labelledby]");
+    const roadmap = screen.getByRole("heading", { name: "Development suggestions" }).closest("[aria-labelledby]");
     expect(roadmap).not.toBeNull();
     expect(
       within(roadmap as HTMLElement).queryByText("Ways this skill could be evidenced")

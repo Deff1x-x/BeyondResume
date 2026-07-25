@@ -145,6 +145,11 @@ async def run_resume_parse_job(session: Session, job_id: UUID) -> Job:
     except (ValueError, SQLAlchemyError):
         resume.extracted_text = None
         return fail_job(session, job, "INTERNAL_ERROR", "Resume processing failed")
+
+    if resume.candidate_id is not None:
+        from app.services.career_companion_hooks import maybe_refresh_companion_after_evidence
+
+        maybe_refresh_companion_after_evidence(session, resume.candidate_id)
     return complete_job(session, job)
 
 
