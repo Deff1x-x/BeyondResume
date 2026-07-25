@@ -346,3 +346,51 @@ def test_put_does_not_require_shortlist(
         assert shortlist is None
     finally:
         session.close()
+
+
+def test_scorecard_rejects_shell_and_suspended_candidates(
+    scorecard_client: tuple[TestClient, ScorecardApiContext],
+) -> None:
+    client, context = scorecard_client
+    session = context.new_session()
+    try:
+        shell_user = User(
+            id=uuid4(),
+            email=f"scorecard-shell-{uuid4()}@example.com",
+            password_hash="hash",
+            role="candidate",
+            status="active",
+        )
+        suspended_user = User(
+            id=uuid4(),
+            email=f"scorecard-suspended-{uuid4()}@example.com",
+            password_hash="hash",
+            role="candidate",
+            status="suspended",
+        )
+        shell = CandidateProfile(
+            id=uuid4(),
+            user_id=shell_user.id,
+            display_name=None,
+            onboarding_status=OnboardingStatus.PROFILE_REQUIRED,
+        )
+        suspended = CandidateProfile(
+            id=uuid4(),
+            user_id=suspended_user.id,
+            display_name="Suspended Scorecard",
+            onboarding_status=OnboardingStatus.PROFILE_REQUIRED,
+        )
+        session.add_all([shell_user, suspended_user, shell, suspended])
+        session.commit()
+        shell_id = shell.id
+        suspended_id = suspended.id
+    finally:
+        session.close()
+
+    for candidate_id in (shell_id, suspended_id):
+        put_response = client.put(_path(context.vacancy.id, candidate_id), json=_payload())
+        get_response = client.get(_path(context.vacancy.id, candidate_id))
+        assert put_response.status_code == 404
+        assert put_response.json()["error"]["code"] == "CANDIDATE_NOT_FOUND"
+        assert get_response.status_code == 404
+        assert get_response.json()["error"]["code"] == "CANDIDATE_NOT_FOUND"

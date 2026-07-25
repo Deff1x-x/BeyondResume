@@ -13,7 +13,6 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models.candidate_profile import CandidateProfile
 from app.models.evidence_skill_link import EvidenceSkillLink
 from app.schemas.employer import (
     EvidenceSuggestionResponse,
@@ -36,6 +35,11 @@ from app.schemas.skill_passport import (
     SkillPassportSkillResponse,
 )
 from app.services.employer import list_vacancy_requirements
+from app.services.employer_candidate_eligibility import (
+    EmployerCandidateUnavailableError,
+    require_employer_eligible_candidate,
+    trimmed_candidate_display_name,
+)
 from app.services.matching import MatchRequirement, match_passport_to_requirements
 from app.services.roadmap import build_roadmap_from_match
 from app.services.signal_summaries import public_categories_for_evidence
@@ -48,18 +52,17 @@ LinkContextIndex = dict[tuple[UUID, UUID], list[Mapping[str, object] | None]]
 
 
 class MatchDetailsCandidateNotFoundError(Exception):
-    """Raised when the candidate profile does not exist."""
+    """Raised when the candidate is missing or not eligible for employer workflows."""
 
 
 def build_match_details(
     session: Session, *, vacancy_id: UUID, candidate_id: UUID
 ) -> MatchDetailsResponse:
     """Aggregate explainable match context for one candidate against one vacancy."""
-    candidate = session.execute(
-        select(CandidateProfile).where(CandidateProfile.id == candidate_id)
-    ).scalar_one_or_none()
-    if candidate is None:
-        raise MatchDetailsCandidateNotFoundError
+    try:
+        candidate = require_employer_eligible_candidate(session, candidate_id)
+    except EmployerCandidateUnavailableError as error:
+        raise MatchDetailsCandidateNotFoundError from error
 
     passport = build_passport(session, candidate_id)
     requirements = [
@@ -86,7 +89,10 @@ def build_match_details(
         session, candidate_id=candidate_id, skill_ids=matched_skill_ids
     )
 
-    name = candidate.display_name.strip() if candidate.display_name else "Unnamed candidate"
+    name = trimmed_candidate_display_name(candidate)
+    if name is None:
+        # Defensive: eligibility already requires a non-empty name.
+        raise MatchDetailsCandidateNotFoundError
     headline = candidate.target_role.strip() if candidate.target_role else None
 
     return MatchDetailsResponse(

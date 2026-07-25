@@ -1292,3 +1292,127 @@ def test_note_database_error_returns_generic_code(
         assert entry.note is None
     finally:
         session.close()
+
+def _add_ineligible_candidate(
+    session: Session,
+    *,
+    display_name: str | None = None,
+    status: str = "active",
+) -> UUID:
+    user = User(
+        id=uuid4(),
+        email=f"shortlist-ineligible-{uuid4()}@example.com",
+        password_hash="hash",
+        role="candidate",
+        status=status,
+    )
+    profile = CandidateProfile(
+        id=uuid4(),
+        user_id=user.id,
+        display_name=display_name,
+        onboarding_status=OnboardingStatus.PROFILE_REQUIRED,
+    )
+    session.add_all([user, profile])
+    session.flush()
+    return profile.id
+
+
+def test_save_rejects_shell_and_suspended_candidates(
+    shortlist_client: tuple[TestClient, ShortlistContext],
+) -> None:
+    client, context = shortlist_client
+    session = context.new_session()
+    try:
+        shell_id = _add_ineligible_candidate(session, display_name=None)
+        blank_id = _add_ineligible_candidate(session, display_name="   ")
+        suspended_id = _add_ineligible_candidate(
+            session, display_name="Suspended Candidate", status="suspended"
+        )
+        session.commit()
+    finally:
+        session.close()
+
+    for candidate_id in (shell_id, blank_id, suspended_id):
+        response = _put(client, context.vacancy.id, candidate_id)
+        assert response.status_code == 404
+        assert response.json()["error"]["code"] == "CANDIDATE_NOT_FOUND"
+
+    assert _get(client, context.vacancy.id).json() == {"entries": []}
+
+
+def test_save_accepts_valid_named_candidate_with_zero_match_context(
+    shortlist_client: tuple[TestClient, ShortlistContext],
+) -> None:
+    client, context = shortlist_client
+    candidate_id = context.candidate_ids[0]
+    response = _put(client, context.vacancy.id, candidate_id)
+    assert response.status_code == 200
+    assert response.json()["candidate_id"] == str(candidate_id)
+
+
+def test_stale_ineligible_shortlist_rows_are_soft_filtered_and_mutable_selectively(
+    shortlist_client: tuple[TestClient, ShortlistContext],
+) -> None:
+    client, context = shortlist_client
+    valid_id = context.candidate_ids[0]
+    assert _put(client, context.vacancy.id, valid_id).status_code == 200
+
+    session = context.new_session()
+    try:
+        shell_id = _add_ineligible_candidate(session, display_name=None)
+        suspended_id = _add_ineligible_candidate(
+            session, display_name="Was Eligible", status="suspended"
+        )
+        session.add_all(
+            [
+                EmployerCandidateShortlist(
+                    id=uuid4(),
+                    employer_id=context.employer.id,
+                    vacancy_id=context.vacancy.id,
+                    candidate_id=shell_id,
+                ),
+                EmployerCandidateShortlist(
+                    id=uuid4(),
+                    employer_id=context.employer.id,
+                    vacancy_id=context.vacancy.id,
+                    candidate_id=suspended_id,
+                ),
+            ]
+        )
+        session.commit()
+    finally:
+        session.close()
+
+    listing = _get(client, context.vacancy.id)
+    assert listing.status_code == 200
+    listed_ids = {entry["candidate_id"] for entry in listing.json()["entries"]}
+    assert listed_ids == {str(valid_id)}
+    assert str(shell_id) not in listed_ids
+    assert str(suspended_id) not in listed_ids
+
+    stage = _patch(client, context.vacancy.id, shell_id, "interview")
+    note = _patch_note(client, context.vacancy.id, suspended_id, {"note": "stale"})
+    assert stage.status_code == 404
+    assert stage.json()["error"]["code"] == "CANDIDATE_NOT_FOUND"
+    assert note.status_code == 404
+    assert note.json()["error"]["code"] == "CANDIDATE_NOT_FOUND"
+
+    delete_shell = _delete(client, context.vacancy.id, shell_id)
+    delete_suspended = _delete(client, context.vacancy.id, suspended_id)
+    assert delete_shell.status_code == 204
+    assert delete_suspended.status_code == 204
+
+    verify = context.new_session()
+    try:
+        remaining = list(
+            verify.execute(
+                select(EmployerCandidateShortlist).where(
+                    EmployerCandidateShortlist.vacancy_id == context.vacancy.id
+                )
+            )
+            .scalars()
+            .all()
+        )
+        assert {entry.candidate_id for entry in remaining} == {valid_id}
+    finally:
+        verify.close()

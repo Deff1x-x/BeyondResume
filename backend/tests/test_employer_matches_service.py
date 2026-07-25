@@ -20,6 +20,7 @@ from app.models.user import User
 from app.models.vacancy import Vacancy
 from app.models.vacancy_skill_requirement import VacancySkillRequirement
 from app.services.employer import list_matchable_candidate_profiles, list_vacancy_matches
+from app.services.employer_candidate_eligibility import list_employer_eligible_candidates
 from app.services.skill_ontology_seed import seed_skill_ontology
 
 
@@ -254,17 +255,20 @@ def test_canonical_name_is_used_without_unnamed_fallback_for_named_profiles(
 def test_skill_ontology_seed_does_not_create_candidate_profiles(
     postgres_session: Session,
 ) -> None:
-    before_ids = {profile.id for profile in list_matchable_candidate_profiles(postgres_session)}
+    before_ids = {profile.id for profile in list_employer_eligible_candidates(postgres_session)}
     first = seed_skill_ontology(postgres_session)
     after_first_ids = {
-        profile.id for profile in list_matchable_candidate_profiles(postgres_session)
+        profile.id for profile in list_employer_eligible_candidates(postgres_session)
     }
     second = seed_skill_ontology(postgres_session)
     after_second_ids = {
-        profile.id for profile in list_matchable_candidate_profiles(postgres_session)
+        profile.id for profile in list_employer_eligible_candidates(postgres_session)
     }
 
     assert first.skills_created >= 0
     assert second.skills_created == 0
     assert after_first_ids == before_ids
     assert after_second_ids == before_ids
+    assert list_matchable_candidate_profiles(postgres_session) == list_employer_eligible_candidates(
+        postgres_session
+    )

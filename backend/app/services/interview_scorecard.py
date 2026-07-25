@@ -6,9 +6,12 @@ from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from app.models.candidate_profile import CandidateProfile
 from app.models.employer_interview_scorecard import EmployerInterviewScorecard
 from app.models.vacancy import Vacancy
+from app.services.employer_candidate_eligibility import (
+    EmployerCandidateUnavailableError,
+    require_employer_eligible_candidate,
+)
 
 
 class ScorecardCandidateNotFoundError(Exception):
@@ -24,11 +27,10 @@ class ScorecardPersistenceError(Exception):
 
 
 def _require_candidate(session: Session, candidate_id: UUID) -> None:
-    candidate_exists = session.scalar(
-        select(CandidateProfile.id).where(CandidateProfile.id == candidate_id)
-    )
-    if candidate_exists is None:
-        raise ScorecardCandidateNotFoundError
+    try:
+        require_employer_eligible_candidate(session, candidate_id)
+    except EmployerCandidateUnavailableError as error:
+        raise ScorecardCandidateNotFoundError from error
 
 
 def get_interview_scorecard(
@@ -37,7 +39,7 @@ def get_interview_scorecard(
     vacancy: Vacancy,
     candidate_id: UUID,
 ) -> EmployerInterviewScorecard:
-    """Load one scorecard for an owned vacancy and candidate."""
+    """Load one scorecard for an owned vacancy and eligible candidate."""
     _require_candidate(session, candidate_id)
     entry = session.execute(
         select(EmployerInterviewScorecard).where(
@@ -64,7 +66,7 @@ def upsert_interview_scorecard(
     interview_notes: str | None,
     recommendation: str,
 ) -> EmployerInterviewScorecard:
-    """Create or fully replace one interview scorecard."""
+    """Create or fully replace one interview scorecard for an eligible candidate."""
     _require_candidate(session, candidate_id)
 
     entry = session.execute(

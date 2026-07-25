@@ -3,16 +3,19 @@
 from dataclasses import dataclass
 from uuid import UUID
 
-from sqlalchemy import and_, func, select
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.models.candidate_profile import CandidateProfile
 from app.models.employer_profile import EmployerProfile
 from app.models.skill import Skill
-from app.models.user import User
 from app.models.vacancy import Vacancy
 from app.models.vacancy_skill_requirement import VacancySkillRequirement
+from app.services.employer_candidate_eligibility import (
+    list_employer_eligible_candidates,
+    trimmed_candidate_display_name,
+)
 from app.services.matching import MatchRequirement, MatchResult, match_passport_to_requirements
 from app.services.skill_passport import build_passport
 
@@ -203,37 +206,9 @@ class VacancyCandidateMatch:
     result: MatchResult
 
 
-def _candidate_display_name(candidate: CandidateProfile) -> str | None:
-    """Return the canonical trimmed candidate name, or None when identity is missing."""
-    if candidate.display_name is None:
-        return None
-    name = candidate.display_name.strip()
-    return name or None
-
-
 def list_matchable_candidate_profiles(session: Session) -> list[CandidateProfile]:
-    """Return active candidate profiles that are eligible for employer matching.
-
-    Empty registration shells (no display name) are excluded. Named candidates with a
-    0% skill match remain eligible. Each profile is returned at most once.
-    """
-    return list(
-        session.execute(
-            select(CandidateProfile)
-            .join(User, User.id == CandidateProfile.user_id)
-            .where(
-                User.role == "candidate",
-                User.status == "active",
-                and_(
-                    CandidateProfile.display_name.is_not(None),
-                    func.length(func.trim(CandidateProfile.display_name)) > 0,
-                ),
-            )
-            .order_by(CandidateProfile.display_name, CandidateProfile.id)
-        )
-        .scalars()
-        .all()
-    )
+    """Compatibility wrapper over the shared employer eligibility policy."""
+    return list_employer_eligible_candidates(session)
 
 
 def list_vacancy_matches(session: Session, vacancy_id: UUID) -> list[VacancyCandidateMatch]:
@@ -249,10 +224,10 @@ def list_vacancy_matches(session: Session, vacancy_id: UUID) -> list[VacancyCand
     ]
 
     matches: list[VacancyCandidateMatch] = []
-    for candidate in list_matchable_candidate_profiles(session):
+    for candidate in list_employer_eligible_candidates(session):
         passport = build_passport(session, candidate.id)
         result = match_passport_to_requirements(passport, requirements)
-        name = _candidate_display_name(candidate)
+        name = trimmed_candidate_display_name(candidate)
         if name is None:
             # Defensive: eligibility already requires a non-empty name.
             continue

@@ -357,7 +357,9 @@ def put_shortlisted_candidate(
             candidate_id=candidate_id,
         )
     except ShortlistCandidateNotFoundError:
-        raise api_error(404, "CANDIDATE_NOT_FOUND", "Candidate not found") from None
+        raise api_error(
+            404, "CANDIDATE_NOT_FOUND", "Candidate not found or unavailable"
+        ) from None
     except (ShortlistPersistenceError, SQLAlchemyError):
         raise api_error(500, "DATABASE_ERROR", "Database operation failed") from None
     return EmployerShortlistEntryResponse.model_validate(entry)
@@ -384,6 +386,10 @@ def patch_shortlisted_candidate_stage(
         )
     except ShortlistEntryNotFoundError:
         raise api_error(404, "SHORTLIST_ENTRY_NOT_FOUND", "Shortlist entry not found") from None
+    except ShortlistCandidateNotFoundError:
+        raise api_error(
+            404, "CANDIDATE_NOT_FOUND", "Candidate not found or unavailable"
+        ) from None
     except SQLAlchemyError:
         raise api_error(500, "DATABASE_ERROR", "Database operation failed") from None
     return EmployerShortlistEntryResponse.model_validate(entry)
@@ -410,6 +416,10 @@ def patch_shortlisted_candidate_note(
         )
     except ShortlistEntryNotFoundError:
         raise api_error(404, "SHORTLIST_ENTRY_NOT_FOUND", "Shortlist entry not found") from None
+    except ShortlistCandidateNotFoundError:
+        raise api_error(
+            404, "CANDIDATE_NOT_FOUND", "Candidate not found or unavailable"
+        ) from None
     except SQLAlchemyError:
         raise api_error(500, "DATABASE_ERROR", "Database operation failed") from None
     return EmployerShortlistEntryResponse.model_validate(entry)
@@ -474,7 +484,9 @@ def get_vacancy_interview_scorecard(
             candidate_id=candidate_id,
         )
     except ScorecardCandidateNotFoundError:
-        raise api_error(404, "CANDIDATE_NOT_FOUND", "Candidate not found") from None
+        raise api_error(
+            404, "CANDIDATE_NOT_FOUND", "Candidate not found or unavailable"
+        ) from None
     except ScorecardNotFoundError:
         raise api_error(404, "SCORECARD_NOT_FOUND", "Interview scorecard not found") from None
     except SQLAlchemyError:
@@ -508,7 +520,9 @@ def put_vacancy_interview_scorecard(
             recommendation=body.recommendation,
         )
     except ScorecardCandidateNotFoundError:
-        raise api_error(404, "CANDIDATE_NOT_FOUND", "Candidate not found") from None
+        raise api_error(
+            404, "CANDIDATE_NOT_FOUND", "Candidate not found or unavailable"
+        ) from None
     except SQLAlchemyError:
         raise api_error(500, "DATABASE_ERROR", "Database operation failed") from None
     return InterviewScorecardResponse.model_validate(entry)
@@ -529,7 +543,9 @@ def get_match_details(
     try:
         return build_match_details(session, vacancy_id=vacancy_id, candidate_id=candidate_id)
     except MatchDetailsCandidateNotFoundError:
-        raise api_error(404, "CANDIDATE_NOT_FOUND", "Candidate not found") from None
+        raise api_error(
+            404, "CANDIDATE_NOT_FOUND", "Candidate not found or unavailable"
+        ) from None
     except SQLAlchemyError:
         raise api_error(500, "DATABASE_ERROR", "Database operation failed") from None
 
@@ -550,7 +566,9 @@ def get_match_interview_questions(
     try:
         details = build_match_details(session, vacancy_id=vacancy_id, candidate_id=candidate_id)
     except MatchDetailsCandidateNotFoundError:
-        raise api_error(404, "CANDIDATE_NOT_FOUND", "Candidate not found") from None
+        raise api_error(
+            404, "CANDIDATE_NOT_FOUND", "Candidate not found or unavailable"
+        ) from None
     try:
         context = build_interview_questions_context(
             session,
@@ -583,7 +601,9 @@ def get_ai_hiring_intelligence(
     try:
         build_match_details(session, vacancy_id=vacancy_id, candidate_id=candidate_id)
     except MatchDetailsCandidateNotFoundError:
-        raise api_error(404, "CANDIDATE_NOT_FOUND", "Candidate not found") from None
+        raise api_error(
+            404, "CANDIDATE_NOT_FOUND", "Candidate not found or unavailable"
+        ) from None
     context = build_hiring_context(
         candidate_name=None,
         passport=build_passport(session, candidate_id),
@@ -613,7 +633,9 @@ def post_match_explanation(
     try:
         details = build_match_details(session, vacancy_id=vacancy_id, candidate_id=candidate_id)
     except MatchDetailsCandidateNotFoundError:
-        raise api_error(404, "CANDIDATE_NOT_FOUND", "Candidate not found") from None
+        raise api_error(
+            404, "CANDIDATE_NOT_FOUND", "Candidate not found or unavailable"
+        ) from None
     requirement_rows = list_vacancy_requirements(session, vacancy_id)
     explanation_input = build_explanation_input(
         details=details,
