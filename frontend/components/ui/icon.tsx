@@ -3,7 +3,7 @@ import Image from "next/image";
 
 import { cn } from "@/lib/cn";
 
-export type IconName = "dashboard" | "profile" | "resume" | "github" | "evidence" | "passport" | "roadmap" | "employer";
+export type IconName = "dashboard" | "profile" | "resume" | "github" | "evidence" | "passport" | "roadmap" | "employer" | "check" | "alert" | "arrow-right" | "gauge" | "spark" | "refresh" | "code";
 
 type IconProps = SVGProps<SVGSVGElement> & { name: IconName };
 
@@ -15,7 +15,14 @@ const paths: Record<IconName, ReactNode> = {
   evidence: <><path d="M12 22s8-3.7 8-10V5l-8-3-8 3v7c0 6.3 8 10 8 10Z" /><path d="m9 12 2 2 4-4" /></>,
   passport: <><path d="M8 3h8l3 3v14a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h2Z" /><path d="M8 3v5h8V3M8.5 14l2 2 4-4" /></>,
   roadmap: <><circle cx="6" cy="18" r="2" /><circle cx="18" cy="6" r="2" /><path d="M8 18h3a3 3 0 0 0 3-3v-1a3 3 0 0 1 3-3h1" /></>,
-  employer: <><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-5h6v5M8 10h.01M12 10h.01M16 10h.01" /></>
+  employer: <><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-5h6v5M8 10h.01M12 10h.01M16 10h.01" /></>,
+  check: <><path d="m5 12.5 4.5 4.5L19 7.5" /></>,
+  alert: <><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" /><path d="M12 9v4.5M12 17.5h.01" /></>,
+  "arrow-right": <><path d="M4 12h15M13 6l6 6-6 6" /></>,
+  gauge: <><path d="M3.5 18a9 9 0 1 1 17 0" /><path d="m12 14 3.5-4.5" /><path d="M12 14h.01" /></>,
+  spark: <><path d="m12 3 1.7 5.3L19 10l-5.3 1.7L12 17l-1.7-5.3L5 10l5.3-1.7Z" /><path d="M18.5 3.5v3M20 5h-3" /></>,
+  refresh: <><path d="M20.5 12a8.5 8.5 0 1 1-2.5-6" /><path d="M20.5 4v5h-5" /></>,
+  code: <><path d="m8.5 8.5-4 3.5 4 3.5M15.5 8.5l4 3.5-4 3.5M13.5 6l-3 12" /></>
 };
 
 export function Icon({ name, className, ...props }: IconProps) {

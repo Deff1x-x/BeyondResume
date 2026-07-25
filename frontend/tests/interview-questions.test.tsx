@@ -124,10 +124,14 @@ describe("InterviewQuestionsWorkspace", () => {
     expect(screen.getByRole("heading", { name: "Risk validation" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Ownership" })).toBeInTheDocument();
     expect(screen.queryByText("risk_validation")).not.toBeInTheDocument();
-    expect(screen.getAllByText("Why ask this").length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/Target skill:/).length).toBeGreaterThan(0);
-    expect(screen.getByText(/Based on evidence/)).toBeInTheDocument();
-    expect(screen.getByText(/Based on gap/)).toBeInTheDocument();
+    expect(screen.getAllByText("Why this matters").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Target skill").length).toBeGreaterThan(0);
+    expect(screen.getByText("Python", { selector: "span" })).toBeInTheDocument();
+    expect(screen.getByText("Evidence")).toBeInTheDocument();
+    expect(screen.getByText("Gap")).toBeInTheDocument();
+    expect(screen.getByText("Questions prepared").parentElement).toHaveTextContent("3");
+    expect(screen.getByText("Required matched").parentElement).toHaveTextContent("1");
+    expect(screen.getByText("Required missing").parentElement).toHaveTextContent("1");
     expect(
       screen.getByText(/AI-generated interview suggestions\. Review each question/)
     ).toBeInTheDocument();
@@ -138,6 +142,36 @@ describe("InterviewQuestionsWorkspace", () => {
     expect(screen.getByRole("link", { name: "Questions" })).toHaveAttribute("aria-current", "page");
     expect(screen.queryByLabelText(/technical competency/i)).not.toBeInTheDocument();
     expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+  });
+
+  it("renders target skill and evidence labels only when present", async () => {
+    apiMocks.getInterviewQuestions.mockResolvedValue({
+      questions: [
+        {
+          category: "ownership",
+          question: "What delivery decision did you personally own recently?",
+          reason: "Ownership should be validated with observable outcomes.",
+          target_skill: null,
+          evidence_basis: null
+        },
+        {
+          category: "experience",
+          question: "Describe a recent backend delivery you owned.",
+          reason: "Experience probe for delivery ownership.",
+          target_skill: null,
+          evidence_basis: "Sources: github_repository"
+        }
+      ]
+    });
+    renderWorkspace();
+
+    expect(
+      await screen.findByText("What delivery decision did you personally own recently?")
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Target skill")).not.toBeInTheDocument();
+    expect(screen.queryByText("Gap")).not.toBeInTheDocument();
+    expect(screen.getByText("Evidence")).toBeInTheDocument();
+    expect(screen.getByText("Sources: github_repository")).toBeInTheDocument();
   });
 
   it("shows loading state while the canonical query is pending", () => {

@@ -64,7 +64,11 @@ describe("AiHiringWorkspace", () => {
     );
     expect(screen.getByRole("heading", { name: "AI Hiring Intelligence" })).toBeInTheDocument();
     expect(screen.getByText("AI-generated analysis")).toBeInTheDocument();
-    expect(screen.getByText("Hire")).toBeInTheDocument();
+    expect(screen.getByLabelText("Recommendation: Hire")).toHaveTextContent("Hire");
+    expect(screen.getByLabelText("Top skills")).toBeInTheDocument();
+    expect(screen.getByText("Python")).toBeInTheDocument();
+    expect(screen.getByText("Required matched").parentElement).toHaveTextContent("1");
+    expect(screen.getByText("Required missing").parentElement).toHaveTextContent("1");
     expect(screen.getByText("Limited Redis evidence")).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Interview Questions" })).not.toBeInTheDocument();
     expect(screen.queryByText(/Explain dependency injection/i)).not.toBeInTheDocument();
@@ -74,6 +78,35 @@ describe("AiHiringWorkspace", () => {
         "Use this analysis as supporting information, not as the sole basis for a hiring decision."
       )
     ).toBeInTheDocument();
+    expect(intelligenceQuery).toHaveBeenCalledTimes(1);
+  });
+
+  it("dedupes top skills and keeps match counts aligned to details", () => {
+    detailsQuery.mockReturnValue({
+      data: {
+        ...details,
+        passport: { ...details.passport, top_skills: ["Python", "Python", "Docker", ""] },
+        match: {
+          score: 70,
+          required: { matched: ["Python", "SQL"], missing: ["Redis", "Kafka"] },
+          preferred: { matched: [], missing: [] }
+        }
+      },
+      isLoading: false,
+      isError: false
+    });
+    intelligenceQuery.mockReturnValue({
+      isLoading: false,
+      isError: false,
+      data: intelligence
+    });
+
+    render(<AiHiringWorkspace candidateId="candidate-1" vacancyId="vacancy-1" enabled />);
+
+    expect(screen.getAllByText("Python")).toHaveLength(1);
+    expect(screen.getByText("Docker")).toBeInTheDocument();
+    expect(screen.getByText("Required matched").parentElement).toHaveTextContent("2");
+    expect(screen.getByText("Required missing").parentElement).toHaveTextContent("2");
     expect(intelligenceQuery).toHaveBeenCalledTimes(1);
   });
 

@@ -41,14 +41,20 @@ describe("AiHiringIntelligenceSection", () => {
     );
 
     expect(screen.getByRole("heading", { name: "AI Hiring Intelligence" })).toBeInTheDocument();
-    expect(screen.getByText("Hire")).toBeInTheDocument();
-    expect(screen.getByText("87% confidence")).toBeInTheDocument();
+    expect(screen.getByText("AI Recommendation")).toBeInTheDocument();
+    expect(screen.getByLabelText("Recommendation: Hire")).toHaveTextContent("Hire");
+    expect(screen.getByLabelText("87% confidence")).toHaveTextContent("87%");
+    expect(screen.getByRole("heading", { name: "Executive summary" })).toBeInTheDocument();
     expect(screen.getByText(sample.executive_summary)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Strengths" })).toBeInTheDocument();
     expect(screen.getByText("Python evidence")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Hiring risks" })).toBeInTheDocument();
     expect(screen.getByText("Limited Docker evidence")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Confidence" })).toBeInTheDocument();
     expect(
       screen.getByText("Python experience is supported by verified evidence")
     ).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "First 90 days" })).toBeInTheDocument();
     expect(
       screen.getByText("Build familiarity with the existing service architecture")
     ).toBeInTheDocument();
@@ -83,8 +89,8 @@ describe("AiHiringIntelligenceSection", () => {
       render(
         <AiHiringIntelligenceSection candidateId="candidate-1" vacancyId="vacancy-1" enabled />
       );
-      expect(screen.getByText(entry.label)).toBeInTheDocument();
-      expect(screen.getByText("0% confidence")).toBeInTheDocument();
+      expect(screen.getByLabelText(`Recommendation: ${entry.label}`)).toHaveTextContent(entry.label);
+      expect(screen.getByLabelText("0% confidence")).toHaveTextContent("0%");
       if (entry.verdict.includes("_")) {
         expect(document.body.textContent).not.toContain(entry.verdict);
       }
@@ -99,7 +105,22 @@ describe("AiHiringIntelligenceSection", () => {
     render(
       <AiHiringIntelligenceSection candidateId="candidate-1" vacancyId="vacancy-1" enabled />
     );
-    expect(screen.getByText("100% confidence")).toBeInTheDocument();
+    expect(screen.getByLabelText("100% confidence")).toHaveTextContent("100%");
+  });
+
+  it("keeps unknown verdicts from breaking the recommendation card", () => {
+    query.mockReturnValue({
+      isLoading: false,
+      isError: false,
+      data: { ...sample, verdict: "unexpected_verdict" as AiHiringIntelligence["verdict"] }
+    });
+    render(
+      <AiHiringIntelligenceSection candidateId="candidate-1" vacancyId="vacancy-1" enabled />
+    );
+    expect(screen.getByLabelText("Recommendation: Evidence review")).toHaveTextContent(
+      "Evidence review"
+    );
+    expect(document.body.textContent).not.toContain("unexpected_verdict");
   });
 
   it("renders duplicate list items without relying on value-only keys", () => {
@@ -119,7 +140,7 @@ describe("AiHiringIntelligenceSection", () => {
     expect(screen.getAllByText("Repeated risk")).toHaveLength(2);
   });
 
-  it("renders empty list placeholders", () => {
+  it("omits empty optional insight sections instead of empty cards", () => {
     query.mockReturnValue({
       isLoading: false,
       isError: false,
@@ -135,10 +156,14 @@ describe("AiHiringIntelligenceSection", () => {
       <AiHiringIntelligenceSection candidateId="candidate-1" vacancyId="vacancy-1" enabled />
     );
 
-    expect(screen.getByText("No clear strengths identified")).toBeInTheDocument();
-    expect(screen.getByText("No significant hiring risks identified")).toBeInTheDocument();
-    expect(screen.getByText("No confidence explanation provided")).toBeInTheDocument();
-    expect(screen.getByText("No first-90-days focus identified")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Strengths" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Hiring risks" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Confidence" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "First 90 days" })).not.toBeInTheDocument();
+    expect(screen.queryByText("No clear strengths identified")).not.toBeInTheDocument();
+    expect(screen.queryByText("No significant hiring risks identified")).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Executive summary" })).toBeInTheDocument();
+    expect(screen.getByText(sample.executive_summary)).toBeInTheDocument();
   });
 
   it("renders unavailable state and keeps retry", () => {
