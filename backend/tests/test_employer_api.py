@@ -131,6 +131,182 @@ def test_create_company_conflict(client: TestClient, monkeypatch: pytest.MonkeyP
     assert response.json()["error"]["code"] == "EMPLOYER_COMPANY_ALREADY_EXISTS"
 
 
+def test_update_company_owner_success(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.api.v1 import employer
+
+    user = make_user()
+    company = make_company(user.id)
+    authorize_employer(user)
+
+    def update(*_args: object, **kwargs: object) -> EmployerProfile:
+        company.company_name = str(kwargs["company_name"])
+        if kwargs.get("website_set"):
+            company.website = kwargs.get("website")  # type: ignore[assignment]
+        if kwargs.get("description_set"):
+            company.description = kwargs.get("description")  # type: ignore[assignment]
+        return company
+
+    monkeypatch.setattr(employer, "update_employer_company", update)
+
+    response = client.patch(
+        "/api/v1/employer/company",
+        json={
+            "company_name": "Acme Updated",
+            "website": "https://updated.example",
+            "description": "New description",
+        },
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["company_name"] == "Acme Updated"
+    assert body["website"] == "https://updated.example/"
+    assert body["description"] == "New description"
+
+
+def test_update_company_not_found(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.api.v1 import employer
+    from app.services.employer import EmployerCompanyNotFoundError
+
+    authorize_employer(make_user())
+
+    def update(*_args: object, **_kwargs: object) -> EmployerProfile:
+        raise EmployerCompanyNotFoundError
+
+    monkeypatch.setattr(employer, "update_employer_company", update)
+
+    response = client.patch(
+        "/api/v1/employer/company",
+        json={"company_name": "Ghost Corp"},
+    )
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "EMPLOYER_COMPANY_NOT_FOUND"
+
+
+def test_update_company_empty_payload_rejected(client: TestClient) -> None:
+    authorize_employer(make_user())
+
+    response = client.patch("/api/v1/employer/company", json={})
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "VALIDATION_ERROR"
+
+
+def test_update_company_invalid_payload(client: TestClient) -> None:
+    authorize_employer(make_user())
+
+    response = client.patch(
+        "/api/v1/employer/company",
+        json={"company_name": ""},
+    )
+    assert response.status_code == 422
+
+
+def test_update_company_partial_description_only(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.api.v1 import employer
+
+    user = make_user()
+    company = make_company(user.id)
+    original_name = company.company_name
+    original_website = company.website
+    authorize_employer(user)
+
+    def update(*_args: object, **kwargs: object) -> EmployerProfile:
+        if kwargs.get("company_name") is not None:
+            company.company_name = str(kwargs["company_name"])
+        if kwargs.get("website_set"):
+            company.website = kwargs.get("website")  # type: ignore[assignment]
+        if kwargs.get("description_set"):
+            company.description = kwargs.get("description")  # type: ignore[assignment]
+        return company
+
+    monkeypatch.setattr(employer, "update_employer_company", update)
+
+    response = client.patch(
+        "/api/v1/employer/company",
+        json={"description": "Only description changed"},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["company_name"] == original_name
+    assert body["website"] == original_website
+    assert body["description"] == "Only description changed"
+
+
+def test_update_company_unchanged_fields(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.api.v1 import employer
+
+    user = make_user()
+    company = make_company(user.id)
+    authorize_employer(user)
+    monkeypatch.setattr(employer, "update_employer_company", lambda *_a, **_k: company)
+
+    response = client.patch(
+        "/api/v1/employer/company",
+        json={
+            "company_name": company.company_name,
+            "website": company.website,
+            "description": company.description,
+        },
+    )
+    assert response.status_code == 200
+    assert response.json()["company_name"] == company.company_name
+    assert response.json()["website"] == company.website
+    assert response.json()["description"] == company.description
+
+
+def test_delete_vacancy_owner_success(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.api.v1 import employer
+
+    user = make_user()
+    company = make_company(user.id)
+    vacancy = make_vacancy(company.id)
+    authorize_employer(user)
+    deleted: list[object] = []
+
+    monkeypatch.setattr(employer, "get_employer_company", lambda *_args: company)
+
+    def delete(_session: object, employer_id: object, vacancy_id: object) -> None:
+        assert employer_id == company.id
+        assert vacancy_id == vacancy.id
+        deleted.append(vacancy_id)
+
+    monkeypatch.setattr(employer, "delete_vacancy", delete)
+
+    response = client.delete(f"/api/v1/employer/vacancies/{vacancy.id}")
+    assert response.status_code == 204
+    assert deleted == [vacancy.id]
+
+
+def test_delete_vacancy_not_found(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.api.v1 import employer
+    from app.services.employer import VacancyNotFoundError
+
+    user = make_user()
+    company = make_company(user.id)
+    authorize_employer(user)
+    monkeypatch.setattr(employer, "get_employer_company", lambda *_args: company)
+
+    def delete(*_args: object, **_kwargs: object) -> None:
+        raise VacancyNotFoundError
+
+    monkeypatch.setattr(employer, "delete_vacancy", delete)
+
+    response = client.delete(f"/api/v1/employer/vacancies/{uuid4()}")
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "VACANCY_NOT_FOUND"
+
+
 def test_vacancies_require_company(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
     from app.api.v1 import employer
 
@@ -733,7 +909,7 @@ def test_match_details_evidence_requires_status_keys(missing_field: str) -> None
     }
     del payload[missing_field]
     with pytest.raises(ValidationError):
-        MatchDetailsEvidenceResponse(**payload)
+        MatchDetailsEvidenceResponse(**payload)  # type: ignore[arg-type]
 
 
 def test_match_details_evidence_accepts_explicit_null_statuses() -> None:

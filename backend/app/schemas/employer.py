@@ -13,6 +13,23 @@ class EmployerCompanyCreateRequest(BaseModel):
     description: Annotated[str | None, Field(default=None, max_length=5000)] = None
 
 
+class EmployerCompanyUpdateRequest(BaseModel):
+    """Partial update of existing company fields. Omitted fields stay unchanged."""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    company_name: Annotated[str | None, Field(default=None, min_length=1, max_length=160)] = None
+    website: HttpUrl | None = None
+    description: Annotated[str | None, Field(default=None, max_length=5000)] = None
+
+    @field_validator("company_name", mode="before")
+    @classmethod
+    def reject_null_company_name(cls, value: object) -> object:
+        if value is None:
+            raise ValueError("company_name cannot be null")
+        return value
+
+
 class EmployerCompanyResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

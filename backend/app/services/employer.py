@@ -3,11 +3,13 @@
 from dataclasses import dataclass
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.models.candidate_profile import CandidateProfile
+from app.models.employer_candidate_shortlist import EmployerCandidateShortlist
+from app.models.employer_interview_scorecard import EmployerInterviewScorecard
 from app.models.employer_profile import EmployerProfile
 from app.models.skill import Skill
 from app.models.vacancy import Vacancy
@@ -80,6 +82,37 @@ def create_employer_company(
     return company
 
 
+def update_employer_company(
+    session: Session,
+    user_id: UUID,
+    *,
+    company_name: str | None = None,
+    website: str | None = None,
+    description: str | None = None,
+    website_set: bool = False,
+    description_set: bool = False,
+) -> EmployerProfile:
+    """Update the authenticated employer's company. Foreign/missing company → not found."""
+    company = get_employer_company(session, user_id)
+    if company is None:
+        raise EmployerCompanyNotFoundError
+
+    if company_name is not None:
+        company.company_name = company_name
+    if website_set:
+        company.website = website
+    if description_set:
+        company.description = description
+
+    try:
+        session.commit()
+    except SQLAlchemyError:
+        session.rollback()
+        raise
+    session.refresh(company)
+    return company
+
+
 def list_vacancies(session: Session, employer_id: UUID) -> list[Vacancy]:
     return list(
         session.execute(
@@ -120,6 +153,40 @@ def create_vacancy(
         raise
     session.refresh(vacancy)
     return vacancy
+
+
+def delete_vacancy(session: Session, employer_id: UUID, vacancy_id: UUID) -> None:
+    """Delete an owned vacancy and vacancy-scoped dependents in one transaction.
+
+    FK constraints on vacancy children use NO ACTION (no CASCADE). Related rows
+    owned by the vacancy are removed explicitly; users, candidates, skills, and
+    other global entities are never deleted.
+    """
+    vacancy = get_vacancy(session, employer_id, vacancy_id)
+    if vacancy is None:
+        raise VacancyNotFoundError
+
+    try:
+        session.execute(
+            delete(EmployerInterviewScorecard).where(
+                EmployerInterviewScorecard.vacancy_id == vacancy_id
+            )
+        )
+        session.execute(
+            delete(EmployerCandidateShortlist).where(
+                EmployerCandidateShortlist.vacancy_id == vacancy_id
+            )
+        )
+        session.execute(
+            delete(VacancySkillRequirement).where(
+                VacancySkillRequirement.vacancy_id == vacancy_id
+            )
+        )
+        session.delete(vacancy)
+        session.commit()
+    except SQLAlchemyError:
+        session.rollback()
+        raise
 
 
 def list_available_skills(session: Session) -> list[Skill]:

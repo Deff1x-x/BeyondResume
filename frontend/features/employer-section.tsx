@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useQueries } from "@tanstack/react-query";
 
 import { Badge, StatusBadge } from "@/components/ui/badge";
@@ -25,11 +25,13 @@ import {
   useAddVacancyRequirement,
   useCreateEmployerCompany,
   useCreateEmployerVacancy,
+  useDeleteEmployerVacancy,
   useDeleteVacancyRequirement,
   useEmployerCompanyQuery,
   useEmployerSkillsQuery,
   useEmployerVacanciesQuery,
   useEmployerVacancyQuery,
+  useUpdateEmployerCompany,
   useVacancyMatchesQuery,
   useVacancyRequirementsQuery,
   useVacancyShortlistQuery,
@@ -262,8 +264,14 @@ function VacancyRequirements({ vacancyId }: Readonly<{ vacancyId: string }>) {
   );
 }
 
-function VacancyDetail({ vacancyId }: Readonly<{ vacancyId: string }>) {
+function VacancyDetail({
+  vacancyId,
+  onDeleted
+}: Readonly<{ vacancyId: string; onDeleted?: () => void }>) {
   const detailQuery = useEmployerVacancyQuery(vacancyId, true);
+  const deleteVacancy = useDeleteEmployerVacancy();
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const deleteInFlight = useRef(false);
 
   if (detailQuery.isLoading) {
     return (
@@ -284,12 +292,91 @@ function VacancyDetail({ vacancyId }: Readonly<{ vacancyId: string }>) {
     return null;
   }
 
+  function onConfirmDelete() {
+    if (deleteInFlight.current || deleteVacancy.isPending) {
+      return;
+    }
+    deleteInFlight.current = true;
+    deleteVacancy.mutate(vacancyId, {
+      onSuccess: () => {
+        setConfirmDelete(false);
+        onDeleted?.();
+      },
+      onSettled: () => {
+        deleteInFlight.current = false;
+      }
+    });
+  }
+
   return (
     <section id={`vacancy-details-${vacancyId}`} aria-labelledby={`vacancy-context-title-${vacancyId}`} className="mt-5 space-y-7 border-t border-border pt-5">
       <header className="flex flex-col gap-4 rounded-xl border border-border bg-surface-subtle/60 p-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0"><p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">Vacancy workspace</p><h3 id={`vacancy-context-title-${vacancyId}`} className="mt-1 break-words text-xl font-semibold tracking-tight text-ink">{vacancy.title}</h3><p className="mt-2 max-w-2xl text-sm leading-6 text-secondary">{vacancy.description?.trim() ? vacancy.description : "No description provided."}</p></div>
         <div className="flex shrink-0 flex-wrap items-center gap-2"><StatusBadge status={vacancyStatusTone(vacancy.status)} label={statusLabel(vacancy.status)} /><span className="text-sm text-secondary">Created {formatDate(vacancy.created_at)}</span></div>
       </header>
+
+      <section
+        aria-labelledby={`delete-vacancy-title-${vacancyId}`}
+        className="rounded-xl border border-border bg-background p-4"
+      >
+        <p
+          id={`delete-vacancy-title-${vacancyId}`}
+          className="text-sm font-medium text-ink"
+        >
+          Delete vacancy
+        </p>
+        <p className="mt-1 text-sm leading-6 text-secondary">
+          Remove this vacancy and its employer-side hiring data for this opening.
+        </p>
+        {confirmDelete ? (
+          <div className="mt-4 space-y-3 rounded-xl border border-danger/20 bg-danger/[0.04] p-4" role="group" aria-label="Confirm vacancy deletion">
+            <p className="text-sm font-medium text-ink">Delete vacancy?</p>
+            <p className="text-sm leading-6 text-secondary">This action cannot be undone.</p>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                disabled={deleteVacancy.isPending}
+                onClick={() => setConfirmDelete(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                size="sm"
+                loading={deleteVacancy.isPending}
+                disabled={deleteVacancy.isPending}
+                onClick={onConfirmDelete}
+              >
+                Delete vacancy
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="mt-4">
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              disabled={deleteVacancy.isPending}
+              onClick={() => {
+                deleteVacancy.reset();
+                setConfirmDelete(true);
+              }}
+            >
+              Delete vacancy
+            </Button>
+          </div>
+        )}
+        {deleteVacancy.isError ? (
+          <p className="mt-3 text-sm text-danger" role="alert">
+            {errorMessage(deleteVacancy.error)}
+          </p>
+        ) : null}
+      </section>
+
       <VacancyRequirements vacancyId={vacancyId} />
       <VacancyMatches vacancyId={vacancyId} />
     </section>
@@ -484,10 +571,12 @@ function VacancyCard({
 
 function SelectedVacancyWorkspace({
   vacancy,
-  onClose
+  onClose,
+  onDeleted
 }: Readonly<{
   vacancy: Vacancy;
   onClose: () => void;
+  onDeleted: () => void;
 }>) {
   return (
     <section id={`selected-vacancy-workspace-${vacancy.id}`} aria-labelledby={`selected-vacancy-title-${vacancy.id}`} className="mt-8 rounded-card border border-primary/20 bg-surface p-5 shadow-card sm:p-6">
@@ -495,7 +584,7 @@ function SelectedVacancyWorkspace({
         <div><p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">Selected vacancy workspace</p><h3 id={`selected-vacancy-title-${vacancy.id}`} className="mt-1 break-words text-2xl font-semibold tracking-tight text-ink">{vacancy.title}</h3><p className="mt-2 text-sm leading-6 text-secondary">Configure requirements and review the candidate matches returned for this vacancy.</p></div>
         <Button type="button" variant="secondary" size="sm" onClick={onClose}>Close workspace</Button>
       </div>
-      <VacancyDetail vacancyId={vacancy.id} />
+      <VacancyDetail vacancyId={vacancy.id} onDeleted={onDeleted} />
     </section>
   );
 }
@@ -554,6 +643,7 @@ function TopMatchesByVacancy({
 
 function EmployerDashboard({ enabled }: Readonly<{ enabled: boolean }>) {
   const [selectedVacancyId, setSelectedVacancyId] = useState<string | null>(null);
+  const [vacancyDeletedNotice, setVacancyDeletedNotice] = useState(false);
   const vacanciesQuery = useEmployerVacanciesQuery(enabled);
   const vacancies = [...(vacanciesQuery.data ?? [])].sort(
     (left, right) => new Date(right.created_at).getTime() - new Date(left.created_at).getTime()
@@ -577,6 +667,7 @@ function EmployerDashboard({ enabled }: Readonly<{ enabled: boolean }>) {
   const activeVacancies = vacancies.filter((vacancy) => vacancy.status === "open").length;
 
   function openMatches(vacancyId: string) {
+    setVacancyDeletedNotice(false);
     setSelectedVacancyId(vacancyId);
     window.requestAnimationFrame(() => {
       document.getElementById(`selected-vacancy-workspace-${vacancyId}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -633,6 +724,11 @@ function EmployerDashboard({ enabled }: Readonly<{ enabled: boolean }>) {
       </section>
 
       <div id="employer-vacancies">
+        {vacancyDeletedNotice ? (
+          <p className="mb-4 text-sm text-success" role="status">
+            Vacancy deleted.
+          </p>
+        ) : null}
         {vacancies.length === 0 ? (
           <EmptyState icon={<Icon name="employer" className="h-8 w-8" />} title="Create your first vacancy" description="Add an opening and its requirements to start discovering candidates through verified skills and evidence." primaryAction={<a href="#create-vacancy" className="inline-flex min-h-control items-center rounded-button bg-primary px-4 text-sm font-medium text-white shadow-sm shadow-primary/25 transition hover:-translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2">Create your first vacancy</a>} className="py-12" />
         ) : (
@@ -640,7 +736,16 @@ function EmployerDashboard({ enabled }: Readonly<{ enabled: boolean }>) {
             <section aria-labelledby="vacancies-title">
               <div className="flex flex-wrap items-end justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">Hiring pipeline</p><h2 id="vacancies-title" className="mt-1 text-2xl font-semibold tracking-tight text-ink">Active vacancies</h2><p className="mt-2 text-sm leading-6 text-secondary">Review vacancy status, requirements, and current candidate matches.</p></div><Badge variant="primary">{activeVacancies} open</Badge></div>
               <ul className="mt-5 grid items-start gap-4 xl:grid-cols-2">{vacancies.map((vacancy, index) => <li id={`vacancy-card-${vacancy.id}`} key={vacancy.id}><VacancyCard vacancy={vacancy} requirementsCount={requirementQueries[index]?.data?.length ?? 0} matches={matchQueries[index]?.data?.matches ?? []} selected={selectedVacancyId === vacancy.id} onSelect={() => openMatches(vacancy.id)} /></li>)}</ul>
-              {selectedVacancy ? <SelectedVacancyWorkspace vacancy={selectedVacancy} onClose={() => setSelectedVacancyId(null)} /> : null}
+              {selectedVacancy ? (
+                <SelectedVacancyWorkspace
+                  vacancy={selectedVacancy}
+                  onClose={() => setSelectedVacancyId(null)}
+                  onDeleted={() => {
+                    setSelectedVacancyId(null);
+                    setVacancyDeletedNotice(true);
+                  }}
+                />
+              ) : null}
             </section>
             <TopMatchesByVacancy vacancies={vacancies} matchesByVacancy={matchQueries.map((query) => query.data?.matches ?? [])} onViewMatches={openMatches} />
           </>
@@ -653,14 +758,29 @@ function EmployerDashboard({ enabled }: Readonly<{ enabled: boolean }>) {
 function CompanyPanel({ enabled }: Readonly<{ enabled: boolean }>) {
   const companyQuery = useEmployerCompanyQuery(enabled);
   const createCompany = useCreateEmployerCompany();
+  const updateCompany = useUpdateEmployerCompany();
   const [companyName, setCompanyName] = useState("");
   const [website, setWebsite] = useState("");
   const [description, setDescription] = useState("");
+  const [editName, setEditName] = useState("");
+  const [editWebsite, setEditWebsite] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  const saveInFlight = useRef(false);
 
   const companyMissing =
     companyQuery.isError &&
     companyQuery.error instanceof ApiClientError &&
     companyQuery.error.status === 404;
+
+  useEffect(() => {
+    if (!companyQuery.data) {
+      return;
+    }
+    setEditName(companyQuery.data.company_name);
+    setEditWebsite(companyQuery.data.website ?? "");
+    setEditDescription(companyQuery.data.description ?? "");
+  }, [companyQuery.data]);
 
   function onCreateCompany(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -673,6 +793,34 @@ function CompanyPanel({ enabled }: Readonly<{ enabled: boolean }>) {
       website: website.trim() || null,
       description: description.trim() || null
     });
+  }
+
+  function onSaveCompany(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const trimmedName = editName.trim();
+    if (!trimmedName || saveInFlight.current || updateCompany.isPending) {
+      return;
+    }
+    saveInFlight.current = true;
+    setSaveSuccess(false);
+    updateCompany.mutate(
+      {
+        company_name: trimmedName,
+        website: editWebsite.trim() || null,
+        description: editDescription.trim() || null
+      },
+      {
+        onSuccess: (company) => {
+          setEditName(company.company_name);
+          setEditWebsite(company.website ?? "");
+          setEditDescription(company.description ?? "");
+          setSaveSuccess(true);
+        },
+        onSettled: () => {
+          saveInFlight.current = false;
+        }
+      }
+    );
   }
 
   if (companyQuery.isLoading) {
@@ -699,26 +847,90 @@ function CompanyPanel({ enabled }: Readonly<{ enabled: boolean }>) {
   }
 
   if (companyQuery.data) {
-    const company = companyQuery.data;
     return (
       <Card className="bg-background">
-        <CardContent className="space-y-2 p-4">
-          <p className="text-sm font-medium text-ink">{company.company_name}</p>
-          {company.website ? (
-            <p className="break-all text-sm text-secondary">
-              <a
-                href={company.website}
-                target="_blank"
-                rel="noreferrer"
-                className="font-medium text-primary underline-offset-2 hover:underline"
-              >
-                {company.website}
-              </a>
+        <CardContent className="space-y-4 p-4">
+          <div>
+            <p className="text-sm font-medium text-ink">Company settings</p>
+            <p className="mt-1 text-sm leading-6 text-secondary">
+              Update the company details used across your employer workspace.
             </p>
-          ) : null}
-          <p className="text-sm leading-6 text-secondary">
-            {company.description?.trim() ? company.description : "No company description."}
-          </p>
+          </div>
+          <form className="space-y-4" onSubmit={onSaveCompany}>
+            <div className="space-y-2">
+              <label htmlFor="employer-company-edit-name" className="block text-sm font-medium text-ink">
+                Company name
+              </label>
+              <Input
+                id="employer-company-edit-name"
+                value={editName}
+                onChange={(event) => {
+                  setSaveSuccess(false);
+                  setEditName(event.target.value);
+                }}
+                disabled={updateCompany.isPending}
+                maxLength={160}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <label
+                htmlFor="employer-company-edit-website"
+                className="block text-sm font-medium text-ink"
+              >
+                Website
+              </label>
+              <Input
+                id="employer-company-edit-website"
+                type="url"
+                value={editWebsite}
+                onChange={(event) => {
+                  setSaveSuccess(false);
+                  setEditWebsite(event.target.value);
+                }}
+                disabled={updateCompany.isPending}
+                placeholder="https://example.com"
+              />
+            </div>
+            <div className="space-y-2">
+              <label
+                htmlFor="employer-company-edit-description"
+                className="block text-sm font-medium text-ink"
+              >
+                Description
+              </label>
+              <textarea
+                id="employer-company-edit-description"
+                value={editDescription}
+                onChange={(event) => {
+                  setSaveSuccess(false);
+                  setEditDescription(event.target.value);
+                }}
+                disabled={updateCompany.isPending}
+                rows={3}
+                maxLength={5000}
+                className={cn(controlClassName, "px-3 py-2")}
+              />
+            </div>
+            {updateCompany.isError ? (
+              <p className="text-sm text-danger" role="alert">
+                {errorMessage(updateCompany.error)}
+              </p>
+            ) : null}
+            {saveSuccess ? (
+              <p className="text-sm text-success" role="status">
+                Company details saved.
+              </p>
+            ) : null}
+            <Button
+              type="submit"
+              variant="primary"
+              disabled={!editName.trim() || updateCompany.isPending}
+              loading={updateCompany.isPending}
+            >
+              Save company
+            </Button>
+          </form>
         </CardContent>
       </Card>
     );
@@ -919,7 +1131,7 @@ export function EmployerSection({ enabled }: Readonly<{ enabled: boolean }>) {
       {hasCompany ? <EmployerDashboard enabled /> : null}
 
       <section id="employer-company" aria-labelledby="company-overview-title">
-        <div className="flex flex-wrap items-end justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">Organization</p><h2 id="company-overview-title" className="mt-1 text-2xl font-semibold tracking-tight text-ink">Company overview</h2><p className="mt-2 text-sm leading-6 text-secondary">Keep the company information used for your existing vacancies in one place.</p></div></div>
+        <div className="flex flex-wrap items-end justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">Organization</p><h2 id="company-overview-title" className="mt-1 text-2xl font-semibold tracking-tight text-ink">Company settings</h2><p className="mt-2 text-sm leading-6 text-secondary">Keep the company information used for your existing vacancies in one place.</p></div></div>
         <div className="mt-5"><CompanyPanel enabled={enabled} /></div>
       </section>
 

@@ -27,7 +27,21 @@ vi.mock("@/lib/dashboard/hooks", () => ({
 vi.mock("@/lib/employer/hooks", () => ({
   useAddVacancyRequirement: () => ({ isPending: false, isError: false, mutate: vi.fn() }),
   useCreateEmployerCompany: () => ({ isPending: false, isError: false, mutate: vi.fn() }),
+  useUpdateEmployerCompany: () => ({
+    mutate: vi.fn(),
+    isPending: false,
+    isError: false,
+    error: null,
+    reset: vi.fn()
+  }),
   useCreateEmployerVacancy: () => ({ isPending: false, isError: false, mutate: vi.fn() }),
+  useDeleteEmployerVacancy: () => ({
+    mutate: vi.fn(),
+    isPending: false,
+    isError: false,
+    error: null,
+    reset: vi.fn()
+  }),
   useDeleteVacancyRequirement: () => ({ isPending: false, isError: false, mutate: vi.fn() }),
   useEmployerCompanyQuery: () => ({ data: null, isLoading: false, isError: false }),
   useEmployerSkillsQuery: () => ({ data: [], isLoading: false, isError: false }),

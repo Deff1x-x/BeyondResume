@@ -15,6 +15,7 @@ from app.schemas.employer import (
     AiMatchExplanationResponse,
     EmployerCompanyCreateRequest,
     EmployerCompanyResponse,
+    EmployerCompanyUpdateRequest,
     EmployerShortlistEntryResponse,
     EmployerShortlistListResponse,
     EmployerShortlistNoteUpdateRequest,
@@ -48,12 +49,15 @@ from app.schemas.interview_scorecard import (
 )
 from app.services.employer import (
     EmployerCompanyAlreadyExistsError,
+    EmployerCompanyNotFoundError,
     SkillNotAvailableError,
+    VacancyNotFoundError,
     VacancyRequirementConflictError,
     VacancyRequirementNotFoundError,
     add_vacancy_requirement,
     create_employer_company,
     create_vacancy,
+    delete_vacancy,
     delete_vacancy_requirement,
     get_employer_company,
     get_vacancy,
@@ -61,6 +65,7 @@ from app.services.employer import (
     list_vacancies,
     list_vacancy_matches,
     list_vacancy_requirements,
+    update_employer_company,
 )
 from app.services.match_details import (
     MatchDetailsCandidateNotFoundError,
@@ -139,6 +144,36 @@ def create_company(
     return EmployerCompanyResponse.model_validate(company)
 
 
+@router.patch("/company", response_model=EmployerCompanyResponse)
+def update_company(
+    request: EmployerCompanyUpdateRequest,
+    current_user: Annotated[User, Depends(require_employer)],
+    session: Annotated[Session, Depends(get_db)],
+) -> EmployerCompanyResponse:
+    fields_set = request.model_fields_set
+    if not fields_set:
+        raise api_error(
+            422,
+            "VALIDATION_ERROR",
+            "At least one company field must be provided",
+        )
+    try:
+        company = update_employer_company(
+            session,
+            current_user.id,
+            company_name=request.company_name if "company_name" in fields_set else None,
+            website=str(request.website) if request.website is not None else None,
+            description=request.description,
+            website_set="website" in fields_set,
+            description_set="description" in fields_set,
+        )
+    except EmployerCompanyNotFoundError:
+        raise api_error(404, "EMPLOYER_COMPANY_NOT_FOUND", "Company not found") from None
+    except SQLAlchemyError:
+        raise api_error(500, "DATABASE_ERROR", "Database operation failed") from None
+    return EmployerCompanyResponse.model_validate(company)
+
+
 @router.get("/vacancies", response_model=list[VacancyResponse])
 def get_vacancies(
     current_user: Annotated[User, Depends(require_employer)],
@@ -180,6 +215,22 @@ def get_vacancy_detail(
     if vacancy is None:
         raise api_error(404, "VACANCY_NOT_FOUND", "Vacancy not found")
     return VacancyResponse.model_validate(vacancy)
+
+
+@router.delete("/vacancies/{vacancy_id}", status_code=status.HTTP_204_NO_CONTENT)
+def remove_vacancy(
+    vacancy_id: UUID,
+    current_user: Annotated[User, Depends(require_employer)],
+    session: Annotated[Session, Depends(get_db)],
+) -> Response:
+    company = _require_company(session, current_user.id)
+    try:
+        delete_vacancy(session, company.id, vacancy_id)
+    except VacancyNotFoundError:
+        raise api_error(404, "VACANCY_NOT_FOUND", "Vacancy not found") from None
+    except SQLAlchemyError:
+        raise api_error(500, "DATABASE_ERROR", "Database operation failed") from None
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 def _require_owned_vacancy(session: Session, user_id: UUID, vacancy_id: UUID) -> EmployerProfile:

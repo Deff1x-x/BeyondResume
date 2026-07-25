@@ -50,7 +50,21 @@ vi.mock("@tanstack/react-query", async (importOriginal) => ({
 vi.mock("@/lib/employer/hooks", () => ({
   useAddVacancyRequirement: () => ({ isPending: false, isError: false, mutate: vi.fn() }),
   useCreateEmployerCompany: () => ({ isPending: false, isError: false, mutate: vi.fn() }),
+  useUpdateEmployerCompany: () => ({
+    mutate: vi.fn(),
+    isPending: false,
+    isError: false,
+    error: null,
+    reset: vi.fn()
+  }),
   useCreateEmployerVacancy: () => ({ isPending: false, isError: false, mutate: vi.fn() }),
+  useDeleteEmployerVacancy: () => ({
+    mutate: vi.fn(),
+    isPending: false,
+    isError: false,
+    error: null,
+    reset: vi.fn()
+  }),
   useDeleteVacancyRequirement: () => ({ isPending: false, isError: false, mutate: vi.fn() }),
   useEmployerCompanyQuery: () => companyQuery(),
   useEmployerSkillsQuery: () => ({
@@ -173,7 +187,13 @@ function readyEmployerWorkspace({
   shortlistEntries = [] as typeof shortlistEntry[]
 } = {}) {
   companyQuery.mockReturnValue({
-    data: { company_name: "Beyond", website: null, description: null },
+    data: {
+      id: "company-1",
+      company_name: "Beyond",
+      website: null,
+      description: null,
+      created_at: "2026-07-20T10:00:00Z"
+    },
     isLoading: false,
     isError: false
   });

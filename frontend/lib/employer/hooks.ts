@@ -6,6 +6,7 @@ import {
   addVacancyRequirement,
   createEmployerCompany,
   createEmployerVacancy,
+  deleteEmployerVacancy,
   deleteVacancyRequirement,
   generateMatchExplanation,
   getEmployerCompany,
@@ -18,11 +19,13 @@ import {
   listVacancyShortlist,
   removeCandidateFromShortlist,
   saveCandidateToShortlist,
+  updateEmployerCompany,
   updateEmployerShortlistNote,
   updateEmployerShortlistStage
 } from "@/lib/api/employer";
 import type {
   EmployerCompanyCreateRequest,
+  EmployerCompanyUpdateRequest,
   EmployerCandidateStage,
   EmployerShortlistResponse,
   VacancyCreateRequest,
@@ -77,6 +80,17 @@ export function useCreateEmployerCompany() {
   });
 }
 
+export function useUpdateEmployerCompany() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (request: EmployerCompanyUpdateRequest) => updateEmployerCompany(request),
+    onSuccess: (company) => {
+      queryClient.setQueryData(employerCompanyQueryKey, company);
+    }
+  });
+}
+
 export function useEmployerVacanciesQuery(enabled: boolean) {
   return useQuery({
     queryKey: employerVacanciesQueryKey,
@@ -93,6 +107,21 @@ export function useCreateEmployerVacancy() {
   return useMutation({
     mutationFn: (request: VacancyCreateRequest) => createEmployerVacancy(request),
     onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: employerVacanciesQueryKey });
+    }
+  });
+}
+
+export function useDeleteEmployerVacancy() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (vacancyId: string) => deleteEmployerVacancy(vacancyId),
+    onSuccess: (_result, vacancyId) => {
+      queryClient.removeQueries({ queryKey: employerVacancyQueryKey(vacancyId) });
+      queryClient.removeQueries({ queryKey: vacancyRequirementsQueryKey(vacancyId) });
+      queryClient.removeQueries({ queryKey: vacancyMatchesQueryKey(vacancyId) });
+      queryClient.removeQueries({ queryKey: vacancyShortlistQueryKey(vacancyId) });
       void queryClient.invalidateQueries({ queryKey: employerVacanciesQueryKey });
     }
   });

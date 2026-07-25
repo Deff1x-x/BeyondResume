@@ -12,6 +12,12 @@ export type EmployerCompanyCreateRequest = {
   description?: string | null;
 };
 
+export type EmployerCompanyUpdateRequest = {
+  company_name?: string;
+  website?: string | null;
+  description?: string | null;
+};
+
 export type VacancyStatus = "draft" | "open" | "closed";
 
 export type Vacancy = {

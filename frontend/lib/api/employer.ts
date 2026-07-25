@@ -2,6 +2,7 @@ import { apiRequest } from "@/lib/api/client";
 import type {
   EmployerCompany,
   EmployerCompanyCreateRequest,
+  EmployerCompanyUpdateRequest,
   AiMatchExplanation,
   EmployerCandidateStage,
   EmployerShortlistEntry,
@@ -29,6 +30,15 @@ export function createEmployerCompany(
   });
 }
 
+export function updateEmployerCompany(
+  request: EmployerCompanyUpdateRequest
+): Promise<EmployerCompany> {
+  return apiRequest<EmployerCompany>("/employer/company", {
+    method: "PATCH",
+    body: request
+  });
+}
+
 export function listEmployerVacancies(): Promise<Vacancy[]> {
   return apiRequest<Vacancy[]>("/employer/vacancies");
 }
@@ -42,6 +52,12 @@ export function createEmployerVacancy(request: VacancyCreateRequest): Promise<Va
 
 export function getEmployerVacancy(vacancyId: string): Promise<Vacancy> {
   return apiRequest<Vacancy>(`/employer/vacancies/${vacancyId}`);
+}
+
+export function deleteEmployerVacancy(vacancyId: string): Promise<void> {
+  return apiRequest<void>(`/employer/vacancies/${vacancyId}`, {
+    method: "DELETE"
+  });
 }
 
 export function listEmployerSkills(): Promise<SkillOption[]> {
