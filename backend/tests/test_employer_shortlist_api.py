@@ -690,7 +690,13 @@ def test_note_migration_contract_and_single_head() -> None:
     config = Config(str(Path(__file__).parents[1] / "alembic.ini"))
     script = ScriptDirectory.from_config(config)
     heads = script.get_heads()
-    assert heads == ["20260726_0018"]
+    assert heads == ["20260726_0019"]
+    assert 'down_revision: Union[str, None] = "20260726_0018"' in (
+        Path(__file__).parents[1]
+        / "alembic"
+        / "versions"
+        / "20260726_0019_employer_interview_scorecards.py"
+    ).read_text(encoding="utf-8")
 
 
 def test_note_patch_create_update_and_get(

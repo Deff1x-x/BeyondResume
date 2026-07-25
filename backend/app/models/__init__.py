@@ -3,6 +3,7 @@ from app.models.candidate_profile import CandidateProfile
 from app.models.evidence_unit import EvidenceUnit
 from app.models.evidence_skill_link import EvidenceSkillLink
 from app.models.employer_candidate_shortlist import EmployerCandidateShortlist
+from app.models.employer_interview_scorecard import EmployerInterviewScorecard
 from app.models.employer_profile import EmployerProfile
 from app.models.github_repository import GitHubRepository
 from app.models.github_repository_snapshot import GitHubRepositorySnapshot
@@ -18,6 +19,7 @@ __all__ = [
     "AuditEvent",
     "CandidateProfile",
     "EmployerCandidateShortlist",
+    "EmployerInterviewScorecard",
     "EmployerProfile",
     "EvidenceUnit",
     "EvidenceSkillLink",

@@ -41,6 +41,10 @@ from app.services.ai_hiring_intelligence import (
     get_hiring_intelligence,
 )
 from app.schemas.ai_hiring_intelligence import AiHiringIntelligenceResponse
+from app.schemas.interview_scorecard import (
+    InterviewScorecardResponse,
+    InterviewScorecardUpsertRequest,
+)
 from app.services.employer import (
     EmployerCompanyAlreadyExistsError,
     SkillNotAvailableError,
@@ -70,6 +74,12 @@ from app.services.employer_shortlist import (
     save_candidate_to_shortlist,
     update_candidate_note,
     update_candidate_stage,
+)
+from app.services.interview_scorecard import (
+    ScorecardCandidateNotFoundError,
+    ScorecardNotFoundError,
+    get_interview_scorecard,
+    upsert_interview_scorecard,
 )
 from app.services.skill_passport import build_passport
 
@@ -166,9 +176,7 @@ def get_vacancy_detail(
     return VacancyResponse.model_validate(vacancy)
 
 
-def _require_owned_vacancy(
-    session: Session, user_id: UUID, vacancy_id: UUID
-) -> EmployerProfile:
+def _require_owned_vacancy(session: Session, user_id: UUID, vacancy_id: UUID) -> EmployerProfile:
     company = _require_company(session, user_id)
     vacancy = get_vacancy(session, company.id, vacancy_id)
     if vacancy is None:
@@ -317,9 +325,7 @@ def get_vacancy_matches(
     )
 
 
-def _owned_vacancy(
-    session: Session, user_id: UUID, vacancy_id: UUID
-) -> Vacancy:
+def _owned_vacancy(session: Session, user_id: UUID, vacancy_id: UUID) -> Vacancy:
     company = _require_owned_vacancy(session, user_id, vacancy_id)
     vacancy = get_vacancy(session, company.id, vacancy_id)
     if vacancy is None:
@@ -371,9 +377,7 @@ def patch_shortlisted_candidate_stage(
             stage=body.stage,
         )
     except ShortlistEntryNotFoundError:
-        raise api_error(
-            404, "SHORTLIST_ENTRY_NOT_FOUND", "Shortlist entry not found"
-        ) from None
+        raise api_error(404, "SHORTLIST_ENTRY_NOT_FOUND", "Shortlist entry not found") from None
     except SQLAlchemyError:
         raise api_error(500, "DATABASE_ERROR", "Database operation failed") from None
     return EmployerShortlistEntryResponse.model_validate(entry)
@@ -399,9 +403,7 @@ def patch_shortlisted_candidate_note(
             note=body.note,
         )
     except ShortlistEntryNotFoundError:
-        raise api_error(
-            404, "SHORTLIST_ENTRY_NOT_FOUND", "Shortlist entry not found"
-        ) from None
+        raise api_error(404, "SHORTLIST_ENTRY_NOT_FOUND", "Shortlist entry not found") from None
     except SQLAlchemyError:
         raise api_error(500, "DATABASE_ERROR", "Database operation failed") from None
     return EmployerShortlistEntryResponse.model_validate(entry)
@@ -444,10 +446,66 @@ def get_shortlisted_candidates(
     except SQLAlchemyError:
         raise api_error(500, "DATABASE_ERROR", "Database operation failed") from None
     return EmployerShortlistListResponse(
-        entries=[
-            EmployerShortlistEntryResponse.model_validate(entry) for entry in entries
-        ]
+        entries=[EmployerShortlistEntryResponse.model_validate(entry) for entry in entries]
     )
+
+
+@router.get(
+    "/vacancies/{vacancy_id}/scorecards/{candidate_id}",
+    response_model=InterviewScorecardResponse,
+)
+def get_vacancy_interview_scorecard(
+    vacancy_id: UUID,
+    candidate_id: UUID,
+    current_user: Annotated[User, Depends(require_employer)],
+    session: Annotated[Session, Depends(get_db)],
+) -> InterviewScorecardResponse:
+    vacancy = _owned_vacancy(session, current_user.id, vacancy_id)
+    try:
+        entry = get_interview_scorecard(
+            session,
+            vacancy=vacancy,
+            candidate_id=candidate_id,
+        )
+    except ScorecardCandidateNotFoundError:
+        raise api_error(404, "CANDIDATE_NOT_FOUND", "Candidate not found") from None
+    except ScorecardNotFoundError:
+        raise api_error(404, "SCORECARD_NOT_FOUND", "Interview scorecard not found") from None
+    except SQLAlchemyError:
+        raise api_error(500, "DATABASE_ERROR", "Database operation failed") from None
+    return InterviewScorecardResponse.model_validate(entry)
+
+
+@router.put(
+    "/vacancies/{vacancy_id}/scorecards/{candidate_id}",
+    response_model=InterviewScorecardResponse,
+)
+def put_vacancy_interview_scorecard(
+    vacancy_id: UUID,
+    candidate_id: UUID,
+    body: InterviewScorecardUpsertRequest,
+    current_user: Annotated[User, Depends(require_employer)],
+    session: Annotated[Session, Depends(get_db)],
+) -> InterviewScorecardResponse:
+    vacancy = _owned_vacancy(session, current_user.id, vacancy_id)
+    try:
+        entry = upsert_interview_scorecard(
+            session,
+            vacancy=vacancy,
+            candidate_id=candidate_id,
+            technical_competency=body.technical_competency,
+            experience_relevance=body.experience_relevance,
+            communication=body.communication,
+            ownership=body.ownership,
+            interview_summary=body.interview_summary,
+            interview_notes=body.interview_notes,
+            recommendation=body.recommendation,
+        )
+    except ScorecardCandidateNotFoundError:
+        raise api_error(404, "CANDIDATE_NOT_FOUND", "Candidate not found") from None
+    except SQLAlchemyError:
+        raise api_error(500, "DATABASE_ERROR", "Database operation failed") from None
+    return InterviewScorecardResponse.model_validate(entry)
 
 
 @router.get(
@@ -463,9 +521,7 @@ def get_match_details(
     """Explainable match view for one candidate against an owned vacancy."""
     _require_owned_vacancy(session, current_user.id, vacancy_id)
     try:
-        return build_match_details(
-            session, vacancy_id=vacancy_id, candidate_id=candidate_id
-        )
+        return build_match_details(session, vacancy_id=vacancy_id, candidate_id=candidate_id)
     except MatchDetailsCandidateNotFoundError:
         raise api_error(404, "CANDIDATE_NOT_FOUND", "Candidate not found") from None
     except SQLAlchemyError:

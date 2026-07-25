@@ -349,6 +349,14 @@ export function VacancyShortlistView({ vacancyId, enabled }: VacancyShortlistVie
                         stage={entry.stage}
                         candidateLabel={match.candidate_name}
                       />
+                      {entry.stage === "interview" ? (
+                        <Link
+                          href={`/employer/matches/${encodeURIComponent(entry.candidate_id)}/scorecard?vacancy_id=${encodeURIComponent(vacancyId)}`}
+                          className="inline-flex min-h-control items-center rounded-button border border-border bg-surface px-3 text-sm font-medium text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2"
+                        >
+                          Open interview scorecard
+                        </Link>
+                      ) : null}
                       <ShortlistRemoveButton
                         vacancyId={vacancyId}
                         candidateId={entry.candidate_id}
