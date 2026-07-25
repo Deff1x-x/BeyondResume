@@ -3,13 +3,14 @@
 from dataclasses import dataclass
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import and_, func, select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.models.candidate_profile import CandidateProfile
 from app.models.employer_profile import EmployerProfile
 from app.models.skill import Skill
+from app.models.user import User
 from app.models.vacancy import Vacancy
 from app.models.vacancy_skill_requirement import VacancySkillRequirement
 from app.services.matching import MatchRequirement, MatchResult, match_passport_to_requirements
@@ -202,8 +203,41 @@ class VacancyCandidateMatch:
     result: MatchResult
 
 
+def _candidate_display_name(candidate: CandidateProfile) -> str | None:
+    """Return the canonical trimmed candidate name, or None when identity is missing."""
+    if candidate.display_name is None:
+        return None
+    name = candidate.display_name.strip()
+    return name or None
+
+
+def list_matchable_candidate_profiles(session: Session) -> list[CandidateProfile]:
+    """Return active candidate profiles that are eligible for employer matching.
+
+    Empty registration shells (no display name) are excluded. Named candidates with a
+    0% skill match remain eligible. Each profile is returned at most once.
+    """
+    return list(
+        session.execute(
+            select(CandidateProfile)
+            .join(User, User.id == CandidateProfile.user_id)
+            .where(
+                User.role == "candidate",
+                User.status == "active",
+                and_(
+                    CandidateProfile.display_name.is_not(None),
+                    func.length(func.trim(CandidateProfile.display_name)) > 0,
+                ),
+            )
+            .order_by(CandidateProfile.display_name, CandidateProfile.id)
+        )
+        .scalars()
+        .all()
+    )
+
+
 def list_vacancy_matches(session: Session, vacancy_id: UUID) -> list[VacancyCandidateMatch]:
-    """Match every candidate passport against this vacancy's structured requirements."""
+    """Match eligible candidate passports against this vacancy's structured requirements."""
     requirement_rows = list_vacancy_requirements(session, vacancy_id)
     requirements = [
         MatchRequirement(
@@ -214,17 +248,14 @@ def list_vacancy_matches(session: Session, vacancy_id: UUID) -> list[VacancyCand
         for requirement, skill in requirement_rows
     ]
 
-    candidates = (
-        session.execute(select(CandidateProfile).order_by(CandidateProfile.display_name))
-        .scalars()
-        .all()
-    )
-
     matches: list[VacancyCandidateMatch] = []
-    for candidate in candidates:
+    for candidate in list_matchable_candidate_profiles(session):
         passport = build_passport(session, candidate.id)
         result = match_passport_to_requirements(passport, requirements)
-        name = candidate.display_name.strip() if candidate.display_name else "Unnamed candidate"
+        name = _candidate_display_name(candidate)
+        if name is None:
+            # Defensive: eligibility already requires a non-empty name.
+            continue
         matches.append(
             VacancyCandidateMatch(
                 candidate_id=candidate.id,
