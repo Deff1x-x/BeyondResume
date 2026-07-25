@@ -1,12 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { SkeletonCard, SkeletonListRow } from "@/components/ui/skeleton";
+import { buildCompareHref } from "@/features/employer/candidate-comparison-view";
 import { ShortlistNoteEditor } from "@/features/employer/shortlist-note-editor";
 import { ShortlistStageControl } from "@/features/employer/shortlist-stage-control";
 import { VacancyMatchCard } from "@/features/employer/vacancy-match-card";
@@ -25,6 +26,9 @@ import {
   useVacancyMatchesQuery,
   useVacancyShortlistQuery
 } from "@/lib/employer/hooks";
+
+const MAX_COMPARE_SELECTION = 4;
+const MIN_COMPARE_SELECTION = 2;
 
 type VacancyShortlistViewProps = Readonly<{
   vacancyId: string;
@@ -53,8 +57,14 @@ function fallbackMatch(candidateId: string): VacancyMatch {
 function ShortlistRemoveButton({
   vacancyId,
   candidateId,
-  candidateName
-}: Readonly<{ vacancyId: string; candidateId: string; candidateName: string }>) {
+  candidateName,
+  onRemoved
+}: Readonly<{
+  vacancyId: string;
+  candidateId: string;
+  candidateName: string;
+  onRemoved?: (candidateId: string) => void;
+}>) {
   const removeMutation = useRemoveCandidateFromShortlist(vacancyId);
   const removingThis =
     removeMutation.isPending && removeMutation.variables === candidateId;
@@ -72,6 +82,7 @@ function ShortlistRemoveButton({
           if (removingThis) {
             return;
           }
+          onRemoved?.(candidateId);
           removeMutation.mutate(candidateId);
         }}
       >
@@ -99,6 +110,7 @@ export function VacancyShortlistView({ vacancyId, enabled }: VacancyShortlistVie
   const shortlistQuery = useVacancyShortlistQuery(vacancyId, enabled);
   const matchesQuery = useVacancyMatchesQuery(vacancyId, enabled);
   const [stageFilter, setStageFilter] = useState<StageFilter>("all");
+  const [selectedCandidateIds, setSelectedCandidateIds] = useState<string[]>([]);
 
   const matchesByCandidate = useMemo(() => {
     const map = new Map<string, VacancyMatch>();
@@ -109,10 +121,35 @@ export function VacancyShortlistView({ vacancyId, enabled }: VacancyShortlistVie
   }, [matchesQuery.data?.matches]);
 
   const entries = shortlistQuery.data?.entries ?? [];
+  const shortlistMembershipKey = useMemo(
+    () =>
+      (shortlistQuery.data?.entries ?? [])
+        .map((entry) => entry.candidate_id)
+        .join("\u0001"),
+    [shortlistQuery.data?.entries]
+  );
+
+  useEffect(() => {
+    const validIds = new Set(
+      shortlistMembershipKey === "" ? [] : shortlistMembershipKey.split("\u0001")
+    );
+    setSelectedCandidateIds((current) => {
+      const next = current.filter((id) => validIds.has(id));
+      if (next.length === current.length) {
+        return current;
+      }
+      return next;
+    });
+  }, [shortlistMembershipKey]);
+
   const visibleEntries =
     stageFilter === "all"
       ? entries
       : entries.filter((entry) => entry.stage === stageFilter);
+  const selectionCount = selectedCandidateIds.length;
+  const selectionAtMax = selectionCount >= MAX_COMPARE_SELECTION;
+  const canCompare = selectionCount >= MIN_COMPARE_SELECTION && selectionCount <= MAX_COMPARE_SELECTION;
+  const compareHref = buildCompareHref(vacancyId, selectedCandidateIds);
   const backHref = "/#employer-vacancies";
   const breadcrumb = (
     <nav aria-label="Breadcrumb" className="flex flex-wrap items-center gap-2">
@@ -125,6 +162,26 @@ export function VacancyShortlistView({ vacancyId, enabled }: VacancyShortlistVie
       <span className="text-secondary">Shortlist</span>
     </nav>
   );
+
+  function toggleCompareSelection(candidateId: string) {
+    setSelectedCandidateIds((current) => {
+      if (current.includes(candidateId)) {
+        return current.filter((id) => id !== candidateId);
+      }
+      if (current.length >= MAX_COMPARE_SELECTION) {
+        return current;
+      }
+      return [...current, candidateId];
+    });
+  }
+
+  function removeFromSelection(candidateId: string) {
+    setSelectedCandidateIds((current) =>
+      current.includes(candidateId)
+        ? current.filter((id) => id !== candidateId)
+        : current
+    );
+  }
 
   if (!enabled) {
     return (
@@ -225,6 +282,32 @@ export function VacancyShortlistView({ vacancyId, enabled }: VacancyShortlistVie
         />
       ) : null}
 
+      {entries.length > 0 ? (
+        <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-surface-subtle/60 px-4 py-3">
+          <p className="text-sm text-secondary" aria-live="polite">
+            {selectionCount} selected
+          </p>
+          {canCompare ? (
+            <Link
+              href={compareHref}
+              className="inline-flex min-h-control items-center rounded-button border border-primary bg-primary px-4 text-sm font-medium text-white shadow-sm shadow-primary/25 transition hover:-translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2"
+              aria-label="Compare selected candidates"
+            >
+              Compare selected
+            </Link>
+          ) : (
+            <Button
+              type="button"
+              variant="primary"
+              disabled
+              aria-label="Compare selected candidates"
+            >
+              Compare selected
+            </Button>
+          )}
+        </div>
+      ) : null}
+
       {entries.length > 0 && visibleEntries.length === 0 && stageFilter !== "all" ? (
         <EmptyState
           title={`No candidates in ${EMPLOYER_CANDIDATE_STAGE_LABELS[stageFilter]}.`}
@@ -239,6 +322,8 @@ export function VacancyShortlistView({ vacancyId, enabled }: VacancyShortlistVie
             const match =
               matchesByCandidate.get(entry.candidate_id) ??
               fallbackMatch(entry.candidate_id);
+            const selected = selectedCandidateIds.includes(entry.candidate_id);
+            const checkboxDisabled = selectionAtMax && !selected;
             return (
               <VacancyMatchCard
                 key={entry.id}
@@ -246,6 +331,17 @@ export function VacancyShortlistView({ vacancyId, enabled }: VacancyShortlistVie
                 vacancyId={vacancyId}
                 actions={
                   <div className="w-full space-y-4 sm:w-auto">
+                    <label className="flex items-center gap-2 text-sm text-ink">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 rounded border-border text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+                        checked={selected}
+                        disabled={checkboxDisabled}
+                        aria-label={`Select ${match.candidate_name} for comparison`}
+                        onChange={() => toggleCompareSelection(entry.candidate_id)}
+                      />
+                      <span>Compare</span>
+                    </label>
                     <div className="flex w-full flex-wrap items-start gap-3 sm:w-auto">
                       <ShortlistStageControl
                         vacancyId={vacancyId}
@@ -257,6 +353,7 @@ export function VacancyShortlistView({ vacancyId, enabled }: VacancyShortlistVie
                         vacancyId={vacancyId}
                         candidateId={entry.candidate_id}
                         candidateName={match.candidate_name}
+                        onRemoved={removeFromSelection}
                       />
                     </div>
                     <ShortlistNoteEditor
