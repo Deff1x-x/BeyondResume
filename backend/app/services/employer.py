@@ -13,10 +13,8 @@ from app.models.employer_candidate_shortlist import EmployerCandidateShortlist
 from app.models.employer_interview_scorecard import EmployerInterviewScorecard
 from app.models.employer_profile import EmployerProfile
 from app.models.skill import Skill
-from app.models.user import User
 from app.models.vacancy import Vacancy
 from app.models.vacancy_skill_requirement import VacancySkillRequirement
-from app.services.demo_users import is_demo_email
 from app.services.employer_candidate_eligibility import (
     list_employer_eligible_candidates,
     trimmed_candidate_display_name,
@@ -294,60 +292,21 @@ def list_vacancy_matches(session: Session, vacancy_id: UUID) -> list[VacancyCand
         for requirement, skill in requirement_rows
     ]
 
-    candidates = list_employer_eligible_candidates(session)
-    employer_email = session.scalar(
-        select(User.email)
-        .join(EmployerProfile, EmployerProfile.user_id == User.id)
-        .join(Vacancy, Vacancy.employer_id == EmployerProfile.id)
-        .where(Vacancy.id == vacancy_id)
-    )
-    if is_demo_email(str(employer_email) if employer_email is not None else None):
-        # Demo recommendations must never expose production candidates. Applicants
-        # are already isolated by the demo vacancy/application graph.
-        candidates = [
-            candidate for candidate in candidates if is_demo_email(candidate.user.email)
-        ]
-
-    matches: list[tuple[VacancyCandidateMatch, float, int]] = []
-    for candidate in candidates:
+    matches: list[VacancyCandidateMatch] = []
+    for candidate in list_employer_eligible_candidates(session):
         passport = build_passport(session, candidate.id)
         result = match_passport_to_requirements(passport, requirements)
         name = trimmed_candidate_display_name(candidate)
         if name is None:
             # Defensive: eligibility already requires a non-empty name.
             continue
-        evidence_strength = (
-            sum(skill.evidence_confidence for skill in passport.skills) / len(passport.skills)
-            if passport.skills
-            else 0.0
-        )
-        verified_evidence = sum(
-            1
-            for skill in passport.skills
-            for unit in skill.evidence
-            if (unit.ownership_status or "").lower() == "verified"
-            or (unit.verification_status or "").lower()
-            in {"ownership_confirmed", "issuer_verified", "platform_assessed"}
-        )
         matches.append(
-            (
-                VacancyCandidateMatch(
-                    candidate_id=candidate.id,
-                    candidate_name=name,
-                    result=result,
-                ),
-                evidence_strength,
-                verified_evidence,
+            VacancyCandidateMatch(
+                candidate_id=candidate.id,
+                candidate_name=name,
+                result=result,
             )
         )
 
-    matches.sort(
-        key=lambda item: (
-            -item[0].result.score,
-            -len(item[0].result.required.matched),
-            -item[1],
-            -item[2],
-            item[0].candidate_name.lower(),
-        )
-    )
-    return [item[0] for item in matches]
+    matches.sort(key=lambda item: (-item.result.score, item.candidate_name.lower()))
+    return matches

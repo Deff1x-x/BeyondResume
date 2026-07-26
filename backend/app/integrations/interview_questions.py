@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from app.core.llm_context import resolve_llm_provider
+from app.core.config import settings
 
 
 class InterviewQuestionsProvider(Protocol):
@@ -19,16 +19,15 @@ class InterviewQuestionsProviderConfigurationError(Exception):
 
 def get_interview_questions_provider() -> InterviewQuestionsProvider:
     """Wire the configured transport while keeping implementations lazy."""
-    provider = resolve_llm_provider()
-    if provider == "mock":
+    if settings.llm_provider == "mock":
         from app.integrations.mock_interview_questions import MockInterviewQuestionsProvider
 
         return MockInterviewQuestionsProvider()
-    if provider == "openai":
+    if settings.llm_provider == "openai":
         from app.integrations.openai_interview_questions import OpenAIInterviewQuestionsProvider
 
         return OpenAIInterviewQuestionsProvider()
 
     raise InterviewQuestionsProviderConfigurationError(
-        f"Unsupported AI Interview Questions provider: {provider!r}"
+        f"Unsupported AI Interview Questions provider: {settings.llm_provider!r}"
     )

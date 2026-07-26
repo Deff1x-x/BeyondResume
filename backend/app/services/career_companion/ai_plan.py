@@ -18,9 +18,7 @@ def enhance_plan_with_ai(
     *,
     revision_hint: str | None = None,
 ) -> tuple[list[DraftAction], str] | None:
-    from app.core.llm_context import resolve_llm_provider
-
-    provider_name = resolve_llm_provider()
+    provider_name = (settings.llm_provider or "mock").lower()
 
     prompt = _build_prompt(context, fallback_actions, revision_hint=revision_hint)
     raw = _generate(provider_name, prompt, fallback_actions)
@@ -45,9 +43,7 @@ def answer_chat_with_ai(
     actions: list[DraftAction] | list[Any],
     question: str,
 ) -> str | None:
-    from app.core.llm_context import resolve_llm_provider
-
-    provider_name = resolve_llm_provider()
+    provider_name = (settings.llm_provider or "mock").lower()
     if provider_name == "mock":
         return _mock_chat_answer(actions, question)
 

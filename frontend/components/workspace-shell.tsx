@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
 
-import { DemoModeBadge } from "@/components/demo-mode-badge";
 import { WorkspaceNavigation } from "@/components/workspace-navigation";
 import { OnboardingTour } from "@/features/onboarding/tour";
 import { CandidateOnboardingProvider } from "@/hooks/use-candidate-onboarding";
@@ -19,7 +18,6 @@ export function WorkspaceShell({
         </div>
       </main>
       {role === "candidate" ? <OnboardingTour /> : null}
-      <DemoModeBadge />
     </div>
   );
 

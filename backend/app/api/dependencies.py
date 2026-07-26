@@ -6,12 +6,10 @@ from jwt import InvalidTokenError
 from sqlalchemy.orm import Session
 
 from app.api.errors import api_error
-from app.core.llm_context import set_force_mock_llm
 from app.core.security import decode_access_token
 from app.db.session import get_db
 from app.models.user import User
 from app.services.auth import get_user_by_id
-from app.services.demo_users import is_demo_user
 
 bearer_scheme = HTTPBearer(auto_error=False)
 _bearer_header = {"WWW-Authenticate": "Bearer"}
@@ -34,9 +32,6 @@ def get_current_active_user(
     user = get_user_by_id(session, user_id)
     if user is None or user.status != "active":
         raise api_error(401, "UNAUTHORIZED", "Invalid access token", headers=_bearer_header)
-
-    # Demo Mode: force deterministic/mock AI for isolated demo tenants.
-    set_force_mock_llm(is_demo_user(user))
     return user
 
 

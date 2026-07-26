@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button, primaryActionClass, secondaryActionClass } from "@/components/ui/button";
@@ -10,7 +9,6 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { SkeletonCard } from "@/components/ui/skeleton";
 import { VacancyMatchCard } from "@/features/employer/vacancy-match-card";
 import { ShortlistSaveButton } from "@/features/employer/shortlist-save-button";
-import { buildCompareHref } from "@/features/employer/candidate-comparison-view";
 import { ApiClientError } from "@/lib/api/error";
 import type { EmployerApplicant, VacancyMatch } from "@/lib/api/types/employer";
 import {
@@ -18,9 +16,6 @@ import {
   useVacancyApplicantsQuery,
   useVacancyShortlistQuery
 } from "@/lib/employer/hooks";
-
-const MIN_COMPARE_SELECTION = 2;
-const MAX_COMPARE_SELECTION = 4;
 
 function errorMessage(error: unknown): string {
   if (error instanceof ApiClientError) {
@@ -86,18 +81,8 @@ function ApplicantContactPanel({
 function ApplicantCard({
   applicant,
   vacancyId,
-  saved,
-  selection
-}: Readonly<{
-  applicant: EmployerApplicant;
-  vacancyId: string;
-  saved: boolean;
-  selection?: Readonly<{
-    checked: boolean;
-    disabled?: boolean;
-    onChange: () => void;
-  }>;
-}>) {
+  saved
+}: Readonly<{ applicant: EmployerApplicant; vacancyId: string; saved: boolean }>) {
   const shortlistHref = `/employer/vacancies/${encodeURIComponent(vacancyId)}/shortlist`;
 
   return (
@@ -106,7 +91,6 @@ function ApplicantCard({
         match={toMatch(applicant)}
         vacancyId={vacancyId}
         saved={saved}
-        selection={selection}
         pipelineActions={
           <div className="flex flex-wrap gap-2">
             <ShortlistSaveButton
@@ -148,37 +132,11 @@ export function VacancyApplicantsView({ vacancyId }: Readonly<{ vacancyId: strin
   const applicantsQuery = useVacancyApplicantsQuery(vacancyId, true);
   const shortlistQuery = useVacancyShortlistQuery(vacancyId, true);
   const applicants = applicantsQuery.data?.applicants ?? [];
-  const savedIds = useMemo(
-    () => new Set((shortlistQuery.data?.entries ?? []).map((entry) => entry.candidate_id)),
-    [shortlistQuery.data?.entries]
+  const savedIds = new Set(
+    (shortlistQuery.data?.entries ?? []).map((entry) => entry.candidate_id)
   );
-  const [selectedCandidateIds, setSelectedCandidateIds] = useState<string[]>([]);
   const shortlistHref = `/employer/vacancies/${encodeURIComponent(vacancyId)}/shortlist`;
-  const selectionCount = selectedCandidateIds.length;
-  const canCompare =
-    selectionCount >= MIN_COMPARE_SELECTION && selectionCount <= MAX_COMPARE_SELECTION;
-  const compareHref = buildCompareHref(vacancyId, selectedCandidateIds);
-
-  function toggleCompareSelection(candidateId: string) {
-    setSelectedCandidateIds((current) => {
-      if (current.includes(candidateId)) {
-        return current.filter((id) => id !== candidateId);
-      }
-      if (current.length >= MAX_COMPARE_SELECTION) {
-        return current;
-      }
-      return [...current, candidateId];
-    });
-  }
-
-  const selectionHint =
-    selectionCount === 0
-      ? `Select ${MIN_COMPARE_SELECTION}–${MAX_COMPARE_SELECTION} shortlisted applicants to compare`
-      : selectionCount < MIN_COMPARE_SELECTION
-        ? `Select ${MIN_COMPARE_SELECTION - selectionCount} more to compare`
-        : canCompare
-          ? `${selectionCount} selected — ready to compare`
-          : `Select at most ${MAX_COMPARE_SELECTION} candidates`;
+  const compareHref = `/employer/vacancies/${encodeURIComponent(vacancyId)}/compare`;
 
   return (
     <section
@@ -198,7 +156,6 @@ export function VacancyApplicantsView({ vacancyId }: Readonly<{ vacancyId: strin
           </h3>
           <p className="mt-2 text-sm leading-6 text-secondary">
             Candidates who applied to this vacancy. Shortlist, interview, and compare from here.
-            Ordered by Match Score.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -210,15 +167,9 @@ export function VacancyApplicantsView({ vacancyId }: Readonly<{ vacancyId: strin
           <Link href={shortlistHref} className={secondaryActionClass}>
             Shortlist
           </Link>
-          {canCompare ? (
-            <Link href={compareHref} className={primaryActionClass}>
-              Compare candidates
-            </Link>
-          ) : (
-            <Button type="button" disabled>
-              Compare candidates
-            </Button>
-          )}
+          <Link href={compareHref} className={primaryActionClass}>
+            Compare
+          </Link>
         </div>
       </div>
 
@@ -252,49 +203,31 @@ export function VacancyApplicantsView({ vacancyId }: Readonly<{ vacancyId: strin
 
       {!applicantsQuery.isLoading && !applicantsQuery.isError && applicants.length > 0 ? (
         <ul className="space-y-4">
-          {applicants.map((applicant) => {
-            const saved = savedIds.has(applicant.candidate_id);
-            const checked = selectedCandidateIds.includes(applicant.candidate_id);
-            return (
-              <li key={applicant.application_id}>
-                <ApplicantCard
-                  applicant={applicant}
-                  vacancyId={vacancyId}
-                  saved={saved}
-                  selection={{
-                    checked,
-                    disabled: !saved || (!checked && selectionCount >= MAX_COMPARE_SELECTION),
-                    onChange: () => {
-                      if (!saved) {
-                        return;
-                      }
-                      toggleCompareSelection(applicant.candidate_id);
-                    }
-                  }}
-                />
-              </li>
-            );
-          })}
+          {applicants.map((applicant) => (
+            <li key={applicant.application_id}>
+              <ApplicantCard
+                applicant={applicant}
+                vacancyId={vacancyId}
+                saved={savedIds.has(applicant.candidate_id)}
+              />
+            </li>
+          ))}
         </ul>
       ) : null}
 
       {!applicantsQuery.isLoading && applicants.length > 0 ? (
         <Card>
           <CardContent className="flex flex-wrap items-center justify-between gap-3 p-5">
-            <p className="text-sm text-secondary">{selectionHint}</p>
+            <p className="text-sm text-secondary">
+              Use the shortlist to manage hiring stages, then compare shortlisted applicants.
+            </p>
             <div className="flex flex-wrap gap-2">
               <Link href={shortlistHref} className={secondaryActionClass}>
                 Manage shortlist
               </Link>
-              {canCompare ? (
-                <Link href={compareHref} className={primaryActionClass}>
-                  Compare candidates
-                </Link>
-              ) : (
-                <Button type="button" disabled>
-                  Compare candidates
-                </Button>
-              )}
+              <Link href={compareHref} className={primaryActionClass}>
+                Compare applicants
+              </Link>
             </div>
           </CardContent>
         </Card>

@@ -3,11 +3,9 @@ from fastapi.exceptions import RequestValidationError
 
 from app.api.errors import http_exception_handler, validation_exception_handler
 from app.api.v1.router import router as api_v1_router
-from app.core.demo_llm_middleware import DemoLlmMiddleware
 
 
 app = FastAPI()
-app.add_middleware(DemoLlmMiddleware)
 app.add_exception_handler(HTTPException, http_exception_handler)
 app.add_exception_handler(RequestValidationError, validation_exception_handler)
 app.include_router(api_v1_router)

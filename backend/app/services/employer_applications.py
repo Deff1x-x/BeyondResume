@@ -69,11 +69,7 @@ def require_active_application(
 
 
 def list_vacancy_applicants(session: Session, *, vacancy: Vacancy) -> list[VacancyApplicant]:
-    """List active eligible applicants for an owned vacancy.
-
-    Ordered by match quality first (score, required coverage, name), then application id
-    for a stable deterministic tie-break — not by application recency alone.
-    """
+    """List active eligible applicants for an owned vacancy, newest application first."""
     rows = session.execute(
         select(Application, CandidateProfile)
         .join(CandidateProfile, CandidateProfile.id == Application.candidate_id)
@@ -83,6 +79,7 @@ def list_vacancy_applicants(session: Session, *, vacancy: Vacancy) -> list[Vacan
             Application.status == ACTIVE_APPLICATION_STATUS,
             *employer_eligible_candidate_filters(),
         )
+        .order_by(Application.created_at.desc(), Application.id.desc())
     ).all()
 
     requirement_rows = list_vacancy_requirements(session, vacancy.id)
@@ -110,14 +107,6 @@ def list_vacancy_applicants(session: Session, *, vacancy: Vacancy) -> list[Vacan
                 result=result,
             )
         )
-    applicants.sort(
-        key=lambda item: (
-            -item.result.score,
-            -len(item.result.required.matched),
-            item.candidate_name.lower(),
-            str(item.application.id),
-        )
-    )
     return applicants
 
 

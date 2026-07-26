@@ -9,7 +9,6 @@ import type {
   VacancyMatch
 } from "@/lib/api/types/employer";
 import { EMPLOYER_CANDIDATE_STAGE_LABELS } from "@/lib/api/types/employer";
-import { buildMatchScoreExplanations } from "@/lib/employer/match-score-explanations";
 
 type VacancyMatchCardProps = Readonly<{
   match: VacancyMatch;
@@ -87,7 +86,6 @@ export function VacancyMatchCard({
   const href = `/employer/matches/${match.candidate_id}?vacancy_id=${encodeURIComponent(vacancyId)}`;
   const requiredTotal = match.required.matched.length + match.required.missing.length;
   const preferredTotal = match.preferred.matched.length + match.preferred.missing.length;
-  const explanations = buildMatchScoreExplanations(match);
   const isSelected = selected || selection?.checked === true;
   const hasStructuredChrome =
     selection != null || pipelineActions != null || notes != null;
@@ -201,16 +199,6 @@ export function VacancyMatchCard({
             )}
           </div>
         </dl>
-        {explanations.length > 0 ? (
-          <ul className="space-y-1.5 text-sm leading-6 text-secondary">
-            {explanations.map((line) => (
-              <li key={line} className="flex gap-2">
-                <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-primary/70" aria-hidden="true" />
-                <span>{line}</span>
-              </li>
-            ))}
-          </ul>
-        ) : null}
       </div>
 
       {/* Actions */}

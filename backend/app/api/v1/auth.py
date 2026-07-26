@@ -21,7 +21,6 @@ from app.services.auth import (
     register_user,
     validate_registration_password,
 )
-from app.services.demo_users import is_demo_email, is_demo_user
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -37,9 +36,6 @@ def register(
 ) -> TokenResponse | VerificationRequiredResponse:
     if not payload.terms_accepted or not payload.privacy_accepted:
         raise api_error(422, "CONSENT_REQUIRED", "Terms and Privacy consent are required")
-
-    if is_demo_email(str(payload.email)):
-        raise api_error(403, "DEMO_EMAIL_RESERVED", "Demo Mode emails cannot be registered")
 
     try:
         validate_registration_password(payload.password, payload.password_confirmation)
@@ -83,4 +79,4 @@ def login(
     user = authenticate_user(session, str(payload.email), payload.password)
     if user is None:
         raise api_error(401, "INVALID_CREDENTIALS", "Invalid credentials")
-    return TokenResponse(access_token=create_access_token(user.id, demo=is_demo_user(user)))
+    return TokenResponse(access_token=create_access_token(user.id))
