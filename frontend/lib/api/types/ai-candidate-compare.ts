@@ -18,6 +18,13 @@ export type CandidateAssessment = {
   risks: GroundedInsight[];
 };
 
+export type HiringRecommendation = {
+  why_leads: GroundedInsight[];
+  main_risk: GroundedInsight;
+  interview_focus: GroundedInsight[];
+  alternative_outcome: GroundedInsight;
+};
+
 export type AiCandidateCompareRequest = {
   candidate_ids: string[];
 };
@@ -30,8 +37,8 @@ export type AiCandidateCompareResponse = {
   candidate_assessments: CandidateAssessment[];
   key_differences: GroundedInsight[];
   interview_focus_questions: GroundedQuestion[];
-  recommended_candidate_id: string | null;
-  recommendation_rationale: GroundedInsight | null;
+  recommended_candidate_id: string;
+  hiring_recommendation: HiringRecommendation;
   confidence: AiCandidateCompareConfidence;
   uncertainties: GroundedInsight[];
 };

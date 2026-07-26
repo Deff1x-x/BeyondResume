@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { EvidenceIntelligenceFlow } from "@/components/evidence-intelligence-flow";
 import { Icon } from "@/components/ui/icon";
 import { CompareFlowSteps } from "@/features/employer/compare-flow-chrome";
+import { HiringRecommendationCard } from "@/features/employer/hiring-recommendation-card";
 import { cn } from "@/lib/cn";
 import { ApiClientError } from "@/lib/api/error";
 import type { AiCandidateCompareResponse } from "@/lib/api/types/ai-candidate-compare";
@@ -55,14 +56,6 @@ function InsightList({
       </ul>
     </div>
   );
-}
-
-function confidenceTone(confidence: string): "success" | "warning" | "neutral" | "ai" {
-  const value = confidence.toLowerCase();
-  if (value.includes("high")) return "success";
-  if (value.includes("medium") || value.includes("moderate")) return "warning";
-  if (value.includes("low")) return "neutral";
-  return "ai";
 }
 
 export function AiCandidateCompareSection({
@@ -279,26 +272,11 @@ export function AiCandidateCompareSection({
             </div>
           ) : null}
 
-          <div className="rounded-card border border-accent/35 bg-accent/10 p-5 sm:p-6">
-            <div className="flex flex-wrap items-center gap-2">
-              <h3 className="text-sm font-semibold tracking-tight text-ink">Recommendation</h3>
-              <Badge variant={confidenceTone(display.confidence)}>
-                Confidence: {display.confidence}
-              </Badge>
-            </div>
-            {display.recommended_candidate_id ? (
-              <div className="mt-4 space-y-2 text-sm leading-7 text-ink">
-                <p className="font-display text-lg font-semibold tracking-tight">
-                  {candidateLabel(display.recommended_candidate_id, candidateNamesById)}
-                </p>
-                {display.recommendation_rationale ? (
-                  <p className="text-secondary">{display.recommendation_rationale.text}</p>
-                ) : null}
-              </div>
-            ) : (
-              <p className="mt-4 text-sm leading-6 text-secondary">No clear recommendation</p>
-            )}
-          </div>
+          <HiringRecommendationCard
+            leaderName={candidateLabel(display.recommended_candidate_id, candidateNamesById)}
+            confidence={display.confidence}
+            recommendation={display.hiring_recommendation}
+          />
 
           <InsightList title="Uncertainties" items={display.uncertainties} />
 

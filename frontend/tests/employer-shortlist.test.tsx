@@ -458,17 +458,23 @@ describe("Employer shortlist UI", () => {
     expect(screen.getByRole("link", { name: "Review candidate Bea Chen" })).toBeInTheDocument();
   });
 
-  it("shows Recommended Candidates and Applicants empty state with shortlist entry point", () => {
+  it("shows Recommended Candidates and Applicants empty state with AI Candidate Comparison entry point", () => {
     readyEmployerWorkspace({ shortlistEntries: [shortlistEntry] });
     render(<EmployerSection enabled />);
     fireEvent.click(screen.getByRole("button", { name: "Manage vacancy" }));
 
     expect(screen.getByRole("heading", { name: "Applicants" })).toBeInTheDocument();
     expect(screen.getByText("No applicants yet")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Shortlist" })).toHaveAttribute(
+    expect(screen.getByText("0 applicants")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Shortlist" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Compare" })).not.toBeInTheDocument();
+    const comparisonLink = screen.getByRole("link", { name: "AI Candidate Comparison" });
+    expect(comparisonLink).toHaveAttribute(
       "href",
       "/employer/vacancies/vacancy-1/shortlist"
     );
+    expect(comparisonLink).toHaveTextContent("1 shortlisted");
+    expect(comparisonLink.getAttribute("href")).not.toContain("/compare");
     expect(screen.getAllByRole("heading", { name: "Recommended Candidates" }).length).toBeGreaterThan(0);
 
     const linksAll = screen
@@ -570,7 +576,12 @@ describe("Employer shortlist UI", () => {
 
     render(<VacancyShortlistView vacancyId="vacancy-1" enabled />);
 
-    expect(screen.getByText("No saved candidates yet.")).toBeInTheDocument();
+    expect(screen.getByText("No candidates shortlisted yet.")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Add candidates from Applicants or Recommended before starting AI comparison."
+      )
+    ).toBeInTheDocument();
   });
 
   it("renders existing shortlist entries with remove actions", async () => {
@@ -657,7 +668,7 @@ describe("Employer shortlist UI", () => {
     render(<VacancyShortlistView vacancyId="vacancy-1" enabled />);
 
     expect(screen.getByRole("alert")).toHaveTextContent("Database operation failed");
-    expect(screen.queryByText("No saved candidates yet.")).not.toBeInTheDocument();
+    expect(screen.queryByText("No candidates shortlisted yet.")).not.toBeInTheDocument();
   });
 
   it("filters the shortlist page by hiring stage without changing backend order", () => {

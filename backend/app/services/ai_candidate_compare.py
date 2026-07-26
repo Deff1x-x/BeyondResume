@@ -291,7 +291,7 @@ def get_ai_candidate_compare(
         key_differences=llm_result.key_differences,
         interview_focus_questions=llm_result.interview_focus_questions,
         recommended_candidate_id=llm_result.recommended_candidate_id,
-        recommendation_rationale=llm_result.recommendation_rationale,
+        hiring_recommendation=llm_result.hiring_recommendation,
         confidence=llm_result.confidence,
         uncertainties=llm_result.uncertainties,
     )
@@ -421,13 +421,8 @@ def _validate_semantics(
     if len(assessments) != len(expected):
         raise AiCandidateCompareUnavailableError("Missing candidate assessment")
 
-    if result.recommended_candidate_id is not None:
-        if result.recommended_candidate_id not in expected:
-            raise AiCandidateCompareUnavailableError("Recommended candidate is not in request")
-        if result.recommendation_rationale is None:
-            raise AiCandidateCompareUnavailableError("Missing recommendation rationale")
-    elif result.recommendation_rationale is not None:
-        raise AiCandidateCompareUnavailableError("Unexpected recommendation rationale")
+    if result.recommended_candidate_id not in expected:
+        raise AiCandidateCompareUnavailableError("Recommended candidate is not in request")
 
     for assessment in assessments:
         for insight in [*assessment.strengths, *assessment.risks]:
@@ -446,13 +441,19 @@ def _validate_semantics(
         )
         _assert_safe_text(insight.text)
 
-    if result.recommendation_rationale is not None:
+    recommendation = result.hiring_recommendation
+    for insight in [
+        *recommendation.why_leads,
+        recommendation.main_risk,
+        *recommendation.interview_focus,
+        recommendation.alternative_outcome,
+    ]:
         _assert_insight_grounding(
-            result.recommendation_rationale,
+            insight,
             allowed_candidates=expected,
             fact_ids=context.fact_ids,
         )
-        _assert_safe_text(result.recommendation_rationale.text)
+        _assert_safe_text(insight.text)
 
     _assert_safe_text(result.summary)
 

@@ -42,6 +42,18 @@ def _fact_ref_count(result: object) -> int:
     rationale = data.get("recommendation_rationale")
     if isinstance(rationale, dict):
         count += len(rationale.get("fact_refs") or [])
+    hiring = data.get("hiring_recommendation")
+    if isinstance(hiring, dict):
+        for insight in hiring.get("why_leads") or []:
+            if isinstance(insight, dict):
+                count += len(insight.get("fact_refs") or [])
+        for key in ("main_risk", "alternative_outcome"):
+            insight = hiring.get(key)
+            if isinstance(insight, dict):
+                count += len(insight.get("fact_refs") or [])
+        for insight in hiring.get("interview_focus") or []:
+            if isinstance(insight, dict):
+                count += len(insight.get("fact_refs") or [])
     return count
 
 

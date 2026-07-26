@@ -2,15 +2,18 @@
 
 import Link from "next/link";
 
+import { ActionCard } from "@/components/ui/action-card";
 import { Badge } from "@/components/ui/badge";
 import { Button, primaryActionClass, secondaryActionClass } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Icon } from "@/components/ui/icon";
 import { SkeletonCard } from "@/components/ui/skeleton";
 import { VacancyMatchCard } from "@/features/employer/vacancy-match-card";
 import { ShortlistSaveButton } from "@/features/employer/shortlist-save-button";
 import { ApiClientError } from "@/lib/api/error";
 import type { EmployerApplicant, VacancyMatch } from "@/lib/api/types/employer";
+import { cn } from "@/lib/cn";
 import {
   useApplicantContactQuery,
   useVacancyApplicantsQuery,
@@ -94,22 +97,34 @@ function ApplicantCard({
         vacancyId={vacancyId}
         saved={saved}
         pipelineActions={
-          <div className="flex flex-wrap gap-2">
+          <>
             <ShortlistSaveButton
               vacancyId={vacancyId}
               candidateId={applicant.candidate_id}
               candidateName={applicant.candidate_name}
             />
-            <Link href={questionsHref} className={secondaryActionClass}>
-              Interview questions
-            </Link>
-            <Link href={scorecardHref} className={secondaryActionClass}>
-              Scorecard
-            </Link>
-            <Link href={shortlistHref} className={secondaryActionClass}>
-              Open shortlist
-            </Link>
-          </div>
+            <ActionCard
+              href={questionsHref}
+              icon="message-square-question"
+              iconTone="ai"
+              title="Interview questions"
+              description="AI-generated interview plan"
+            />
+            <ActionCard
+              href={scorecardHref}
+              icon="clipboard-check"
+              iconTone="primary"
+              title="Scorecard"
+              description="Evaluate interview"
+            />
+            <ActionCard
+              href={shortlistHref}
+              icon="folder-open"
+              iconTone="accent"
+              title="Open shortlist"
+              description="View all shortlisted candidates"
+            />
+          </>
         }
         notes={
           <div className="space-y-3">
@@ -141,9 +156,9 @@ export function VacancyApplicantsView({ vacancyId }: Readonly<{ vacancyId: strin
   const applicantsQuery = useVacancyApplicantsQuery(vacancyId, true);
   const shortlistQuery = useVacancyShortlistQuery(vacancyId, true);
   const applicants = applicantsQuery.data?.applicants ?? [];
-  const savedIds = new Set(
-    (shortlistQuery.data?.entries ?? []).map((entry) => entry.candidate_id)
-  );
+  const shortlistEntries = shortlistQuery.data?.entries;
+  const shortlistCount = shortlistEntries?.length;
+  const savedIds = new Set((shortlistEntries ?? []).map((entry) => entry.candidate_id));
   const shortlistHref = `/employer/vacancies/${encodeURIComponent(vacancyId)}/shortlist`;
   const compareHref = `/employer/vacancies/${encodeURIComponent(vacancyId)}/compare`;
 
@@ -152,8 +167,8 @@ export function VacancyApplicantsView({ vacancyId }: Readonly<{ vacancyId: strin
       aria-labelledby={`vacancy-applicants-title-${vacancyId}`}
       className="space-y-6 border-t border-border pt-6"
     >
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
+      <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
+        <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">
             Hiring pipeline
           </p>
@@ -164,20 +179,34 @@ export function VacancyApplicantsView({ vacancyId }: Readonly<{ vacancyId: strin
             Applicants
           </h3>
           <p className="mt-2 text-sm leading-6 text-secondary">
-            Candidates who applied to this vacancy. Shortlist, interview, and compare from here.
+            Candidates who applied to this vacancy. Shortlist strong fits, then compare with AI.
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex w-full flex-col items-stretch gap-2 sm:w-auto sm:flex-row sm:items-center sm:justify-end">
           {applicantsQuery.data ? (
-            <Badge variant="neutral">
+            <Badge variant="neutral" className="w-fit">
               {applicants.length} {applicants.length === 1 ? "applicant" : "applicants"}
             </Badge>
           ) : null}
-          <Link href={shortlistHref} className={secondaryActionClass}>
-            Shortlist
-          </Link>
-          <Link href={compareHref} className={primaryActionClass}>
-            Compare
+          <Link
+            href={shortlistHref}
+            className={cn(
+              primaryActionClass,
+              "h-auto w-full justify-center gap-2.5 px-5 py-2.5 text-left sm:w-auto sm:min-w-[14.5rem]"
+            )}
+            aria-label="AI Candidate Comparison"
+          >
+            <Icon name="spark" className="h-4 w-4 shrink-0" aria-hidden="true" />
+            <span className="min-w-0">
+              <span className="block text-sm font-semibold leading-5 tracking-tight">
+                AI Candidate Comparison
+              </span>
+              <span className="mt-0.5 block text-xs font-medium leading-4 text-accent-foreground/75">
+                {typeof shortlistCount === "number"
+                  ? `${shortlistCount} shortlisted`
+                  : "Shortlist and compare candidates"}
+              </span>
+            </span>
           </Link>
         </div>
       </div>

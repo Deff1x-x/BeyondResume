@@ -1,7 +1,6 @@
-import Link from "next/link";
-import { primaryActionClass, secondaryActionClass } from "@/components/ui/button";
 import type { ReactNode } from "react";
 
+import { ActionCard, ActionCardGrid } from "@/components/ui/action-card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/cn";
 import type {
@@ -89,9 +88,6 @@ export function VacancyMatchCard({
   const isSelected = selected || selection?.checked === true;
   const hasStructuredChrome =
     selection != null || pipelineActions != null || notes != null;
-
-  const reviewClassName =
-    reviewVariant === "primary" ? primaryActionClass : secondaryActionClass;
 
   return (
     <li
@@ -238,21 +234,22 @@ export function VacancyMatchCard({
           </label>
         ) : null}
 
-        <div className="flex flex-wrap items-center gap-3">
-          <Link
+        <ActionCardGrid>
+          <ActionCard
             href={href}
-            className={reviewClassName}
+            icon="user-search"
+            title="Review candidate"
+            description="Open full profile and evidence"
+            variant={reviewVariant === "primary" ? "primary" : "secondary"}
             aria-label={`Review candidate ${match.candidate_name}`}
-          >
-            Review candidate
-          </Link>
+          />
           {pipelineActions ? (
-            <div className="flex min-h-control flex-wrap items-center gap-3">
-              {pipelineActions}
-            </div>
+            <div className="contents">{pipelineActions}</div>
           ) : null}
-          {!hasStructuredChrome ? actions : null}
-        </div>
+          {!hasStructuredChrome && actions ? (
+            <div className="contents">{actions}</div>
+          ) : null}
+        </ActionCardGrid>
       </div>
 
       {/* Private notes */}

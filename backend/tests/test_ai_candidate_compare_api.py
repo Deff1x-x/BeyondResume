@@ -100,8 +100,38 @@ def _sample_response(vacancy_id: UUID, candidate_ids: list[UUID]) -> AiCandidate
                     "fact_refs": [f"candidate:{left}:match-score"],
                 }
             ],
-            "recommended_candidate_id": None,
-            "recommendation_rationale": None,
+            "recommended_candidate_id": str(left),
+            "hiring_recommendation": {
+                "why_leads": [
+                    {
+                        "text": "Narrow lead on required-skill evidence in supplied facts.",
+                        "fact_refs": [
+                            f"candidate:{left}:match-score",
+                            f"candidate:{right}:match-score",
+                        ],
+                    }
+                ],
+                "main_risk": {
+                    "text": "Evidence depth is limited.",
+                    "fact_refs": [f"candidate:{left}:match-score"],
+                },
+                "interview_focus": [
+                    {
+                        "text": "Validate ownership of strongest required skills",
+                        "fact_refs": [f"candidate:{left}:match-score"],
+                    }
+                ],
+                "alternative_outcome": {
+                    "text": (
+                        "If interview evidence favors the trailing candidate on ownership, "
+                        "that candidate becomes the stronger choice."
+                    ),
+                    "fact_refs": [
+                        f"candidate:{left}:match-score",
+                        f"candidate:{right}:match-score",
+                    ],
+                },
+            },
             "confidence": "low",
             "uncertainties": [
                 {
@@ -302,7 +332,8 @@ def test_ai_compare_success(
     assert response.status_code == 200
     body = response.json()
     assert body["generation_mode"] == "mock"
-    assert body["recommended_candidate_id"] is None
+    assert body["recommended_candidate_id"] == str(selected[0])
+    assert body["hiring_recommendation"]["why_leads"]
     assert len(body["candidate_assessments"]) == 2
 
 

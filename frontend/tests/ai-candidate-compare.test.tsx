@@ -58,9 +58,31 @@ function sampleResponse(
       }
     ],
     recommended_candidate_id: "candidate-1",
-    recommendation_rationale: {
-      text: "Stronger required coverage in supplied facts.",
-      fact_refs: ["f1"]
+    hiring_recommendation: {
+      why_leads: [
+        {
+          text: "Stronger required coverage in supplied facts.",
+          fact_refs: ["f1"]
+        }
+      ],
+      main_risk: {
+        text: "Missing GraphQL evidence still needs interview validation.",
+        fact_refs: ["f2"]
+      },
+      interview_focus: [
+        {
+          text: "TypeScript service ownership",
+          fact_refs: ["f1"]
+        },
+        {
+          text: "GraphQL delivery experience",
+          fact_refs: ["f2"]
+        }
+      ],
+      alternative_outcome: {
+        text: "If GraphQL ownership cannot be confirmed, Bea Chen becomes the stronger candidate.",
+        fact_refs: ["f2", "f3"]
+      }
     },
     confidence: "medium",
     uncertainties: [
@@ -191,17 +213,24 @@ describe("AiCandidateCompareSection", () => {
     expect(screen.getByText("Demo AI")).toBeInTheDocument();
   });
 
-  it("shows no clear recommendation when recommended_candidate_id is null", async () => {
-    postVacancyAiCompare.mockResolvedValue(
-      sampleResponse({
-        recommended_candidate_id: null,
-        recommendation_rationale: null,
-        confidence: "low"
-      })
-    );
+  it("renders a structured hiring recommendation card for the current leader", async () => {
+    postVacancyAiCompare.mockResolvedValue(sampleResponse({ confidence: "low" }));
     renderSection();
     fireEvent.click(screen.getByRole("button", { name: "Generate AI comparison" }));
-    expect(await screen.findByText("No clear recommendation")).toBeInTheDocument();
+    expect(await screen.findByText("Hiring Recommendation")).toBeInTheDocument();
+    expect(screen.getByText("Current Leader")).toBeInTheDocument();
+    const recommendation = screen.getByRole("region", { name: "Hiring Recommendation" });
+    expect(recommendation).toHaveTextContent("Alex Morgan");
+    expect(recommendation).toHaveTextContent("Low");
+    expect(recommendation).toHaveTextContent("Stronger required coverage in supplied facts.");
+    expect(recommendation).toHaveTextContent(
+      "Missing GraphQL evidence still needs interview validation."
+    );
+    expect(recommendation).toHaveTextContent("TypeScript service ownership");
+    expect(recommendation).toHaveTextContent(
+      "If GraphQL ownership cannot be confirmed, Bea Chen becomes the stronger candidate."
+    );
+    expect(screen.queryByText("No clear recommendation")).not.toBeInTheDocument();
   });
 
   it("maps candidate ids to local names and never invents client pseudo-AI text", async () => {

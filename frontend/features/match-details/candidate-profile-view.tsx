@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
+import { ActionCard, ActionCardGrid } from "@/components/ui/action-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -152,37 +153,41 @@ function MatchHero({
           <p className="text-xs font-semibold uppercase tracking-[0.12em] text-secondary">
             Hiring actions
           </p>
-          <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center">
+          <ActionCardGrid>
             <ShortlistSaveButton
               vacancyId={vacancyId}
               candidateId={candidateId}
               candidateName={details.candidate.name}
             />
-            {savedEntry ? (
+            {showInterviewActions ? (
+              <>
+                <ActionCard
+                  href={questionsHref}
+                  icon="message-square-question"
+                  iconTone="ai"
+                  title="Interview questions"
+                  description="AI-generated interview plan"
+                />
+                <ActionCard
+                  href={scorecardHref}
+                  icon="clipboard-check"
+                  iconTone="primary"
+                  title="Interview scorecard"
+                  description="Evaluate interview"
+                />
+              </>
+            ) : null}
+          </ActionCardGrid>
+          {savedEntry ? (
+            <div className="max-w-md">
               <ShortlistStageControl
                 vacancyId={vacancyId}
                 candidateId={candidateId}
                 stage={savedEntry.stage}
                 candidateLabel={details.candidate.name}
               />
-            ) : null}
-            {showInterviewActions ? (
-              <>
-                <Link
-                  href={questionsHref}
-                  className="inline-flex min-h-control items-center rounded-button border border-border bg-surface px-4 text-sm font-medium text-ink shadow-sm transition duration-200 hover:-translate-y-px hover:border-border-strong hover:bg-surface-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2"
-                >
-                  Interview questions
-                </Link>
-                <Link
-                  href={scorecardHref}
-                  className="inline-flex min-h-control items-center rounded-button border border-border bg-surface px-4 text-sm font-medium text-ink shadow-sm transition duration-200 hover:-translate-y-px hover:border-border-strong hover:bg-surface-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2"
-                >
-                  Interview scorecard
-                </Link>
-              </>
-            ) : null}
-          </div>
+            </div>
+          ) : null}
         </div>
 
         {savedEntry ? (

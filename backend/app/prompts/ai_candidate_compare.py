@@ -5,17 +5,35 @@ from __future__ import annotations
 from app.schemas.ai_candidate_compare import AiCandidateCompareLlmPayload
 
 
-PROMPT_VERSION = "ai-candidate-compare-v5"
-SCHEMA_VERSION = "ai-candidate-compare-schema-v1"
+PROMPT_VERSION = "ai-candidate-compare-v6"
+SCHEMA_VERSION = "ai-candidate-compare-schema-v2"
 RESPONSE_JSON_SCHEMA = AiCandidateCompareLlmPayload.model_json_schema()
 MAX_SYSTEM_RULES_CHARS = 5000
 
 
-def _example_json(*, with_recommendation: bool) -> str:
+def _hiring_recommendation(
+    *,
+    leader: str,
+    runner: str,
+    why: list[dict[str, object]],
+    main_risk: dict[str, object],
+    interview_focus: list[dict[str, object]],
+    alternative_outcome: dict[str, object],
+) -> dict[str, object]:
+    del leader, runner  # display labels live in INPUT; IDs are referenced via fact_refs
+    return {
+        "why_leads": why,
+        "main_risk": main_risk,
+        "interview_focus": interview_focus,
+        "alternative_outcome": alternative_outcome,
+    }
+
+
+def _example_json(*, close_race: bool) -> str:
     """DTO fixtures for tests only — not concatenated into the runtime prompt."""
     candidate_a = "11111111-1111-1111-1111-111111111111"
     candidate_b = "22222222-2222-2222-2222-222222222222"
-    if with_recommendation:
+    if not close_race:
         payload: dict[str, object] = {
             "summary": (
                 "If you decide today, Candidate A is the only profile you can underwrite "
@@ -112,20 +130,71 @@ def _example_json(*, with_recommendation: bool) -> str:
                 }
             ],
             "recommended_candidate_id": candidate_a,
-            "recommendation_rationale": {
-                "text": (
-                    "Decide for Candidate A today because only that profile has "
-                    "underwritable evidence for near-term contribution. Confidence is "
-                    "medium: production data-layer depth could still change sequencing. "
-                    "Credible recent backend ownership from Candidate B would reopen "
-                    "the ranking."
-                ),
-                "fact_refs": [
-                    f"candidate:{candidate_a}:matched-required:python",
-                    f"candidate:{candidate_a}:evidence:a1b2c3d4e5f60718",
-                    f"candidate:{candidate_b}:missing-required:python",
+            "hiring_recommendation": _hiring_recommendation(
+                leader=candidate_a,
+                runner=candidate_b,
+                why=[
+                    {
+                        "text": "Better required-skill coverage with corroborating sources",
+                        "fact_refs": [
+                            f"candidate:{candidate_a}:matched-required:python",
+                            f"candidate:{candidate_a}:evidence:a1b2c3d4e5f60718",
+                        ],
+                    },
+                    {
+                        "text": "Stronger evidence quality for near-term backend delivery",
+                        "fact_refs": [
+                            f"candidate:{candidate_a}:evidence:a1b2c3d4e5f60718",
+                        ],
+                    },
+                    {
+                        "text": "Higher ownership confidence relative to Candidate B",
+                        "fact_refs": [
+                            f"candidate:{candidate_a}:evidence:a1b2c3d4e5f60718",
+                            f"candidate:{candidate_b}:missing-required:python",
+                        ],
+                    },
                 ],
-            },
+                main_risk={
+                    "text": "Data-layer ownership still requires interview validation.",
+                    "fact_refs": [
+                        f"candidate:{candidate_a}:missing-required:postgresql",
+                        "vacancy:required-skill:postgresql",
+                    ],
+                },
+                interview_focus=[
+                    {
+                        "text": "Production data-layer ownership",
+                        "fact_refs": [
+                            f"candidate:{candidate_a}:missing-required:postgresql",
+                            "vacancy:required-skill:postgresql",
+                        ],
+                    },
+                    {
+                        "text": "Backend architecture trade-offs",
+                        "fact_refs": [
+                            f"candidate:{candidate_a}:matched-required:python",
+                            f"candidate:{candidate_a}:evidence:a1b2c3d4e5f60718",
+                        ],
+                    },
+                    {
+                        "text": "Evidence of repository ownership",
+                        "fact_refs": [
+                            f"candidate:{candidate_a}:evidence:a1b2c3d4e5f60718",
+                        ],
+                    },
+                ],
+                alternative_outcome={
+                    "text": (
+                        "If recent production backend ownership from Candidate B is "
+                        "confirmed, Candidate B becomes the stronger choice."
+                    ),
+                    "fact_refs": [
+                        f"candidate:{candidate_b}:missing-required:python",
+                        "vacancy:required-skill:python",
+                    ],
+                },
+            ),
             "confidence": "medium",
             "uncertainties": [
                 {
@@ -144,10 +213,9 @@ def _example_json(*, with_recommendation: bool) -> str:
     else:
         payload = {
             "summary": (
-                "Do not force a ranking today: both profiles underwrite similarly on "
-                "the core requirement and share the same preferred-tooling gap, so the "
-                "table alone cannot decide. Wait for one differentiating signal on "
-                "production ownership."
+                "Both profiles underwrite similarly on the core requirement and share "
+                "the same preferred-tooling gap. Candidate A leads narrowly on "
+                "evaluability, but one ownership signal could reverse the ranking."
             ),
             "candidate_assessments": [
                 {
@@ -155,8 +223,8 @@ def _example_json(*, with_recommendation: bool) -> str:
                     "strengths": [
                         {
                             "text": (
-                                "Core backend coverage is enough for a usable baseline, "
-                                "but it does not create a hiring edge versus Candidate B."
+                                "Core backend coverage is enough for a usable baseline "
+                                "and currently edges Candidate B on evaluability."
                             ),
                             "fact_refs": [
                                 f"candidate:{candidate_a}:matched-required:python"
@@ -183,7 +251,7 @@ def _example_json(*, with_recommendation: bool) -> str:
                         {
                             "text": (
                                 "Baseline readiness looks comparable; nothing here "
-                                "justifies treating Candidate B as safer than A."
+                                "justifies treating Candidate B as safer than A yet."
                             ),
                             "fact_refs": [
                                 f"candidate:{candidate_b}:matched-required:python"
@@ -207,9 +275,8 @@ def _example_json(*, with_recommendation: bool) -> str:
             "key_differences": [
                 {
                     "text": (
-                        "There is no underwritable distinction yet: both look "
-                        "evaluable on the core stack and both leave the same "
-                        "preferred-tooling question open."
+                        "The distinction is thin: both look evaluable on the core stack "
+                        "and both leave the same preferred-tooling question open."
                     ),
                     "fact_refs": [
                         f"candidate:{candidate_a}:matched-required:python",
@@ -233,15 +300,58 @@ def _example_json(*, with_recommendation: bool) -> str:
                     ],
                 }
             ],
-            "recommended_candidate_id": None,
-            "recommendation_rationale": None,
-            "confidence": "low",
+            "recommended_candidate_id": candidate_a,
+            "hiring_recommendation": _hiring_recommendation(
+                leader=candidate_a,
+                runner=candidate_b,
+                why=[
+                    {
+                        "text": "Slightly stronger required-skill evidence for evaluability",
+                        "fact_refs": [
+                            f"candidate:{candidate_a}:matched-required:python",
+                        ],
+                    }
+                ],
+                main_risk={
+                    "text": "Repository ownership is not fully verified for either profile.",
+                    "fact_refs": [
+                        f"candidate:{candidate_a}:match-score",
+                        f"candidate:{candidate_b}:match-score",
+                    ],
+                },
+                interview_focus=[
+                    {
+                        "text": "Validate production ownership depth",
+                        "fact_refs": [
+                            f"candidate:{candidate_a}:matched-required:python",
+                            f"candidate:{candidate_b}:matched-required:python",
+                        ],
+                    },
+                    {
+                        "text": "Compare recent backend delivery decisions",
+                        "fact_refs": [
+                            f"candidate:{candidate_a}:matched-required:python",
+                            f"candidate:{candidate_b}:matched-required:python",
+                        ],
+                    },
+                ],
+                alternative_outcome={
+                    "text": (
+                        "If ownership depth favors Candidate B in interview, "
+                        "Candidate B becomes the preferred candidate."
+                    ),
+                    "fact_refs": [
+                        f"candidate:{candidate_b}:matched-required:python",
+                        f"candidate:{candidate_a}:match-score",
+                    ],
+                },
+            ),
+            "confidence": "medium",
             "uncertainties": [
                 {
                     "text": (
-                        "One signal that could create a ranking: clearer proof of "
-                        "recent production ownership depth for either candidate "
-                        "beyond what the table already shows."
+                        "One signal that could reverse today's narrow lead: clearer "
+                        "proof of recent production ownership depth for either candidate."
                     ),
                     "fact_refs": [
                         f"candidate:{candidate_a}:match-score",
@@ -253,8 +363,10 @@ def _example_json(*, with_recommendation: bool) -> str:
     return AiCandidateCompareLlmPayload.model_validate(payload).model_dump_json(indent=2)
 
 
-COMPLETE_EXAMPLE_JSON = _example_json(with_recommendation=True)
-NO_RECOMMENDATION_EXAMPLE_JSON = _example_json(with_recommendation=False)
+COMPLETE_EXAMPLE_JSON = _example_json(close_race=False)
+CLOSE_RACE_EXAMPLE_JSON = _example_json(close_race=True)
+# Backward-compatible alias for older test imports.
+NO_RECOMMENDATION_EXAMPLE_JSON = CLOSE_RACE_EXAMPLE_JSON
 
 # Compact runtime instructions. Schema is enforced via Structured Outputs response_format;
 # DTO fixtures above are for tests only and must not be concatenated here.
@@ -284,7 +396,10 @@ Grounding:
 Safety:
 - Do not infer protected traits or personality.
 - Recommendation is advisory only; never suggest automatic hire/reject or pipeline mutation.
-- Return recommended_candidate_id null when evidence does not support a clear preference.
+- Always name a current leader. Never omit hiring_recommendation.
+- Never say "no recommendation", "no clear recommendation", or refuse to choose a leader.
+- When candidates are close, still choose a current leader with medium or low confidence
+  and explain the remaining uncertainty plus the alternative outcome.
 
 Do NOT:
 - Restate scores, matched/missing skills, evidence lists, or table rows.
@@ -301,9 +416,11 @@ Do:
 Brevity:
 - At most 2 strengths and 2 risks per candidate.
 - At most 3 key_differences, 3 interview_focus_questions, and 2 uncertainties.
+- hiring_recommendation.why_leads: 1-4 short evidence-backed reasons.
+- hiring_recommendation.interview_focus: 1-5 short interview topics (not full questions).
 - Each grounded insight normally cites 1-2 strongest fact_refs only.
 - Do not duplicate the same conclusion across summary, key_differences,
-  recommendation_rationale, and uncertainties.
+  hiring_recommendation, and uncertainties.
 
 Field focus:
 - summary: executive answer to "if I only read this paragraph, do I understand the hiring situation?"
@@ -312,15 +429,17 @@ Field focus:
 - key_differences: non-obvious relative distinctions (not score or table restatement).
 - interview_focus_questions: ask what would most raise/lower confidence — ownership,
   judgement, trade-offs, architecture, debugging, production decisions.
-- recommendation_rationale: if deciding today, what and why; what would change it;
-  why this confidence. Do not repeat summary.
+- recommended_candidate_id: ALWAYS the current evidence-based leader (never null).
+- hiring_recommendation: structured card — why_leads, main_risk, interview_focus,
+  alternative_outcome. Every statement must be grounded in available evidence.
+- confidence: high|medium|low from evidence completeness, ownership confidence,
+  match-score separation, missing required skills, and ambiguity. Explain via the card.
 - uncertainties: what single additional fact could flip today's recommendation
   (do not restate risks).
 
 Required fields: summary; candidate_assessments (exactly one per INPUT candidate);
-key_differences; interview_focus_questions; recommended_candidate_id (UUID or null);
-recommendation_rationale (required when recommending, else null); confidence;
-uncertainties.
+key_differences; interview_focus_questions; recommended_candidate_id (UUID, never null);
+hiring_recommendation; confidence; uncertainties.
 """
 
 assert len(SYSTEM_RULES) <= MAX_SYSTEM_RULES_CHARS

@@ -127,7 +127,15 @@ class MockAiCandidateCompareProvider:
         scores.sort(key=lambda pair: (-pair[1], pair[0]))
         leader_id, leader_score = scores[0]
         runner_id, runner_score = scores[1]
-        recommend = leader_score >= runner_score + 10
+        clear_lead = leader_score >= runner_score + 10
+        score_refs = [
+            ref
+            for ref in (
+                f"candidate:{leader_id}:match-score",
+                f"candidate:{runner_id}:match-score",
+            )
+            if ref in fact_ids
+        ]
 
         payload: dict[str, object] = {
             "summary": (
@@ -140,14 +148,7 @@ class MockAiCandidateCompareProvider:
                     "text": (
                         "System match scores differ between the leading and trailing candidates."
                     ),
-                    "fact_refs": [
-                        ref
-                        for ref in (
-                            f"candidate:{leader_id}:match-score",
-                            f"candidate:{runner_id}:match-score",
-                        )
-                        if ref in fact_ids
-                    ],
+                    "fact_refs": score_refs,
                 }
             ],
             "interview_focus_questions": [
@@ -160,26 +161,41 @@ class MockAiCandidateCompareProvider:
                     "fact_refs": [f"candidate:{leader_id}:match-score"],
                 }
             ],
-            "recommended_candidate_id": leader_id if recommend else None,
-            "recommendation_rationale": (
-                {
+            "recommended_candidate_id": leader_id,
+            "hiring_recommendation": {
+                "why_leads": [
+                    {
+                        "text": (
+                            "Stronger required-skill evidence in the supplied match facts"
+                            if clear_lead
+                            else "Narrow lead on required-skill evidence in the supplied facts"
+                        ),
+                        "fact_refs": score_refs,
+                    }
+                ],
+                "main_risk": {
+                    "text": "Evidence depth beyond employer-safe summaries remains limited.",
+                    "fact_refs": key_refs[:2],
+                },
+                "interview_focus": [
+                    {
+                        "text": "Validate ownership of strongest required skills",
+                        "fact_refs": [f"candidate:{leader_id}:match-score"],
+                    },
+                    {
+                        "text": "Probe recent production delivery decisions",
+                        "fact_refs": score_refs,
+                    },
+                ],
+                "alternative_outcome": {
                     "text": (
-                        "The leading candidate has a meaningfully higher system match score "
-                        "in the supplied facts."
+                        "If interview evidence favors the trailing candidate on ownership, "
+                        "that candidate becomes the stronger choice."
                     ),
-                    "fact_refs": [
-                        ref
-                        for ref in (
-                            f"candidate:{leader_id}:match-score",
-                            f"candidate:{runner_id}:match-score",
-                        )
-                        if ref in fact_ids
-                    ],
-                }
-                if recommend
-                else None
-            ),
-            "confidence": "medium" if recommend else "low",
+                    "fact_refs": score_refs,
+                },
+            },
+            "confidence": "medium" if clear_lead else "low",
             "uncertainties": [
                 {
                     "text": "Evidence depth beyond employer-safe summaries remains limited.",

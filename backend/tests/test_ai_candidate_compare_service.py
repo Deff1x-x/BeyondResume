@@ -121,12 +121,36 @@ def _valid_payload() -> dict[str, object]:
             }
         ],
         "recommended_candidate_id": str(left),
-        "recommendation_rationale": {
-            "text": "Better required-skill coverage in supplied facts.",
-            "fact_refs": [
-                f"candidate:{left}:matched-required:python",
-                f"candidate:{left}:match-score",
+        "hiring_recommendation": {
+            "why_leads": [
+                {
+                    "text": "Better required-skill coverage in supplied facts.",
+                    "fact_refs": [
+                        f"candidate:{left}:matched-required:python",
+                        f"candidate:{left}:match-score",
+                    ],
+                }
             ],
+            "main_risk": {
+                "text": "Evidence depth is limited to employer-safe summaries.",
+                "fact_refs": [f"candidate:{left}:match-score"],
+            },
+            "interview_focus": [
+                {
+                    "text": "Validate production ownership of required skills",
+                    "fact_refs": [f"candidate:{left}:matched-required:python"],
+                }
+            ],
+            "alternative_outcome": {
+                "text": (
+                    "If Candidate B demonstrates stronger ownership in interview, "
+                    "Candidate B becomes the preferred candidate."
+                ),
+                "fact_refs": [
+                    f"candidate:{right}:missing-required:python",
+                    f"candidate:{left}:match-score",
+                ],
+            },
         },
         "confidence": "medium",
         "uncertainties": [
@@ -147,9 +171,7 @@ def test_prompt_examples_validate_against_dto() -> None:
     from app.prompts import ai_candidate_compare as prompt_module
 
     AiCandidateCompareLlmPayload.model_validate_json(prompt_module.COMPLETE_EXAMPLE_JSON)
-    AiCandidateCompareLlmPayload.model_validate_json(
-        prompt_module.NO_RECOMMENDATION_EXAMPLE_JSON
-    )
+    AiCandidateCompareLlmPayload.model_validate_json(prompt_module.CLOSE_RACE_EXAMPLE_JSON)
 
 
 def test_successful_generation_uses_provider_and_sets_mode(
@@ -252,6 +274,7 @@ def test_unknown_candidate_id_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_missing_assessment_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
     payload = _valid_payload()
     payload["candidate_assessments"] = payload["candidate_assessments"][:1]
+    hiring = payload["hiring_recommendation"]
 
     class Provider:
         def generate(self, prompt: str) -> str:
@@ -260,7 +283,8 @@ def test_missing_assessment_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
                 '{"summary":"x","candidate_assessments":'
                 + __import__("json").dumps(payload["candidate_assessments"])
                 + ',"key_differences":[],"interview_focus_questions":[],'
-                '"recommended_candidate_id":null,"recommendation_rationale":null,'
+                f'"recommended_candidate_id":"{payload["recommended_candidate_id"]}",'
+                f'"hiring_recommendation":{__import__("json").dumps(hiring)},'
                 '"confidence":"low","uncertainties":[]}'
             )
 
@@ -296,11 +320,45 @@ def test_protected_language_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
         service.get_ai_candidate_compare(_context())
 
 
-def test_nullable_recommendation_accepted(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_close_race_still_returns_structured_recommendation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    left, right = _ids()
     payload = _valid_payload()
-    payload["recommended_candidate_id"] = None
-    payload["recommendation_rationale"] = None
     payload["confidence"] = "low"
+    payload["hiring_recommendation"] = {
+        "why_leads": [
+            {
+                "text": "Slightly stronger required-skill evidence for evaluability.",
+                "fact_refs": [f"candidate:{left}:matched-required:python"],
+            }
+        ],
+        "main_risk": {
+            "text": "Repository ownership is not fully verified.",
+            "fact_refs": [
+                f"candidate:{left}:match-score",
+                f"candidate:{right}:match-score",
+            ],
+        },
+        "interview_focus": [
+            {
+                "text": "Validate ownership during the technical interview",
+                "fact_refs": [
+                    f"candidate:{left}:matched-required:python",
+                    f"candidate:{right}:missing-required:python",
+                ],
+            }
+        ],
+        "alternative_outcome": {
+            "text": (
+                "If ownership cannot be confirmed, Candidate B becomes the preferred candidate."
+            ),
+            "fact_refs": [
+                f"candidate:{right}:missing-required:python",
+                f"candidate:{left}:match-score",
+            ],
+        },
+    }
 
     class Provider:
         def generate(self, prompt: str) -> str:
@@ -308,8 +366,9 @@ def test_nullable_recommendation_accepted(monkeypatch: pytest.MonkeyPatch) -> No
 
     monkeypatch.setattr(service, "get_ai_candidate_compare_provider", lambda: Provider())
     result = service.get_ai_candidate_compare(_context())
-    assert result.recommended_candidate_id is None
-    assert result.recommendation_rationale is None
+    assert result.recommended_candidate_id == left
+    assert result.hiring_recommendation.main_risk.text.startswith("Repository ownership")
+    assert result.confidence == "low"
 
 
 def test_model_generation_mode_is_ignored(monkeypatch: pytest.MonkeyPatch) -> None:

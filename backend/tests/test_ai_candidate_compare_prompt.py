@@ -13,15 +13,13 @@ from app.services.ai_candidate_compare import (
 from uuid import UUID, uuid4
 
 
-def test_prompt_version_is_v5() -> None:
-    assert prompt_module.PROMPT_VERSION == "ai-candidate-compare-v5"
+def test_prompt_version_is_v6() -> None:
+    assert prompt_module.PROMPT_VERSION == "ai-candidate-compare-v6"
 
 
 def test_prompt_examples_validate_against_dto() -> None:
     AiCandidateCompareLlmPayload.model_validate_json(prompt_module.COMPLETE_EXAMPLE_JSON)
-    AiCandidateCompareLlmPayload.model_validate_json(
-        prompt_module.NO_RECOMMENDATION_EXAMPLE_JSON
-    )
+    AiCandidateCompareLlmPayload.model_validate_json(prompt_module.CLOSE_RACE_EXAMPLE_JSON)
 
 
 def test_system_rules_remain_compact_and_include_required_guidance() -> None:
@@ -51,7 +49,9 @@ def test_system_rules_remain_compact_and_include_required_guidance() -> None:
         "key_differences",
         "interview_focus_questions",
         "uncertainties",
-        "null",
+        "hiring_recommendation",
+        "current leader",
+        "no clear recommendation",
         "brevity",
         "at most 2 strengths",
         "strongest fact_refs",
@@ -83,6 +83,6 @@ def test_runtime_prompt_excludes_full_schema_and_few_shot_fixtures() -> None:
     assert schema_blob not in prompt
     assert '"$defs"' not in prompt
     assert prompt_module.COMPLETE_EXAMPLE_JSON not in prompt
-    assert prompt_module.NO_RECOMMENDATION_EXAMPLE_JSON not in prompt
+    assert prompt_module.CLOSE_RACE_EXAMPLE_JSON not in prompt
     assert "\nINPUT:\n" in prompt
     assert prompt.startswith(prompt_module.SYSTEM_RULES)

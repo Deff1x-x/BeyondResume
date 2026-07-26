@@ -207,8 +207,32 @@ def test_semantic_grounding_accepts_opaque_evidence_fact_refs(
                 "fact_refs": [evidence_fact],
             }
         ],
-        "recommended_candidate_id": None,
-        "recommendation_rationale": None,
+        "recommended_candidate_id": str(left),
+        "hiring_recommendation": {
+            "why_leads": [
+                {
+                    "text": "Evidence summary supports stronger required coverage.",
+                    "fact_refs": [evidence_fact],
+                }
+            ],
+            "main_risk": {
+                "text": "Evidence depth remains limited to summaries.",
+                "fact_refs": [evidence_fact],
+            },
+            "interview_focus": [
+                {
+                    "text": "Validate production ownership behind the evidence",
+                    "fact_refs": [evidence_fact],
+                }
+            ],
+            "alternative_outcome": {
+                "text": (
+                    "If ownership depth favors the trailing candidate, that candidate "
+                    "becomes the stronger choice."
+                ),
+                "fact_refs": [evidence_fact, f"candidate:{right}:match-score"],
+            },
+        },
         "confidence": "low",
         "uncertainties": [
             {

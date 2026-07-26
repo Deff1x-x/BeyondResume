@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
+import { ActionCard } from "@/components/ui/action-card";
 import { Button, primaryActionClass } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -78,14 +79,14 @@ function ShortlistRemoveButton({
     removeMutation.isPending && removeMutation.variables === candidateId;
 
   return (
-    <div className="space-y-2">
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
+    <>
+      <ActionCard
+        variant="destructive"
+        icon="trash-2"
+        title={removingThis ? "Removing..." : "Remove from shortlist"}
+        description="Remove candidate from shortlist"
         loading={removingThis}
         disabled={removingThis}
-        className="min-h-control text-secondary hover:bg-danger/5 hover:text-danger"
         aria-label={`Remove ${candidateName} from shortlist`}
         onClick={() => {
           if (removingThis) {
@@ -94,15 +95,13 @@ function ShortlistRemoveButton({
           onRemoved?.(candidateId);
           removeMutation.mutate(candidateId);
         }}
-      >
-        {removingThis ? "Removing..." : "Remove"}
-      </Button>
+      />
       {removeMutation.isError ? (
-        <p className="text-sm text-danger" role="alert">
+        <p className="col-span-full text-sm text-danger" role="alert">
           {errorMessage(removeMutation.error)}
         </p>
       ) : null}
-    </div>
+    </>
   );
 }
 
@@ -392,29 +391,35 @@ export function VacancyShortlistView({ vacancyId, enabled }: VacancyShortlistVie
                     }}
                     pipelineActions={
                       <>
-                        <ShortlistStageControl
-                          vacancyId={vacancyId}
-                          candidateId={entry.candidate_id}
-                          stage={entry.stage}
-                          candidateLabel={match.candidate_name}
-                          compact
-                        />
-                        <Link
+                        <div className="col-span-full">
+                          <ShortlistStageControl
+                            vacancyId={vacancyId}
+                            candidateId={entry.candidate_id}
+                            stage={entry.stage}
+                            candidateLabel={match.candidate_name}
+                            compact
+                          />
+                        </div>
+                        <ActionCard
                           href={`/employer/matches/${encodeURIComponent(entry.candidate_id)}/interview-questions?vacancy_id=${encodeURIComponent(vacancyId)}`}
-                          className="inline-flex min-h-control items-center rounded-button border border-border bg-surface px-4 text-sm font-medium text-ink shadow-sm transition duration-200 hover:-translate-y-px hover:border-border-strong hover:bg-surface-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2"
-                        >
-                          Interview questions
-                        </Link>
-                        <Link
+                          icon="message-square-question"
+                          iconTone="ai"
+                          title="Interview questions"
+                          description="AI-generated interview plan"
+                        />
+                        <ActionCard
                           href={`/employer/matches/${encodeURIComponent(entry.candidate_id)}/scorecard?vacancy_id=${encodeURIComponent(vacancyId)}`}
-                          className="inline-flex min-h-control items-center rounded-button border border-border bg-surface px-4 text-sm font-medium text-ink shadow-sm transition duration-200 hover:-translate-y-px hover:border-border-strong hover:bg-surface-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2"
-                        >
-                          {entry.scorecard_status === "completed"
-                            ? "Open scorecard"
-                            : entry.scorecard_status === "draft"
-                              ? "Continue scorecard draft"
-                              : "Open interview scorecard"}
-                        </Link>
+                          icon="clipboard-check"
+                          iconTone="primary"
+                          title={
+                            entry.scorecard_status === "completed"
+                              ? "Open scorecard"
+                              : entry.scorecard_status === "draft"
+                                ? "Continue scorecard draft"
+                                : "Open interview scorecard"
+                          }
+                          description="Evaluate interview"
+                        />
                         <ShortlistRemoveButton
                           vacancyId={vacancyId}
                           candidateId={entry.candidate_id}
@@ -458,8 +463,8 @@ export function VacancyShortlistView({ vacancyId, enabled }: VacancyShortlistVie
 
       {entries.length === 0 ? (
         <EmptyState
-          title="No saved candidates yet."
-          description="Save candidates from Candidate Review, then return here to start Compare and AI Hiring Analysis."
+          title="No candidates shortlisted yet."
+          description="Add candidates from Applicants or Recommended before starting AI comparison."
           className="bg-surface py-10"
         />
       ) : null}

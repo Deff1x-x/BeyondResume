@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Literal, Self
+from typing import Annotated, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 GenerationMode = Literal["live", "mock"]
@@ -62,6 +62,17 @@ class CandidateAssessment(BaseModel):
     risks: list[GroundedInsight] = Field(default_factory=list, max_length=4)
 
 
+class HiringRecommendation(BaseModel):
+    """Structured advisory hiring recommendation grounded in INPUT evidence."""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    why_leads: list[GroundedInsight] = Field(min_length=1, max_length=4)
+    main_risk: GroundedInsight
+    interview_focus: list[GroundedInsight] = Field(min_length=1, max_length=5)
+    alternative_outcome: GroundedInsight
+
+
 class AiCandidateCompareLlmPayload(BaseModel):
     """Structured Outputs contract produced by the LLM (no generation_mode)."""
 
@@ -73,22 +84,10 @@ class AiCandidateCompareLlmPayload(BaseModel):
     interview_focus_questions: list[GroundedQuestion] = Field(
         default_factory=list, max_length=6
     )
-    recommended_candidate_id: UUID | None = None
-    recommendation_rationale: GroundedInsight | None = None
+    recommended_candidate_id: UUID
+    hiring_recommendation: HiringRecommendation
     confidence: CompareConfidence
     uncertainties: list[GroundedInsight] = Field(default_factory=list, max_length=5)
-
-    @model_validator(mode="after")
-    def recommendation_consistency(self) -> Self:
-        if self.recommended_candidate_id is None and self.recommendation_rationale is not None:
-            raise ValueError(
-                "recommendation_rationale must be null when recommended_candidate_id is null"
-            )
-        if self.recommended_candidate_id is not None and self.recommendation_rationale is None:
-            raise ValueError(
-                "recommendation_rationale is required when recommended_candidate_id is set"
-            )
-        return self
 
 
 class AiCandidateCompareResponse(AiCandidateCompareLlmPayload):

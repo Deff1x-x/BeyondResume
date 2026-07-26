@@ -1,6 +1,6 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
+import { ActionCard } from "@/components/ui/action-card";
 import { ApiClientError } from "@/lib/api/error";
 import {
   useRemoveCandidateFromShortlist,
@@ -47,20 +47,22 @@ export function ShortlistSaveButton({
     (removeMutation.isError ? removeMutation.error : null);
 
   return (
-    <div className="space-y-2">
+    <>
       {isSaved ? (
-        <div className="flex flex-wrap items-center gap-2">
-          <Button
-            type="button"
-            variant="secondary"
-            disabled
+        <>
+          <ActionCard
+            status
+            variant="success"
+            icon="bookmark-check"
+            title="Shortlisted"
+            description="Saved to vacancy shortlist"
             aria-label={`${labelTarget} is shortlisted`}
-          >
-            Shortlisted
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
+          />
+          <ActionCard
+            variant="destructive"
+            icon="trash-2"
+            title={removingThis ? "Removing..." : "Remove from shortlist"}
+            description="Remove candidate from shortlist"
             loading={removingThis}
             disabled={isBusy || stateUnknown}
             aria-label={`Remove ${labelTarget} from shortlist`}
@@ -72,14 +74,15 @@ export function ShortlistSaveButton({
               saveMutation.reset();
               removeMutation.mutate(candidateId);
             }}
-          >
-            {removingThis ? "Removing..." : "Remove from shortlist"}
-          </Button>
-        </div>
+          />
+        </>
       ) : (
-        <Button
-          type="button"
-          variant="primary"
+        <ActionCard
+          variant="secondary"
+          icon="bookmark-plus"
+          iconTone="accent"
+          title={savingThis ? "Adding..." : "Add to shortlist"}
+          description="Save candidate to this vacancy"
           loading={savingThis}
           disabled={isBusy || stateUnknown}
           aria-label={`Add ${labelTarget} to shortlist`}
@@ -91,15 +94,13 @@ export function ShortlistSaveButton({
             removeMutation.reset();
             saveMutation.mutate(candidateId);
           }}
-        >
-          {savingThis ? "Adding..." : "Add to shortlist"}
-        </Button>
+        />
       )}
       {error ? (
-        <p className="text-sm text-danger" role="alert">
+        <p className="col-span-full text-sm text-danger" role="alert">
           {errorMessage(error)}
         </p>
       ) : null}
-    </div>
+    </>
   );
 }
