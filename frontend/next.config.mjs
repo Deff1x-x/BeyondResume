@@ -7,6 +7,7 @@ const apiUpstream = process.env.API_UPSTREAM ?? "http://localhost:8000";
 const llmProxyTimeoutMs = Number(process.env.API_PROXY_TIMEOUT_MS ?? 90_000);
 
 const nextConfig = {
+  output: "standalone",
   experimental: {
     proxyTimeout: Number.isFinite(llmProxyTimeoutMs) && llmProxyTimeoutMs > 0
       ? llmProxyTimeoutMs

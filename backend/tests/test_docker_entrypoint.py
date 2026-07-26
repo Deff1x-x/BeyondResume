@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 _ENTRYPOINT = Path(__file__).resolve().parents[1] / "docker-entrypoint.sh"
+_DOCKERFILE = Path(__file__).resolve().parents[1] / "Dockerfile"
 
 
 def _active_commands(script: str) -> list[str]:
@@ -49,3 +50,13 @@ def test_docker_entrypoint_runs_migrations_seed_then_exec_uvicorn() -> None:
     assert "|| true" not in joined
     assert "sleep" not in joined
     assert "--reload" not in joined
+
+
+def test_backend_dockerfile_is_production_oriented() -> None:
+    text = _DOCKERFILE.read_text(encoding="utf-8").replace("\r\n", "\n")
+    assert "python:3.12-slim" in text
+    assert "PYTHONUNBUFFERED=1" in text
+    assert "--reload" not in text
+    assert "docker-entrypoint.sh" in text
+    assert "/app/data/uploads" in text
+    assert "USER app" in text

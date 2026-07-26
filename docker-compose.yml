@@ -1,33 +1,10 @@
 services:
-  frontend:
-    build:
-      context: ./frontend
-    ports:
-      - "3000:3000"
-    environment:
-      API_UPSTREAM: http://backend:8000
-    depends_on:
-      - backend
-
-  backend:
-    build:
-      context: ./backend
-    ports:
-      - "8000:8000"
-    depends_on:
-      postgres:
-        condition: service_healthy
-    env_file:
-      - .env
-    volumes:
-      - ./data/uploads:/app/data/uploads
-
   postgres:
     image: postgres:16
     environment:
-      POSTGRES_DB: ebh
-      POSTGRES_USER: ebh
-      POSTGRES_PASSWORD: ebh
+      POSTGRES_DB: ${POSTGRES_DB:-ebh}
+      POSTGRES_USER: ${POSTGRES_USER:-ebh}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ebh}
     ports:
       - "5432:5432"
     volumes:
@@ -38,6 +15,65 @@ services:
       timeout: 5s
       retries: 10
       start_period: 10s
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      # Docker service hostname (not 127.0.0.1). Overrides host-local DATABASE_URL if present.
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-ebh}:${POSTGRES_PASSWORD:-ebh}@postgres:5432/${POSTGRES_DB:-ebh}
+      UPLOAD_DIR: /app/data/uploads
+    volumes:
+      - uploads_data:/app/data/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health', timeout=5)",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        API_UPSTREAM: http://backend:8000
+    ports:
+      - "3000:3000"
+    environment:
+      API_UPSTREAM: http://backend:8000
+      NODE_ENV: production
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    restart: unless-stopped
 
 volumes:
   postgres_data:
+  uploads_data:
