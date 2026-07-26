@@ -135,14 +135,63 @@ describe("CareerCompanionSection", () => {
     expect(screen.getByText("Explore direction")).toBeInTheDocument();
   });
 
-  it("renders horizons and refuses complete-by-click controls", async () => {
+  it("renders a connected timeline and refuses complete-by-click controls", async () => {
     getPlan.mockResolvedValue(samplePlan());
     renderSection();
-    expect(await screen.findByText("Fix Now")).toBeInTheDocument();
-    expect(screen.getByText("Create evidence for Docker")).toBeInTheDocument();
+    expect(await screen.findByText("Create evidence for Docker")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Connected roadmap" })).toBeInTheDocument();
+    expect(screen.getByText("Fix Now")).toBeInTheDocument();
+    expect(screen.getByText("Recommended next step")).toBeInTheDocument();
+    expect(screen.getByText("0 of 1 completed")).toBeInTheDocument();
+    expect(screen.getByText("Overall progress")).toBeInTheDocument();
+    expect(screen.getByText("0%")).toBeInTheDocument();
+    expect(screen.getByLabelText("Overall roadmap progress")).toHaveAttribute("aria-valuenow", "0");
+    expect(screen.getByRole("button", { name: "Hide details" })).toHaveAttribute(
+      "aria-expanded",
+      "true"
+    );
     expect(screen.getByText(/Not verified until evidence is detected/i)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^Complete$/i })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Accept" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Hide details" }));
+    expect(screen.getByRole("button", { name: "Show details" })).toHaveAttribute(
+      "aria-expanded",
+      "false"
+    );
+    expect(screen.queryByText(/Not verified until evidence is detected/i)).not.toBeInTheDocument();
+    expect(screen.queryByText("Implementation steps")).not.toBeInTheDocument();
+  });
+
+  it("marks the first incomplete stage as the recommended next step", async () => {
+    const plan = samplePlan();
+    plan.actions = [
+      {
+        ...plan.actions[0],
+        id: "done-1",
+        status: "completed",
+        title: "Completed Docker baseline",
+        sort_order: 0
+      },
+      {
+        ...plan.actions[0],
+        id: "next-1",
+        status: "suggested",
+        title: "Add API tests",
+        horizon: "build_next",
+        sort_order: 1,
+        skills: [{ skill_id: "s2", skill_name: "Testing", role: "gap" }]
+      }
+    ];
+    getPlan.mockResolvedValue(plan);
+    renderSection();
+
+    expect(await screen.findByText("Add API tests")).toBeInTheDocument();
+    expect(screen.getByText("1 of 2 completed")).toBeInTheDocument();
+    expect(screen.getByText("50%")).toBeInTheDocument();
+    expect(screen.getByLabelText("Overall roadmap progress")).toHaveAttribute("aria-valuenow", "50");
+    expect(screen.getByText("Recommended next step")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /Step 2:.*Add API tests/i })).toBeInTheDocument();
   });
 
   it("posts the UI target_role payload contract", async () => {
