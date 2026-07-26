@@ -6,7 +6,11 @@ from dataclasses import dataclass, field
 from uuid import UUID, uuid4
 
 from app.services.career_companion.context import CompanionContext, ProjectContext
-from app.services.career_companion.gaps import SkillGap, analyze_gaps, analyze_growth_gaps
+from app.services.career_companion.gaps import (
+    SkillGap,
+    analyze_growth_gaps,
+    analyze_mode_gaps,
+)
 from app.services.career_companion.priority import score_action
 
 
@@ -40,12 +44,12 @@ class DraftAction:
 
 
 def assemble_fallback_actions(context: CompanionContext) -> list[DraftAction]:
-    gaps = analyze_gaps(context)
+    gaps = analyze_mode_gaps(context)
     growth_gaps = analyze_growth_gaps(context)
     actions: list[DraftAction] = []
 
     # Fix Now — one critical gap action (prefer improve existing)
-    critical = [g for g in gaps if g.kind == "required"][:4]
+    critical = [g for g in gaps if g.kind in {"required", "growth"}][:4]
     if not critical:
         critical = list(gaps[:3])
 
@@ -90,13 +94,12 @@ def assemble_fallback_actions(context: CompanionContext) -> list[DraftAction]:
                 )
             )
         else:
-            role = context.target_role or "Backend"
             actions.append(
                 _learn_or_build(
                     context,
                     horizon="build_next",
                     gaps=multi,
-                    title=f"Build a production-ready {role} project covering {skill_names}",
+                    title=f"Build a production-ready {_focus_label(context)} project covering {skill_names}",
                     prefer_build=True,
                 )
             )
@@ -171,6 +174,17 @@ def assemble_fallback_actions(context: CompanionContext) -> list[DraftAction]:
 
 def _best_project(projects: tuple[ProjectContext, ...]) -> ProjectContext | None:
     return projects[0] if projects else None
+
+
+def _focus_label(context: CompanionContext) -> str:
+    """Project focus per mode: explore uses the strongest evidence direction."""
+    if context.mode == "explore_direction" and context.explore_directions:
+        return context.explore_directions[0]
+    if context.mode == "career_growth" and context.next_level_vacancies:
+        return context.next_level_vacancies[0].vacancy.title
+    return context.target_role or (
+        context.explore_directions[0] if context.explore_directions else "Backend"
+    )
 
 
 def _improve_action(

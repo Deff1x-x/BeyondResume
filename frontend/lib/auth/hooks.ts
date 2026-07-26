@@ -47,6 +47,8 @@ export function useCurrentUser() {
   };
 }
 
+export const useCurrentUserQuery = useCurrentUser;
+
 export function useLogin() {
   const queryClient = useQueryClient();
 

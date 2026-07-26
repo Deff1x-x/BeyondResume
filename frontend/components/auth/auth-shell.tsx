@@ -9,7 +9,7 @@ export function AuthShell({ children }: Readonly<{ children: ReactNode }>) {
     <main className="min-h-screen overflow-x-hidden bg-background lg:grid lg:grid-cols-[minmax(0,1.05fr)_minmax(420px,0.95fr)]">
       <aside className="relative hidden overflow-hidden bg-primary px-10 py-10 text-white lg:flex lg:flex-col xl:px-14">
         <Link
-          href="/"
+          href="/landing"
           className="relative flex w-fit items-center gap-3 rounded-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-primary"
         >
           <BrandMark />

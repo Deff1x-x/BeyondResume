@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from app.api.dependencies import require_employer
 from app.db.session import engine, get_db
 from app.main import app
+from app.models.application import Application
 from app.models.candidate_profile import CandidateProfile, OnboardingStatus
 from app.models.employer_profile import EmployerProfile
 from app.models.skill import Skill
@@ -109,6 +110,12 @@ def interview_questions_client() -> (
         skill_id=skill.id,
         requirement_type="required",
     )
+    application = Application(
+        id=uuid4(),
+        vacancy_id=vacancy.id,
+        candidate_id=candidate.id,
+        status="applied",
+    )
     setup.add_all(
         [
             employer_user,
@@ -121,6 +128,7 @@ def interview_questions_client() -> (
             foreign_vacancy,
             skill,
             requirement,
+            application,
         ]
     )
     setup.commit()
@@ -184,7 +192,7 @@ def test_missing_candidate_returns_404(
     client, context = interview_questions_client
     response = client.get(_path(uuid4(), context.vacancy.id))
     assert response.status_code == 404
-    assert response.json()["error"]["code"] == "CANDIDATE_NOT_FOUND"
+    assert response.json()["error"]["code"] == "APPLICANT_NOT_FOUND"
 
 
 def test_foreign_vacancy_hidden(
@@ -218,7 +226,7 @@ def test_missing_candidate_does_not_call_provider(
     monkeypatch.setattr("app.api.v1.employer.build_interview_questions_context", spy)
     response = client.get(_path(uuid4(), context.vacancy.id))
     assert response.status_code == 404
-    assert response.json()["error"]["code"] == "CANDIDATE_NOT_FOUND"
+    assert response.json()["error"]["code"] == "APPLICANT_NOT_FOUND"
     spy.assert_not_called()
 
 

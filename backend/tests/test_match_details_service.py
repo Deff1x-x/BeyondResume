@@ -877,9 +877,10 @@ def test_gap_suggestions_do_not_read_candidate_evidence_or_add_queries(
 
     result, react_id, _docker_id = run(session)
 
-    # Only the candidate lookup hits the session; gaps add no EvidenceUnit or
-    # EvidenceSkillLink query, and the link-context loader is scoped to matches.
-    assert session.execute.call_count == 1
+    # Candidate eligibility lookup plus the has_applied application check hit the
+    # session; gap suggestions add no EvidenceUnit or EvidenceSkillLink query, and
+    # the link-context loader is scoped to matches.
+    assert session.execute.call_count == 2
     assert loader.call_count == 1
     assert loader.call_args.kwargs["skill_ids"] == {react_id}
     assert result.match.required.missing_details[0].skill_name == "Docker"

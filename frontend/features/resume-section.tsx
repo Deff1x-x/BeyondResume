@@ -3,7 +3,7 @@
 import { useRef, useState, type ChangeEvent, type FormEvent } from "react";
 
 import { Badge, StatusBadge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, primaryActionClass } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { SectionHeader } from "@/components/ui/section-header";
@@ -191,7 +191,11 @@ export function ResumeSection({ enabled }: Readonly<{ enabled: boolean }>) {
 
   if (!enabled) {
     return (
-      <Card aria-labelledby="resume-section-title">
+      <Card
+        id="resume-section"
+        className="scroll-mt-[var(--workspace-scroll-offset)]"
+        aria-labelledby="resume-section-title"
+      >
         <CardContent className="p-6">
           <SectionHeader
             title="Resume"
@@ -205,7 +209,11 @@ export function ResumeSection({ enabled }: Readonly<{ enabled: boolean }>) {
   }
 
   return (
-    <Card aria-labelledby="resume-section-title">
+    <Card
+      id="resume-section"
+      className="scroll-mt-[var(--workspace-scroll-offset)]"
+      aria-labelledby="resume-section-title"
+    >
       <CardContent className="space-y-6 p-6">
         <SectionHeader
           title="Resume"
@@ -242,9 +250,14 @@ export function ResumeSection({ enabled }: Readonly<{ enabled: boolean }>) {
 
           {resumeMissing && !isProcessing ? (
             <EmptyState
-              title="No resume evidence added yet"
-              description="Upload a PDF to compare your stated experience with verified project evidence."
+              title="No resume uploaded yet."
+              description="Upload a PDF so BeyondResume can compare your stated experience with verified project evidence."
               className="bg-background"
+              primaryAction={
+                <label htmlFor="resume-file" className={primaryActionClass}>
+                  Upload Resume
+                </label>
+              }
             />
           ) : null}
 
@@ -324,7 +337,7 @@ export function ResumeSection({ enabled }: Readonly<{ enabled: boolean }>) {
                 onChange={onFileChange}
                 disabled={isBusy}
                 aria-describedby="resume-file-help"
-                className="block min-h-control w-full rounded-input border border-border bg-surface px-3 py-2 text-sm text-ink file:mr-4 file:rounded-button file:border-0 file:bg-primary file:px-4 file:py-2 file:text-sm file:font-medium file:text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 disabled:bg-background"
+                className="block min-h-control w-full rounded-input border border-border bg-surface px-3 py-2 text-sm text-ink file:mr-4 file:rounded-button file:border-0 file:bg-accent file:px-4 file:py-2 file:text-sm file:font-medium file:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 disabled:bg-background"
               />
               <p id="resume-file-help" className="text-sm text-secondary">
                 PDF only · Maximum file size: 8 MiB

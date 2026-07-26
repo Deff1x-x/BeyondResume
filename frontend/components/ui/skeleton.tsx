@@ -7,7 +7,7 @@ type SkeletonProps = {
 export function Skeleton({ className }: SkeletonProps) {
   return (
     <div
-      className={cn("animate-pulse rounded-button bg-border/80", className)}
+      className={cn("skeleton-fade rounded-button bg-border/80", className)}
       aria-hidden="true"
     />
   );

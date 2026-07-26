@@ -51,7 +51,7 @@ function SkillList({
 
 function RoadmapCard({ item }: Readonly<{ item: RoadmapItem }>) {
   return (
-    <li className="rounded-card border border-border bg-background p-4">
+    <li className="surface-lift rounded-card border border-border bg-background p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="break-words text-sm font-medium text-ink">{item.title}</p>

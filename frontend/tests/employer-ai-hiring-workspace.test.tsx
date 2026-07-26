@@ -18,7 +18,8 @@ const details = {
   match: { score: 82, required: { matched: ["Python"], missing: ["Redis"] }, preferred: { matched: [], missing: [] } },
   passport: { top_skills: ["Python"], skills: [{ name: "Python", evidence_confidence: 0.87, evidence_count: 2, source_types: ["github_repository"] }] },
   evidence: [],
-  roadmap: []
+  roadmap: [],
+  has_applied: true
 };
 
 const intelligence = {

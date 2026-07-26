@@ -312,7 +312,11 @@ export function GitHubSection({ enabled }: Readonly<{ enabled: boolean }>) {
 
   if (!enabled) {
     return (
-      <Card className="lg:col-span-2" aria-labelledby="github-section-title">
+      <Card
+        id="github-section"
+        className="scroll-mt-[var(--workspace-scroll-offset)] lg:col-span-2"
+        aria-labelledby="github-section-title"
+      >
         <CardContent className="p-6">
           <SectionHeader
             title="GitHub"
@@ -329,7 +333,11 @@ export function GitHubSection({ enabled }: Readonly<{ enabled: boolean }>) {
   const showConnectForm = repositoriesQuery.isSuccess;
 
   return (
-    <Card className="lg:col-span-2" aria-labelledby="github-section-title">
+    <Card
+      id="github-section"
+      className="scroll-mt-[var(--workspace-scroll-offset)] lg:col-span-2"
+      aria-labelledby="github-section-title"
+    >
       <CardContent className="space-y-6 p-6">
         <SectionHeader
           title="GitHub"
@@ -374,7 +382,7 @@ export function GitHubSection({ enabled }: Readonly<{ enabled: boolean }>) {
             <Card className="bg-background">
               <CardContent className="space-y-4 p-4">
                 <div>
-                  <p className="text-sm font-medium text-ink">No repository connected</p>
+                  <p className="text-sm font-medium text-ink">Connect GitHub to automatically collect evidence.</p>
                   <p className="mt-2 text-sm text-secondary">
                     Add a public repository URL, for example https://github.com/owner/repository.
                   </p>
@@ -422,7 +430,7 @@ export function GitHubSection({ enabled }: Readonly<{ enabled: boolean }>) {
                     disabled={!repositoryUrl.trim()}
                     loading={connectMutation.isPending}
                   >
-                    Connect repository
+                    Connect GitHub
                   </Button>
                 </form>
               </CardContent>

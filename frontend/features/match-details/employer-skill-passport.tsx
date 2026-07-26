@@ -35,7 +35,7 @@ function SkillPassportFallback({ skills }: Readonly<{ skills: string[] }>) {
   return (
     <ul className="mt-5 space-y-3" aria-label="Candidate skills">
       {skills.map((skill) => (
-        <li key={skill} className="rounded-card border border-border bg-background px-4 py-3">
+        <li key={skill} className="surface-lift rounded-card border border-border bg-background px-4 py-3">
           <p className="font-medium text-ink">{skill}</p>
           <p className="mt-1 text-sm text-secondary">Confidence unavailable</p>
         </li>
@@ -66,7 +66,7 @@ export function EmployerSkillPassport({ passport, match, onSelectSkill }: Employ
                 const sourceTypes = [...new Set(skill.source_types)];
 
                 return (
-                  <li key={skill.name} className="py-4 first:pt-0 last:pb-0">
+                  <li key={skill.name} className="surface-lift rounded-card border border-transparent px-3 py-4 first:pt-4 last:pb-4 hover:border-border hover:bg-background">
                     <div className="flex flex-wrap items-start justify-between gap-4">
                       <div className="min-w-0">
                         <h3 className="break-words text-base font-semibold tracking-tight text-ink sm:text-lg">{skill.name}</h3>
@@ -86,7 +86,7 @@ export function EmployerSkillPassport({ passport, match, onSelectSkill }: Employ
                       aria-valuemax={100}
                       aria-valuenow={percentage}
                     >
-                      <div className="h-full rounded-full bg-primary" style={{ width: `${percentage}%` }} />
+                      <div className="progress-fill h-full rounded-full bg-accent" style={{ width: `${percentage}%` }} />
                     </div>
 
                     <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-secondary">

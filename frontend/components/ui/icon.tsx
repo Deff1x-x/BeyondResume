@@ -3,7 +3,25 @@ import Image from "next/image";
 
 import { cn } from "@/lib/cn";
 
-export type IconName = "dashboard" | "profile" | "resume" | "github" | "evidence" | "passport" | "roadmap" | "employer" | "check" | "alert" | "arrow-right" | "gauge" | "spark" | "refresh" | "code";
+export type IconName =
+  | "dashboard"
+  | "profile"
+  | "resume"
+  | "github"
+  | "evidence"
+  | "passport"
+  | "roadmap"
+  | "employer"
+  | "check"
+  | "check-circle"
+  | "send"
+  | "undo"
+  | "alert"
+  | "arrow-right"
+  | "gauge"
+  | "spark"
+  | "refresh"
+  | "code";
 
 type IconProps = SVGProps<SVGSVGElement> & { name: IconName };
 
@@ -17,6 +35,24 @@ const paths: Record<IconName, ReactNode> = {
   roadmap: <><circle cx="6" cy="18" r="2" /><circle cx="18" cy="6" r="2" /><path d="M8 18h3a3 3 0 0 0 3-3v-1a3 3 0 0 1 3-3h1" /></>,
   employer: <><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-5h6v5M8 10h.01M12 10h.01M16 10h.01" /></>,
   check: <><path d="m5 12.5 4.5 4.5L19 7.5" /></>,
+  "check-circle": (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="m8.5 12.2 2.4 2.4 4.6-5" />
+    </>
+  ),
+  send: (
+    <>
+      <path d="M4.5 12.5 19.2 4.8 12.5 19.5l-1.8-6.2Z" />
+      <path d="m10.7 13.3 8.5-8.5" />
+    </>
+  ),
+  undo: (
+    <>
+      <path d="M9.5 7.5 5.5 11.5 9.5 15.5" />
+      <path d="M5.5 11.5h8a5 5 0 1 1 0 10H12" />
+    </>
+  ),
   alert: <><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" /><path d="M12 9v4.5M12 17.5h.01" /></>,
   "arrow-right": <><path d="M4 12h15M13 6l6 6-6 6" /></>,
   gauge: <><path d="M3.5 18a9 9 0 1 1 17 0" /><path d="m12 14 3.5-4.5" /><path d="M12 14h.01" /></>,

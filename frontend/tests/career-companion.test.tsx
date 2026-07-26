@@ -129,8 +129,8 @@ describe("CareerCompanionSection", () => {
       })
     );
     renderSection();
-    expect(await screen.findByText(/No active plan yet/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Generate plan/i })).toBeInTheDocument();
+    expect(await screen.findByText(/Generate your first personalized career plan./i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Generate .*plan/i })).toBeInTheDocument();
     expect(screen.getByText("Target vacancy")).toBeInTheDocument();
     expect(screen.getByText("Explore direction")).toBeInTheDocument();
   });
@@ -155,11 +155,11 @@ describe("CareerCompanionSection", () => {
     );
     generatePlan.mockResolvedValue(samplePlan());
     renderSection();
-    await screen.findByText(/No active plan yet/i);
+    await screen.findByText(/Generate your first personalized career plan./i);
     fireEvent.change(screen.getByPlaceholderText("Backend Developer"), {
       target: { value: "Backend Developer" }
     });
-    fireEvent.click(screen.getByRole("button", { name: /Generate plan/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Generate .*plan/i }));
     await waitFor(() => {
       expect(generatePlan).toHaveBeenCalledWith({
         mode: "target_role",
@@ -169,5 +169,193 @@ describe("CareerCompanionSection", () => {
     });
     expect(await screen.findByText("Create evidence for Docker")).toBeInTheDocument();
     expect(screen.queryByText(/Request failed/i)).not.toBeInTheDocument();
+  });
+});
+
+describe("CareerCompanionSection mode selector", () => {
+  beforeEach(() => {
+    getPlan.mockReset();
+    generatePlan.mockReset();
+    patchAction.mockReset();
+    chat.mockReset();
+    refresh.mockReset();
+    vacancies.mockReturnValue([
+      {
+        id: "vacancy-9",
+        title: "Backend Engineer",
+        company_name: "Acme",
+        match: { score: 72 }
+      }
+    ]);
+    profile.mockReturnValue({ target_role: "Backend Developer" });
+    getPlan.mockRejectedValue(
+      new ApiClientError({
+        status: 404,
+        code: "CAREER_COMPANION_NOT_FOUND",
+        message: "missing"
+      })
+    );
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  function modeRadio(label: RegExp) {
+    return screen.getByRole("radio", { name: label });
+  }
+
+  it("exposes the four modes as a keyboard-reachable radio group", async () => {
+    renderSection();
+    await screen.findByText(/Generate your first personalized career plan./i);
+
+    expect(screen.getByRole("radiogroup", { name: /goal mode/i })).toBeInTheDocument();
+    expect(screen.getAllByRole("radio")).toHaveLength(4);
+    expect(modeRadio(/Target role/i)).toBeChecked();
+    expect(modeRadio(/Target vacancy/i)).not.toBeChecked();
+  });
+
+  it("activates Target vacancy and shows the vacancy selector only", async () => {
+    renderSection();
+    await screen.findByText(/Generate your first personalized career plan./i);
+
+    fireEvent.click(modeRadio(/Target vacancy/i));
+
+    expect(modeRadio(/Target vacancy/i)).toBeChecked();
+    expect(modeRadio(/Target role/i)).not.toBeChecked();
+    expect(screen.getByLabelText("Vacancy")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Target role")).not.toBeInTheDocument();
+  });
+
+  it("activates Career growth and hides the target role input", async () => {
+    renderSection();
+    await screen.findByText(/Generate your first personalized career plan./i);
+
+    fireEvent.click(modeRadio(/Career growth/i));
+
+    expect(modeRadio(/Career growth/i)).toBeChecked();
+    expect(screen.getByTestId("companion-career-growth-body")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Target role")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Vacancy")).not.toBeInTheDocument();
+  });
+
+  it("activates Explore direction and requires no manual target role", async () => {
+    renderSection();
+    await screen.findByText(/Generate your first personalized career plan./i);
+
+    fireEvent.click(modeRadio(/Explore direction/i));
+
+    expect(modeRadio(/Explore direction/i)).toBeChecked();
+    expect(screen.getByTestId("companion-explore-direction-body")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Target role")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Generate .*plan/i })).toBeEnabled();
+  });
+
+  it("syncs the mode even when the radio is already checked in the DOM", async () => {
+    renderSection();
+    await screen.findByText(/Generate your first personalized career plan./i);
+
+    // An out-of-sync DOM (e.g. browser form restoration) fires no change event.
+    const explore = modeRadio(/Explore direction/i);
+    (explore as HTMLInputElement).checked = true;
+    fireEvent.click(explore);
+
+    expect(explore).toBeChecked();
+    expect(screen.getByTestId("companion-explore-direction-body")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Target role")).not.toBeInTheDocument();
+  });
+
+  it("activates a mode via keyboard interaction", async () => {
+    renderSection();
+    await screen.findByText(/Generate your first personalized career plan./i);
+
+    const growth = modeRadio(/Career growth/i);
+    growth.focus();
+    expect(growth).toHaveFocus();
+    fireEvent.keyDown(growth, { key: " " });
+    fireEvent.click(growth);
+
+    expect(growth).toBeChecked();
+    expect(screen.getByTestId("companion-career-growth-body")).toBeInTheDocument();
+  });
+
+  it("sends target_vacancy_id and no target_role for Target vacancy", async () => {
+    generatePlan.mockResolvedValue({ ...samplePlan(), mode: "target_vacancy" });
+    renderSection();
+    await screen.findByText(/Generate your first personalized career plan./i);
+
+    fireEvent.click(modeRadio(/Target vacancy/i));
+    fireEvent.change(screen.getByLabelText("Vacancy"), { target: { value: "vacancy-9" } });
+    fireEvent.click(screen.getByRole("button", { name: /Generate .*plan/i }));
+
+    await waitFor(() => {
+      expect(generatePlan).toHaveBeenCalledWith({
+        mode: "target_vacancy",
+        target_vacancy_id: "vacancy-9",
+        target_role: null
+      });
+    });
+  });
+
+  it("disables generation until a vacancy is selected", async () => {
+    renderSection();
+    await screen.findByText(/Generate your first personalized career plan./i);
+
+    fireEvent.click(modeRadio(/Target vacancy/i));
+    const cta = screen.getByRole("button", { name: /Generate .*plan/i });
+    expect(cta).toBeDisabled();
+    expect(screen.getByText(/Select a vacancy to generate a plan/i)).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Vacancy"), { target: { value: "vacancy-9" } });
+    expect(screen.getByRole("button", { name: /Generate .*plan/i })).toBeEnabled();
+  });
+
+  it("does not reuse a typed target role for Career growth or Explore direction", async () => {
+    generatePlan.mockResolvedValue({ ...samplePlan(), mode: "career_growth" });
+    renderSection();
+    await screen.findByText(/Generate your first personalized career plan./i);
+
+    fireEvent.change(screen.getByLabelText("Target role"), {
+      target: { value: "Staff Platform Engineer" }
+    });
+
+    fireEvent.click(modeRadio(/Career growth/i));
+    fireEvent.click(screen.getByRole("button", { name: /Generate .*plan/i }));
+    await waitFor(() => {
+      expect(generatePlan).toHaveBeenCalledWith({
+        mode: "career_growth",
+        target_vacancy_id: null,
+        target_role: null
+      });
+    });
+
+    generatePlan.mockClear();
+    generatePlan.mockResolvedValue({ ...samplePlan(), mode: "explore_direction" });
+    fireEvent.click(modeRadio(/Explore direction/i));
+    fireEvent.click(screen.getByRole("button", { name: /Generate .*plan/i }));
+    await waitFor(() => {
+      expect(generatePlan).toHaveBeenCalledWith({
+        mode: "explore_direction",
+        target_vacancy_id: null,
+        target_role: null
+      });
+    });
+  });
+
+  it("does not present a previous mode's plan as the current mode's result", async () => {
+    getPlan.mockReset();
+    getPlan.mockResolvedValue(samplePlan());
+    renderSection();
+
+    await screen.findByText("Create evidence for Docker");
+    expect(screen.queryByTestId("companion-stale-plan-notice")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Regenerate .*plan/i })).toBeInTheDocument();
+
+    fireEvent.click(modeRadio(/Explore direction/i));
+
+    const notice = screen.getByTestId("companion-stale-plan-notice");
+    expect(notice).toBeInTheDocument();
+    expect(notice).toHaveTextContent(/saved target role plan/i);
+    expect(screen.getByRole("button", { name: /Generate explore direction plan/i })).toBeInTheDocument();
   });
 });

@@ -40,6 +40,7 @@ from app.services.employer_candidate_eligibility import (
     require_employer_eligible_candidate,
     trimmed_candidate_display_name,
 )
+from app.services.candidate_applications import has_active_application
 from app.services.matching import MatchRequirement, match_passport_to_requirements
 from app.services.roadmap import build_roadmap_from_match
 from app.services.signal_summaries import public_categories_for_evidence
@@ -151,6 +152,9 @@ def build_match_details(
             )
             for item in roadmap.items
         ],
+        has_applied=has_active_application(
+            session, vacancy_id=vacancy_id, candidate_id=candidate_id
+        ),
     )
 
 

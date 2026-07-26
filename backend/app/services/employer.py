@@ -8,6 +8,7 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.models.candidate_profile import CandidateProfile
+from app.models.application import Application
 from app.models.employer_candidate_shortlist import EmployerCandidateShortlist
 from app.models.employer_interview_scorecard import EmployerInterviewScorecard
 from app.models.employer_profile import EmployerProfile
@@ -177,6 +178,7 @@ def delete_vacancy(session: Session, employer_id: UUID, vacancy_id: UUID) -> Non
                 EmployerCandidateShortlist.vacancy_id == vacancy_id
             )
         )
+        session.execute(delete(Application).where(Application.vacancy_id == vacancy_id))
         session.execute(
             delete(VacancySkillRequirement).where(
                 VacancySkillRequirement.vacancy_id == vacancy_id

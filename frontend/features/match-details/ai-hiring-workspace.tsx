@@ -120,7 +120,12 @@ export function AiHiringWorkspace({ candidateId, vacancyId, enabled }: AiHiringW
         description={PAGE_DESCRIPTION}
         breadcrumb={breadcrumb}
       />
-      <MatchReviewNavigation candidateId={candidateId} vacancyId={vacancyId} active="ai" />
+      <MatchReviewNavigation
+        candidateId={candidateId}
+        vacancyId={vacancyId}
+        active="ai"
+        hasApplied={details.has_applied}
+      />
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_20rem] xl:gap-8">
         <main>
           <AiHiringIntelligenceSection candidateId={candidateId} vacancyId={vacancyId} enabled />

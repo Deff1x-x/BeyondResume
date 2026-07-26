@@ -145,6 +145,11 @@ describe("AiCandidateCompareSection", () => {
     expect(postVacancyAiCompare).not.toHaveBeenCalled();
     expect(screen.getByRole("button", { name: "Generate AI comparison" })).toBeEnabled();
     expect(screen.queryByText(/Summary/i)).not.toBeInTheDocument();
+    expect(screen.getByText("Evidence")).toBeInTheDocument();
+    expect(screen.getByText("Verified Skills")).toBeInTheDocument();
+    expect(screen.getByText("Candidate Match")).toBeInTheDocument();
+    expect(screen.getByText("AI Insight")).toBeInTheDocument();
+    expect(screen.getByText("Waiting")).toBeInTheDocument();
   });
 
   it("shows loading then live success without Demo AI", async () => {
@@ -160,6 +165,7 @@ describe("AiCandidateCompareSection", () => {
     fireEvent.click(screen.getByRole("button", { name: "Generate AI comparison" }));
 
     expect(await screen.findByText("Generating AI comparison…")).toBeInTheDocument();
+    expect(screen.getByText("Generating")).toBeInTheDocument();
     expect(postVacancyAiCompare).toHaveBeenCalledTimes(1);
     expect(postVacancyAiCompare).toHaveBeenCalledWith("vacancy-1", {
       candidate_ids: ["candidate-1", "candidate-2"]
@@ -225,6 +231,10 @@ describe("AiCandidateCompareSection", () => {
     expect(
       await screen.findByText("AI comparison is temporarily unavailable.")
     ).toBeInTheDocument();
+    expect(
+      screen.getByText(/deterministic comparison above remains valid/i)
+    ).toBeInTheDocument();
+    expect(screen.getByText("Unavailable")).toBeInTheDocument();
     expect(screen.queryByText(/Candidate A covers more required skills/)).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Try again" }));

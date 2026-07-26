@@ -4,12 +4,14 @@ type MatchReviewNavigationProps = Readonly<{
   candidateId: string;
   vacancyId: string;
   active: "review" | "ai" | "questions" | "scorecard";
+  hasApplied?: boolean;
 }>;
 
 export function MatchReviewNavigation({
   candidateId,
   vacancyId,
-  active
+  active,
+  hasApplied = false
 }: MatchReviewNavigationProps) {
   const query = `vacancy_id=${encodeURIComponent(vacancyId)}`;
   const reviewHref = `/employer/matches/${encodeURIComponent(candidateId)}?${query}`;
@@ -43,20 +45,24 @@ export function MatchReviewNavigation({
       >
         AI Hiring
       </Link>
-      <Link
-        href={questionsHref}
-        aria-current={active === "questions" ? "page" : undefined}
-        className={tabClass(active === "questions")}
-      >
-        Questions
-      </Link>
-      <Link
-        href={scorecardHref}
-        aria-current={active === "scorecard" ? "page" : undefined}
-        className={tabClass(active === "scorecard")}
-      >
-        Interview Scorecard
-      </Link>
+      {hasApplied ? (
+        <>
+          <Link
+            href={questionsHref}
+            aria-current={active === "questions" ? "page" : undefined}
+            className={tabClass(active === "questions")}
+          >
+            Questions
+          </Link>
+          <Link
+            href={scorecardHref}
+            aria-current={active === "scorecard" ? "page" : undefined}
+            className={tabClass(active === "scorecard")}
+          >
+            Interview Scorecard
+          </Link>
+        </>
+      ) : null}
     </nav>
   );
 }

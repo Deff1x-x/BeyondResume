@@ -68,7 +68,7 @@ function dashboardCards(data: CandidateDashboardResponse): DashboardCardProps[] 
       detail: data.github.connected
         ? "Repository linked for analysis and evidence."
         : "Connect a repository to start collecting evidence.",
-      href: "#github-section-title",
+      href: "#github-section",
       actionLabel: "Open GitHub"
     },
     {
@@ -78,7 +78,7 @@ function dashboardCards(data: CandidateDashboardResponse): DashboardCardProps[] 
         data.evidence.count === 1
           ? "1 evidence item collected from your sources."
           : `${data.evidence.count} evidence items collected from your sources.`,
-      href: "#evidence-hub-section-title",
+      href: "#evidence-section",
       actionLabel: "View evidence"
     },
     {

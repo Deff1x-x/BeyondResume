@@ -246,6 +246,34 @@ class MatchDetailsResponse(BaseModel):
     passport: MatchDetailsPassportResponse
     evidence: list[MatchDetailsEvidenceResponse]
     roadmap: list[MatchDetailsRoadmapItemResponse]
+    has_applied: bool = False
+
+
+ApplicationStatus = Literal["applied", "withdrawn"]
+
+
+class EmployerApplicantResponse(BaseModel):
+    application_id: UUID
+    candidate_id: UUID
+    candidate_name: str
+    status: ApplicationStatus
+    applied_at: datetime
+    score: int
+    required: MatchSkillGroupResponse
+    preferred: MatchSkillGroupResponse
+
+
+class EmployerApplicantsResponse(BaseModel):
+    applicants: list[EmployerApplicantResponse]
+
+
+class ApplicantContactResponse(BaseModel):
+    email: str
+    phone: str | None
+    telegram: str | None
+    linkedin_url: str | None
+    portfolio_url: str | None
+    location: str | None
 
 
 class AiMatchExplanationResponse(BaseModel):

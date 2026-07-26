@@ -52,6 +52,22 @@ const MODE_OPTIONS: Array<{ value: CompanionMode; label: string; help: string }>
   }
 ];
 
+const MODE_LABELS: Record<CompanionMode, string> = {
+  target_vacancy: "Target vacancy",
+  target_role: "Target role",
+  career_growth: "Career growth",
+  explore_direction: "Explore direction"
+};
+
+const modeCardClass = (active: boolean) =>
+  [
+    "block cursor-pointer rounded-card border p-4 text-left transition-all duration-200 ease-out",
+    "peer-focus-visible:ring-2 peer-focus-visible:ring-focus-ring peer-focus-visible:ring-offset-2",
+    active
+      ? "border-accent bg-accent/10 shadow-sm"
+      : "border-border bg-background hover:border-border-strong"
+  ].join(" ");
+
 const HORIZON_META: Record<ActionHorizon, { title: string; eyebrow: string }> = {
   fix_now: { title: "Fix Now", eyebrow: "Current blockers" },
   build_next: { title: "Build Next", eyebrow: "High-leverage projects" },
@@ -427,17 +443,38 @@ export function CareerCompanionSection({ enabled }: Readonly<{ enabled: boolean 
     planQuery.error.status === 404;
 
   const profileRole = profileQuery.data?.target_role ?? "";
+  const vacancies = vacanciesQuery.data ?? [];
+  const effectiveRole = role.trim() || profileRole;
+
+  /**
+   * Only the field the selected mode owns is submitted. Career growth and
+   * explore direction deliberately send no target_role so the backend derives
+   * the goal from evidence instead of a stale text input.
+   */
+  const payload = {
+    mode,
+    target_vacancy_id: mode === "target_vacancy" ? vacancyId || null : null,
+    target_role: mode === "target_role" ? effectiveRole || null : null
+  };
+
+  const missingRequiredInput =
+    (mode === "target_vacancy" && !vacancyId) ||
+    (mode === "target_role" && !effectiveRole);
+
+  const plan = planQuery.data;
+  // A plan belongs to the current selection only when mode and target agree.
+  const planMatchesSelection =
+    plan !== undefined &&
+    plan.mode === mode &&
+    (mode !== "target_vacancy" || plan.target_vacancy_id === (vacancyId || null)) &&
+    (mode !== "target_role" || !effectiveRole || plan.target_role === effectiveRole);
 
   function onGenerate(event: FormEvent) {
     event.preventDefault();
-    generate.mutate({
-      mode,
-      target_vacancy_id: mode === "target_vacancy" ? vacancyId || null : null,
-      target_role:
-        mode === "target_vacancy"
-          ? null
-          : role.trim() || profileRole || "Backend Developer"
-    });
+    if (missingRequiredInput || generate.isPending) {
+      return;
+    }
+    generate.mutate(payload);
   }
 
   if (!enabled) return null;
@@ -467,7 +504,11 @@ export function CareerCompanionSection({ enabled }: Readonly<{ enabled: boolean 
   }
 
   return (
-    <section id="career-companion-section" aria-labelledby="career-companion-title" className="space-y-8">
+    <section
+      id="career-companion-section"
+      aria-labelledby="career-companion-title"
+      className="scroll-mt-[var(--workspace-scroll-offset)] space-y-8"
+    >
       <div>
         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-ai-muted">AI Career Companion</p>
         <h2 id="career-companion-title" className="mt-1 text-3xl font-semibold tracking-tight text-ink">
@@ -480,26 +521,31 @@ export function CareerCompanionSection({ enabled }: Readonly<{ enabled: boolean 
 
       <Card>
         <CardContent className="p-5 sm:p-6">
-          <form className="space-y-4" onSubmit={onGenerate}>
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <form className="space-y-4" autoComplete="off" onSubmit={onGenerate}>
+            <div
+              role="radiogroup"
+              aria-label="Career Companion goal mode"
+              className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
+            >
               {MODE_OPTIONS.map((option) => (
-                <label
-                  key={option.value}
-                  className={`cursor-pointer rounded-card border p-4 transition ${
-                    mode === option.value
-                      ? "border-accent bg-accent/10"
-                      : "border-border bg-background hover:border-border-strong"
-                  }`}
-                >
+                <label key={option.value} className="contents">
                   <input
                     type="radio"
                     name="companion-mode"
-                    className="sr-only"
+                    className="peer sr-only"
+                    value={option.value}
                     checked={mode === option.value}
+                    autoComplete="off"
                     onChange={() => setMode(option.value)}
+                    // An already-checked radio fires no change event, so clicks sync too.
+                    onClick={() => setMode(option.value)}
                   />
-                  <p className="text-sm font-semibold text-ink">{option.label}</p>
-                  <p className="mt-1 text-xs leading-5 text-secondary">{option.help}</p>
+                  <span className={modeCardClass(mode === option.value)}>
+                    <span className="block text-sm font-semibold text-ink">{option.label}</span>
+                    <span className="mt-1 block text-xs leading-5 text-secondary">
+                      {option.help}
+                    </span>
+                  </span>
                 </label>
               ))}
             </div>
@@ -513,17 +559,24 @@ export function CareerCompanionSection({ enabled }: Readonly<{ enabled: boolean 
                   id="companion-vacancy"
                   value={vacancyId}
                   onChange={(event) => setVacancyId(event.target.value)}
-                  required
+                  aria-describedby="companion-vacancy-help"
                 >
                   <option value="">Select an open vacancy</option>
-                  {(vacanciesQuery.data ?? []).map((item) => (
+                  {vacancies.map((item) => (
                     <option key={item.id} value={item.id}>
                       {item.title} · {item.company_name} · {item.match.score}%
                     </option>
                   ))}
                 </Select>
+                <p id="companion-vacancy-help" className="text-xs leading-5 text-secondary">
+                  {vacancies.length === 0
+                    ? "No open vacancies are available yet. Recommended vacancies appear here once published."
+                    : "The plan uses the missing required and preferred skills of this vacancy."}
+                </p>
               </div>
-            ) : (
+            ) : null}
+
+            {mode === "target_role" ? (
               <div className="space-y-2">
                 <label htmlFor="companion-role" className="text-sm font-medium text-ink">
                   Target role
@@ -533,13 +586,61 @@ export function CareerCompanionSection({ enabled }: Readonly<{ enabled: boolean 
                   value={role}
                   onChange={(event) => setRole(event.target.value)}
                   placeholder={profileRole || "Backend Developer"}
+                  aria-describedby="companion-role-help"
                 />
+                <p id="companion-role-help" className="text-xs leading-5 text-secondary">
+                  {profileRole
+                    ? `Leave empty to use your profile target role (${profileRole}).`
+                    : "Enter the profession you want this plan to target."}
+                </p>
               </div>
-            )}
+            ) : null}
 
-            <Button type="submit" variant="primary" loading={generate.isPending}>
-              {planQuery.data ? "Regenerate plan" : "Generate plan"}
+            {mode === "career_growth" ? (
+              <div
+                className="space-y-1 rounded-card border border-border bg-background p-4"
+                data-testid="companion-career-growth-body"
+              >
+                <p className="text-sm font-medium text-ink">Next-level growth</p>
+                <p className="text-xs leading-5 text-secondary">
+                  {profileRole
+                    ? `Uses your verified evidence and stronger vacancies above ${profileRole}. No target role input is needed.`
+                    : "Uses your verified evidence and the stronger vacancies it already supports. No target role input is needed."}
+                </p>
+              </div>
+            ) : null}
+
+            {mode === "explore_direction" ? (
+              <div
+                className="space-y-1 rounded-card border border-border bg-background p-4"
+                data-testid="companion-explore-direction-body"
+              >
+                <p className="text-sm font-medium text-ink">Evidence-based directions</p>
+                <p className="text-xs leading-5 text-secondary">
+                  Ranks the directions your verified skills and projects already support. No target
+                  role is required.
+                </p>
+              </div>
+            ) : null}
+
+            <Button
+              type="submit"
+              variant="primary"
+              loading={generate.isPending}
+              disabled={missingRequiredInput}
+              aria-label={`${planMatchesSelection ? "Regenerate" : "Generate"} ${MODE_LABELS[
+                mode
+              ].toLowerCase()} plan`}
+            >
+              {planMatchesSelection ? "Regenerate plan" : "Generate plan"}
             </Button>
+            {missingRequiredInput ? (
+              <p className="text-xs text-secondary">
+                {mode === "target_vacancy"
+                  ? "Select a vacancy to generate a plan."
+                  : "Enter a target role to generate a plan."}
+              </p>
+            ) : null}
             {generate.isError ? (
               <p className="text-sm text-danger" role="alert">
                 {errorMessage(generate.error)}
@@ -552,14 +653,37 @@ export function CareerCompanionSection({ enabled }: Readonly<{ enabled: boolean 
       {missingPlan && !generate.isSuccess ? (
         <EmptyState
           icon={<Icon name="roadmap" className="h-8 w-8" />}
-          title="No active plan yet"
-          description="Choose a goal mode and generate a deterministic fallback plan. AI personalization enhances explanations when available."
+          title="Generate your first personalized career plan."
+          description="Choose a goal above, then generate a plan. Career Companion explains gaps and next steps from your verified evidence — it does not invent skills."
         />
       ) : null}
 
-      {planQuery.data ? (
+      {generate.isPending ? (
+        <div role="status" aria-label={`Generating ${MODE_LABELS[mode].toLowerCase()} plan`}>
+          <SkeletonCard className="min-h-40" />
+        </div>
+      ) : null}
+
+      {plan && !planMatchesSelection ? (
+        <div
+          role="status"
+          data-testid="companion-stale-plan-notice"
+          className="rounded-card border border-warning/30 bg-warning-soft p-4"
+        >
+          <p className="text-sm font-medium text-warning-muted">
+            Showing your saved {MODE_LABELS[plan.mode].toLowerCase()} plan
+          </p>
+          <p className="mt-1 text-sm leading-6 text-warning-muted">
+            This plan was generated for a different goal
+            {plan.target_role ? ` (${plan.target_role})` : ""}. Generate a{" "}
+            {MODE_LABELS[mode].toLowerCase()} plan to see results for your current selection.
+          </p>
+        </div>
+      ) : null}
+
+      {plan ? (
         <PlanView
-          plan={planQuery.data}
+          plan={plan}
           refreshing={refresh.isPending}
           onRefresh={() => refresh.mutate()}
           onStatus={(actionId, status) => patchAction.mutate({ actionId, status })}

@@ -58,8 +58,8 @@ export function EvidenceHubSection({ enabled }: Readonly<{ enabled: boolean }>) 
 
   return (
     <Card
-      id="evidence-hub"
-      className="lg:col-span-2"
+      id="evidence-section"
+      className="scroll-mt-[var(--workspace-scroll-offset)] lg:col-span-2"
       aria-labelledby="evidence-hub-section-title"
     >
       <CardContent className="space-y-6 p-6">

@@ -8,6 +8,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base, TimestampMixin
 
 if TYPE_CHECKING:
+    from app.models.application import Application
     from app.models.employer_profile import EmployerProfile
     from app.models.vacancy_skill_requirement import VacancySkillRequirement
 
@@ -38,3 +39,4 @@ class Vacancy(TimestampMixin, Base):
     skill_requirements: Mapped[list["VacancySkillRequirement"]] = relationship(
         back_populates="vacancy"
     )
+    applications: Mapped[list["Application"]] = relationship(back_populates="vacancy")

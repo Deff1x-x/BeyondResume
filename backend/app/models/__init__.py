@@ -1,3 +1,4 @@
+from app.models.application import Application
 from app.models.audit_event import AuditEvent
 from app.models.candidate_profile import CandidateProfile
 from app.models.career_companion_action import CareerCompanionAction
@@ -21,6 +22,7 @@ from app.models.vacancy import Vacancy
 from app.models.vacancy_skill_requirement import VacancySkillRequirement
 
 __all__ = [
+    "Application",
     "AuditEvent",
     "CandidateProfile",
     "CareerCompanionAction",

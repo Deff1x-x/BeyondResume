@@ -63,7 +63,7 @@ export function EvidenceToolbar({
               onClick={() => onSourceFilterChange(option.value)}
               className={
                 selected
-                  ? "min-h-control rounded-button border border-ink bg-ink px-3 text-sm font-medium text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2"
+                  ? "min-h-control rounded-button border border-accent bg-accent px-3 text-sm font-medium text-accent-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2"
                   : "min-h-control rounded-button border border-border bg-surface px-3 text-sm font-medium text-ink transition-colors hover:bg-surface-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2"
               }
             >

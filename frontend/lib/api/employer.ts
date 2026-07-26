@@ -4,6 +4,8 @@ import type {
   EmployerCompanyCreateRequest,
   EmployerCompanyUpdateRequest,
   AiMatchExplanation,
+  ApplicantContact,
+  EmployerApplicantsResponse,
   EmployerCandidateStage,
   EmployerShortlistEntry,
   EmployerShortlistNoteUpdateRequest,
@@ -89,6 +91,19 @@ export function deleteVacancyRequirement(
 
 export function listVacancyMatches(vacancyId: string): Promise<VacancyMatchesResponse> {
   return apiRequest<VacancyMatchesResponse>(`/employer/vacancies/${vacancyId}/matches`);
+}
+
+export function listVacancyApplicants(vacancyId: string): Promise<EmployerApplicantsResponse> {
+  return apiRequest<EmployerApplicantsResponse>(`/employer/vacancies/${vacancyId}/applicants`);
+}
+
+export function getApplicantContact(
+  vacancyId: string,
+  candidateId: string
+): Promise<ApplicantContact> {
+  return apiRequest<ApplicantContact>(
+    `/employer/vacancies/${vacancyId}/applicants/${candidateId}/contact`
+  );
 }
 
 export function getMatchDetails(

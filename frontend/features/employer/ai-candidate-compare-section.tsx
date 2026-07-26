@@ -4,8 +4,10 @@ import { useEffect, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { EvidenceIntelligenceFlow } from "@/components/evidence-intelligence-flow";
 import { Icon } from "@/components/ui/icon";
 import { CompareFlowSteps } from "@/features/employer/compare-flow-chrome";
+import { cn } from "@/lib/cn";
 import { ApiClientError } from "@/lib/api/error";
 import type { AiCandidateCompareResponse } from "@/lib/api/types/ai-candidate-compare";
 import { useAiCandidateCompareMutation } from "@/lib/ai-candidate-compare/hooks";
@@ -33,13 +35,14 @@ function candidateLabel(
 
 function InsightList({
   title,
-  items
-}: Readonly<{ title: string; items: Array<{ text: string }> }>) {
+  items,
+  className
+}: Readonly<{ title: string; items: Array<{ text: string }>; className?: string }>) {
   if (items.length === 0) {
     return null;
   }
   return (
-    <div>
+    <div className={className}>
       <h4 className="text-xs font-semibold uppercase tracking-[0.12em] text-secondary">
         {title}
       </h4>
@@ -54,6 +57,14 @@ function InsightList({
   );
 }
 
+function confidenceTone(confidence: string): "success" | "warning" | "neutral" | "ai" {
+  const value = confidence.toLowerCase();
+  if (value.includes("high")) return "success";
+  if (value.includes("medium") || value.includes("moderate")) return "warning";
+  if (value.includes("low")) return "neutral";
+  return "ai";
+}
+
 export function AiCandidateCompareSection({
   vacancyId,
   candidateIds,
@@ -62,35 +73,47 @@ export function AiCandidateCompareSection({
 }: AiCandidateCompareSectionProps) {
   const mutation = useAiCandidateCompareMutation(vacancyId, candidateIds);
   const [lastSuccess, setLastSuccess] = useState<AiCandidateCompareResponse | null>(null);
+  const [revealReady, setRevealReady] = useState(false);
   const selectionValid = enabled && candidateIds.length >= 2 && candidateIds.length <= 4;
   const selectionKey = candidateIds.join(",");
 
   useEffect(() => {
     setLastSuccess(null);
+    setRevealReady(false);
   }, [vacancyId, selectionKey]);
 
   useEffect(() => {
     if (mutation.isSuccess && mutation.data) {
       setLastSuccess(mutation.data);
+      setRevealReady(false);
+      const frame = window.requestAnimationFrame(() => setRevealReady(true));
+      return () => window.cancelAnimationFrame(frame);
     }
   }, [mutation.data, mutation.isSuccess]);
 
   const display = mutation.isSuccess && mutation.data ? mutation.data : lastSuccess;
   const showUnavailable = mutation.isError && !mutation.isPending;
   const showLoading = mutation.isPending;
+  const flowState = showLoading
+    ? "loading"
+    : display
+      ? "success"
+      : showUnavailable
+        ? "error"
+        : "idle";
 
   return (
     <section
       id="ai-hiring-analysis"
-      className="scroll-mt-6 space-y-6 rounded-card border border-border bg-surface p-5 shadow-card sm:p-6"
+      className="ai-glow scroll-mt-6 space-y-6 overflow-hidden rounded-card border border-ai/25 bg-surface p-5 shadow-card sm:p-6"
       aria-labelledby="ai-candidate-compare-heading"
     >
       <CompareFlowSteps active="ai" className="shadow-none" />
 
-      <div className="flex flex-wrap items-start justify-between gap-5">
+      <div className="relative flex flex-wrap items-start justify-between gap-5">
         <div className="min-w-0 max-w-2xl">
           <div className="flex flex-wrap items-center gap-3">
-            <span className="inline-flex h-10 w-10 items-center justify-center rounded-card bg-ai/10 text-ai-muted ring-1 ring-ai/20">
+            <span className="ai-icon-pulse inline-flex h-11 w-11 items-center justify-center rounded-card bg-ai/15 text-ai-muted ring-1 ring-ai/25">
               <Icon name="spark" className="h-[18px] w-[18px]" aria-hidden="true" />
             </span>
             <Badge variant="ai" aria-label="AI analysis">
@@ -112,6 +135,7 @@ export function AiCandidateCompareSection({
             Second opinion from an AI Hiring Manager. Uses deterministic evidence only.
             Does not replace recruiter judgement.
           </p>
+          <EvidenceIntelligenceFlow state={flowState} className="mt-5" />
         </div>
         <Button
           type="button"
@@ -131,9 +155,24 @@ export function AiCandidateCompareSection({
       </div>
 
       {showLoading ? (
-        <p className="text-sm text-secondary" role="status" aria-live="polite">
-          Generating AI comparison…
-        </p>
+        <div className="space-y-3" role="status" aria-live="polite">
+          <p className="text-sm font-medium text-ink">Generating AI comparison…</p>
+          <p className="text-sm text-secondary">
+            Reading match evidence, weighing risks, and drafting interview focus.
+          </p>
+          <div className="ai-loading-bar" aria-hidden="true" />
+          <ol className="grid gap-2 text-xs text-secondary sm:grid-cols-3">
+            <li className="rounded-control border border-border bg-surface-subtle/70 px-3 py-2">
+              1. Ground in evidence
+            </li>
+            <li className="rounded-control border border-border bg-surface-subtle/70 px-3 py-2">
+              2. Compare trade-offs
+            </li>
+            <li className="rounded-control border border-border bg-surface-subtle/70 px-3 py-2">
+              3. Recommend with caution
+            </li>
+          </ol>
+        </div>
       ) : null}
 
       {showUnavailable ? (
@@ -141,6 +180,9 @@ export function AiCandidateCompareSection({
           <p className="font-medium text-ink">AI comparison is temporarily unavailable.</p>
           <p className="mt-2 text-sm leading-6 text-secondary">
             {unavailableMessage(mutation.error)}
+          </p>
+          <p className="mt-2 text-sm leading-6 text-secondary">
+            The deterministic comparison above remains valid — only the AI second opinion failed.
           </p>
           <Button
             type="button"
@@ -160,20 +202,26 @@ export function AiCandidateCompareSection({
       ) : null}
 
       {!display && !showLoading && !showUnavailable ? (
-        <div className="rounded-card border border-dashed border-border bg-surface-subtle/50 px-5 py-6">
+        <div className="rounded-card border border-dashed border-ai/30 bg-ai/[0.04] px-5 py-6">
           <p className="text-sm font-medium text-ink">Ready when you are</p>
           <p className="mt-2 text-sm leading-6 text-secondary">
             Generate to surface hiring risks, onboarding insights, and interview focus that are
-            not obvious from the comparison table alone.
+            not obvious from the comparison table alone. AI Insight builds only after evidence,
+            verified skills, and the deterministic match above.
           </p>
         </div>
       ) : null}
 
       {display ? (
-        <div className="space-y-5 border-t border-border pt-6">
-          <div className="rounded-card border border-border bg-surface-subtle/70 p-5">
+        <div
+          className={cn(
+            "stagger-children space-y-6 border-t border-border pt-6",
+            !revealReady && "opacity-100"
+          )}
+        >
+          <div className="rounded-card border border-border bg-surface-subtle/70 p-5 sm:p-6">
             <h3 className="text-sm font-semibold tracking-tight text-ink">Summary</h3>
-            <p className="mt-3 text-sm leading-6 text-ink">{display.summary}</p>
+            <p className="mt-3 text-sm leading-7 text-ink">{display.summary}</p>
           </div>
 
           <div className="space-y-4">
@@ -184,7 +232,7 @@ export function AiCandidateCompareSection({
                 return (
                   <div
                     key={assessment.candidate_id}
-                    className="rounded-card border border-border bg-surface p-5"
+                    className="surface-lift rounded-card border border-border bg-surface p-5"
                     aria-label={`Assessment for ${name}`}
                   >
                     <h4 className="font-medium text-ink">{name}</h4>
@@ -198,32 +246,49 @@ export function AiCandidateCompareSection({
             </div>
           </div>
 
-          <InsightList title="Key differences" items={display.key_differences} />
+          <div className="rounded-card border border-border bg-background p-5 sm:p-6">
+            <InsightList title="Key differences" items={display.key_differences} />
+          </div>
 
           {display.interview_focus_questions.length > 0 ? (
-            <div className="space-y-3">
-              <h3 className="text-sm font-semibold tracking-tight text-ink">Interview focus questions</h3>
-              <ul className="list-disc space-y-3 pl-4 text-sm text-ink">
-                {display.interview_focus_questions.map((item) => {
+            <div className="rounded-card border border-border bg-surface p-5 sm:p-6">
+              <h3 className="text-sm font-semibold tracking-tight text-ink">
+                Interview focus questions
+              </h3>
+              <ol className="mt-4 space-y-4">
+                {display.interview_focus_questions.map((item, index) => {
                   const names = item.candidate_ids
                     .map((id) => candidateLabel(id, candidateNamesById))
                     .join(", ");
                   return (
-                    <li key={`${item.question}-${names}`} className="leading-6">
-                      <span className="break-words">{item.question}</span>
-                      <span className="mt-1 block text-secondary">For: {names}</span>
+                    <li
+                      key={`${item.question}-${names}`}
+                      className="flex gap-3 border-t border-border pt-4 first:border-t-0 first:pt-0"
+                    >
+                      <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-ai/15 text-xs font-semibold text-ai-muted">
+                        {index + 1}
+                      </span>
+                      <div>
+                        <p className="break-words text-sm leading-6 text-ink">{item.question}</p>
+                        <p className="mt-1 text-sm text-secondary">For: {names}</p>
+                      </div>
                     </li>
                   );
                 })}
-              </ul>
+              </ol>
             </div>
           ) : null}
 
-          <div className="rounded-card border border-border bg-surface-subtle/70 p-5">
-            <h3 className="text-sm font-semibold tracking-tight text-ink">Recommendation</h3>
+          <div className="rounded-card border border-accent/35 bg-accent/10 p-5 sm:p-6">
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="text-sm font-semibold tracking-tight text-ink">Recommendation</h3>
+              <Badge variant={confidenceTone(display.confidence)}>
+                Confidence: {display.confidence}
+              </Badge>
+            </div>
             {display.recommended_candidate_id ? (
-              <div className="mt-3 space-y-2 text-sm leading-6 text-ink">
-                <p className="font-medium">
+              <div className="mt-4 space-y-2 text-sm leading-7 text-ink">
+                <p className="font-display text-lg font-semibold tracking-tight">
                   {candidateLabel(display.recommended_candidate_id, candidateNamesById)}
                 </p>
                 {display.recommendation_rationale ? (
@@ -231,11 +296,8 @@ export function AiCandidateCompareSection({
                 ) : null}
               </div>
             ) : (
-              <p className="mt-3 text-sm leading-6 text-secondary">No clear recommendation</p>
+              <p className="mt-4 text-sm leading-6 text-secondary">No clear recommendation</p>
             )}
-            <p className="mt-3 text-xs text-muted">
-              Confidence: {display.confidence}
-            </p>
           </div>
 
           <InsightList title="Uncertainties" items={display.uncertainties} />

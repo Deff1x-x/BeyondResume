@@ -269,4 +269,42 @@ def test_profile_response_contains_only_public_candidate_fields(
         "relocation_readiness",
         "portfolio_url",
         "linkedin_url",
+        "phone",
+        "telegram",
     }
+
+
+def test_get_and_patch_phone_and_telegram(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.api.v1 import candidate
+
+    user = make_user()
+    authorize(user)
+    profile = make_profile(user.id)
+    profile.phone = "+77001234567"
+    profile.telegram = "@alan"
+    monkeypatch.setattr(candidate, "get_candidate_profile", lambda *_args: profile)
+
+    get_response = client.get("/api/v1/candidate/profile")
+    assert get_response.status_code == 200
+    assert get_response.json()["phone"] == "+77001234567"
+    assert get_response.json()["telegram"] == "@alan"
+
+    captured: dict[str, object] = {}
+
+    def patch(*args: object) -> CandidateProfile:
+        captured.update(args[2])  # type: ignore[arg-type]
+        profile.phone = "  +77009876543  ".strip()
+        profile.telegram = "@updated"
+        return profile
+
+    monkeypatch.setattr(candidate, "patch_candidate_profile", patch)
+    patch_response = client.patch(
+        "/api/v1/candidate/profile",
+        json={"phone": "  +77009876543  ", "telegram": "  @updated  "},
+    )
+    assert patch_response.status_code == 200
+    assert captured == {"phone": "+77009876543", "telegram": "@updated"}
+    assert patch_response.json()["phone"] == "+77009876543"
+    assert patch_response.json()["telegram"] == "@updated"

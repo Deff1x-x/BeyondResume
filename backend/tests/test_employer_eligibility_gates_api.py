@@ -168,6 +168,32 @@ def test_match_details_allows_valid_named_zero_percent_candidate(
     assert body["candidate"]["name"] == "Eligible Candidate"
     assert "Unnamed" not in body["candidate"]["name"]
     assert body["match"]["score"] == 0
+    assert body["has_applied"] is False
+
+
+def test_match_details_has_applied_true_for_active_applicant(
+    eligibility_client: tuple[TestClient, EligibilityApiContext],
+) -> None:
+    from app.models.application import Application
+
+    client, context = eligibility_client
+    session = context.new_session()
+    try:
+        session.add(
+            Application(
+                id=uuid4(),
+                vacancy_id=context.vacancy.id,
+                candidate_id=context.eligible_id,
+                status="applied",
+            )
+        )
+        session.commit()
+    finally:
+        session.close()
+
+    response = client.get(_match_path(context.eligible_id, context.vacancy.id))
+    assert response.status_code == 200
+    assert response.json()["has_applied"] is True
 
 
 def test_ai_hiring_rejects_ineligible_before_provider(
@@ -193,7 +219,26 @@ def test_interview_questions_rejects_ineligible_before_provider(
     eligibility_client: tuple[TestClient, EligibilityApiContext],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    from app.models.application import Application
+
     client, context = eligibility_client
+    session = context.new_session()
+    try:
+        session.add_all(
+            [
+                Application(
+                    id=uuid4(),
+                    vacancy_id=context.vacancy.id,
+                    candidate_id=candidate_id,
+                    status="applied",
+                )
+                for candidate_id in (context.shell_id, context.suspended_id)
+            ]
+        )
+        session.commit()
+    finally:
+        session.close()
+
     spy = MagicMock(side_effect=AssertionError("Questions provider must not run"))
     monkeypatch.setattr("app.api.v1.employer.get_interview_questions", spy)
     monkeypatch.setattr("app.api.v1.employer.build_interview_questions_context", spy)

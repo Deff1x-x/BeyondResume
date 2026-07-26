@@ -239,7 +239,12 @@ export function InterviewQuestionsWorkspace({
         description="Candidate-specific interview suggestions for the selected vacancy."
         breadcrumb={breadcrumb}
       />
-      <MatchReviewNavigation candidateId={candidateId} vacancyId={vacancyId} active="questions" />
+      <MatchReviewNavigation
+        candidateId={candidateId}
+        vacancyId={vacancyId}
+        active="questions"
+        hasApplied={details.has_applied}
+      />
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_20rem] xl:gap-8">
         <main className="space-y-8">
           <Card>

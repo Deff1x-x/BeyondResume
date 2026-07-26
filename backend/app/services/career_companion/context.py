@@ -102,14 +102,20 @@ def build_companion_context(
         )
 
     role = (target_role or "").strip() or None
-    if mode in {"target_role", "career_growth", "explore_direction"} and role is None:
+    if mode in {"target_role", "career_growth"} and role is None:
         # Prefer profile target when caller omitted it.
         from app.models.candidate_profile import CandidateProfile
 
         profile = session.get(CandidateProfile, candidate_id)
         role = (profile.target_role if profile else None) or None
+    if mode == "explore_direction":
+        # Exploration must stay evidence-driven, never narrowed to one role.
+        role = None
 
-    skill_frequencies = _skill_frequencies(vacancy_matches, role)
+    # Explore mode needs unfiltered breadth across all open vacancies.
+    skill_frequencies = _skill_frequencies(
+        vacancy_matches, None if mode == "explore_direction" else role
+    )
     next_level = _next_level_vacancies(vacancy_matches, role, target_match)
     directions = _explore_directions(passport, vacancy_matches)
 

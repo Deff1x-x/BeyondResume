@@ -13,6 +13,9 @@ from app.models.user import User
 from app.models.vacancy import Vacancy
 from app.schemas.employer import (
     AiMatchExplanationResponse,
+    ApplicantContactResponse,
+    EmployerApplicantsResponse,
+    EmployerApplicantResponse,
     EmployerCompanyCreateRequest,
     EmployerCompanyResponse,
     EmployerCompanyUpdateRequest,
@@ -91,6 +94,12 @@ from app.services.employer_shortlist import (
     save_candidate_to_shortlist,
     update_candidate_note,
     update_candidate_stage,
+)
+from app.services.employer_applications import (
+    ApplicantNotFoundError,
+    get_applicant_contact,
+    list_vacancy_applicants,
+    require_active_application,
 )
 from app.services.interview_questions import (
     InterviewQuestionsUnavailableError,
@@ -437,6 +446,74 @@ def _owned_vacancy(session: Session, user_id: UUID, vacancy_id: UUID) -> Vacancy
     return vacancy
 
 
+@router.get(
+    "/vacancies/{vacancy_id}/applicants",
+    response_model=EmployerApplicantsResponse,
+)
+def get_vacancy_applicants(
+    vacancy_id: UUID,
+    current_user: Annotated[User, Depends(require_employer)],
+    session: Annotated[Session, Depends(get_db)],
+) -> EmployerApplicantsResponse:
+    vacancy = _owned_vacancy(session, current_user.id, vacancy_id)
+    try:
+        applicants = list_vacancy_applicants(session, vacancy=vacancy)
+    except SQLAlchemyError:
+        raise api_error(500, "DATABASE_ERROR", "Database operation failed") from None
+    return EmployerApplicantsResponse(
+        applicants=[
+            EmployerApplicantResponse(
+                application_id=item.application.id,
+                candidate_id=item.candidate.id,
+                candidate_name=item.candidate_name,
+                status=item.application.status,  # type: ignore[arg-type]
+                applied_at=item.application.created_at,
+                score=item.result.score,
+                required=MatchSkillGroupResponse(
+                    matched=list(item.result.required.matched),
+                    missing=list(item.result.required.missing),
+                ),
+                preferred=MatchSkillGroupResponse(
+                    matched=list(item.result.preferred.matched),
+                    missing=list(item.result.preferred.missing),
+                ),
+            )
+            for item in applicants
+        ]
+    )
+
+
+@router.get(
+    "/vacancies/{vacancy_id}/applicants/{candidate_id}/contact",
+    response_model=ApplicantContactResponse,
+)
+def get_vacancy_applicant_contact(
+    vacancy_id: UUID,
+    candidate_id: UUID,
+    current_user: Annotated[User, Depends(require_employer)],
+    session: Annotated[Session, Depends(get_db)],
+) -> ApplicantContactResponse:
+    vacancy = _owned_vacancy(session, current_user.id, vacancy_id)
+    try:
+        contact = get_applicant_contact(
+            session, vacancy=vacancy, candidate_id=candidate_id
+        )
+    except ApplicantNotFoundError:
+        raise api_error(
+            404, "APPLICANT_NOT_FOUND", "Applicant not found or unavailable"
+        ) from None
+    except SQLAlchemyError:
+        raise api_error(500, "DATABASE_ERROR", "Database operation failed") from None
+    return ApplicantContactResponse(
+        email=contact.email,
+        phone=contact.phone,
+        telegram=contact.telegram,
+        linkedin_url=contact.linkedin_url,
+        portfolio_url=contact.portfolio_url,
+        location=contact.location,
+    )
+
+
 @router.put(
     "/vacancies/{vacancy_id}/shortlist/{candidate_id}",
     response_model=EmployerShortlistEntryResponse,
@@ -659,8 +736,16 @@ def get_match_interview_questions(
     session: Annotated[Session, Depends(get_db)],
     refresh: Annotated[bool, Query()] = False,
 ) -> InterviewQuestionsResponse:
-    """Employer-only interview preparation questions for one match."""
-    company = _require_owned_vacancy(session, current_user.id, vacancy_id)
+    """Employer-only interview preparation questions for one applicant."""
+    vacancy = _owned_vacancy(session, current_user.id, vacancy_id)
+    try:
+        require_active_application(
+            session, vacancy=vacancy, candidate_id=candidate_id
+        )
+    except ApplicantNotFoundError:
+        raise api_error(
+            404, "APPLICANT_NOT_FOUND", "Applicant not found or unavailable"
+        ) from None
     try:
         details = build_match_details(session, vacancy_id=vacancy_id, candidate_id=candidate_id)
     except MatchDetailsCandidateNotFoundError:
@@ -670,7 +755,7 @@ def get_match_interview_questions(
     try:
         context = build_interview_questions_context(
             session,
-            employer_id=company.id,
+            employer_id=vacancy.employer_id,
             vacancy_id=vacancy_id,
             candidate_id=candidate_id,
             details=details,

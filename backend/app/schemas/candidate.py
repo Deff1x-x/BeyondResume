@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Annotated
+from typing import Annotated, Literal
 from uuid import UUID
 
 from pydantic import AnyHttpUrl, BaseModel, ConfigDict, Field
@@ -11,6 +11,8 @@ from app.schemas.employer import (
 )
 
 NonEmptyString = Annotated[str, Field(min_length=1)]
+
+ApplicationStatus = Literal["applied", "withdrawn"]
 
 
 class CandidateProfileResponse(BaseModel):
@@ -31,6 +33,8 @@ class CandidateProfileResponse(BaseModel):
     relocation_readiness: bool | None
     portfolio_url: str | None
     linkedin_url: str | None
+    phone: str | None
+    telegram: str | None
 
 
 class CandidateProfilePatchRequest(BaseModel):
@@ -49,6 +53,25 @@ class CandidateProfilePatchRequest(BaseModel):
     relocation_readiness: bool | None = None
     portfolio_url: AnyHttpUrl | None = None
     linkedin_url: AnyHttpUrl | None = None
+    phone: Annotated[str | None, Field(max_length=50, min_length=1)] = None
+    telegram: Annotated[str | None, Field(max_length=100, min_length=1)] = None
+
+
+class CandidateApplicationResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    vacancy_id: UUID
+    candidate_id: UUID
+    status: ApplicationStatus
+    created_at: datetime
+    updated_at: datetime
+
+
+class CandidateApplicationWithdrawRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    status: Literal["withdrawn"]
 
 
 class CandidateVacancyListItemResponse(BaseModel):
@@ -60,6 +83,7 @@ class CandidateVacancyListItemResponse(BaseModel):
     match: MatchDetailsMatchResponse
     required_skills: list[str]
     preferred_skills: list[str]
+    application: CandidateApplicationResponse | None = None
 
 
 class CandidateVacancyDetailResponse(CandidateVacancyListItemResponse):

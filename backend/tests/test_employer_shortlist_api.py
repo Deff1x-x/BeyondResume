@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from app.api.dependencies import require_employer
 from app.db.session import engine, get_db
 from app.main import app
+from app.models.application import Application
 from app.models.candidate_profile import CandidateProfile, OnboardingStatus
 from app.models.employer_candidate_shortlist import EmployerCandidateShortlist
 from app.models.employer_profile import EmployerProfile
@@ -99,6 +100,16 @@ def shortlist_client() -> Generator[tuple[TestClient, ShortlistContext], None, N
         vacancy_id=foreign_vacancy.id,
         candidate_id=candidates[0].id,
     )
+    applications = [
+        Application(
+            id=uuid4(),
+            vacancy_id=owned_vacancy.id,
+            candidate_id=candidate.id,
+            status="applied",
+        )
+        for owned_vacancy in (vacancy, second_vacancy)
+        for candidate in candidates
+    ]
     setup.add_all(
         [
             employer_user,
@@ -113,7 +124,7 @@ def shortlist_client() -> Generator[tuple[TestClient, ShortlistContext], None, N
         ]
     )
     setup.flush()
-    setup.add(foreign_entry)
+    setup.add_all([*applications, foreign_entry])
     setup.commit()
     setup.close()
 
@@ -690,7 +701,7 @@ def test_note_migration_contract_and_single_head() -> None:
     config = Config(str(Path(__file__).parents[1] / "alembic.ini"))
     script = ScriptDirectory.from_config(config)
     heads = script.get_heads()
-    assert heads == ["20260726_0020"]
+    assert heads == ["20260726_0021"]
     assert 'down_revision: Union[str, None] = "20260726_0018"' in (
         Path(__file__).parents[1]
         / "alembic"
@@ -702,6 +713,12 @@ def test_note_migration_contract_and_single_head() -> None:
         / "alembic"
         / "versions"
         / "20260726_0020_career_companion.py"
+    ).read_text(encoding="utf-8")
+    assert 'down_revision: Union[str, None] = "20260726_0020"' in (
+        Path(__file__).parents[1]
+        / "alembic"
+        / "versions"
+        / "20260726_0021_applications_and_candidate_contacts.py"
     ).read_text(encoding="utf-8")
 
 
@@ -1321,6 +1338,37 @@ def _add_ineligible_candidate(
     session.add_all([user, profile])
     session.flush()
     return profile.id
+
+
+def test_save_rejects_candidate_without_active_application(
+    shortlist_client: tuple[TestClient, ShortlistContext],
+) -> None:
+    client, context = shortlist_client
+    session = context.new_session()
+    try:
+        user = User(
+            id=uuid4(),
+            email=f"shortlist-no-app-{uuid4()}@example.com",
+            password_hash="hash",
+            role="candidate",
+            status="active",
+        )
+        profile = CandidateProfile(
+            id=uuid4(),
+            user_id=user.id,
+            display_name="No Application Candidate",
+            onboarding_status=OnboardingStatus.PROFILE_REQUIRED,
+        )
+        session.add_all([user, profile])
+        session.commit()
+        candidate_id = profile.id
+    finally:
+        session.close()
+
+    response = _put(client, context.vacancy.id, candidate_id)
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "CANDIDATE_NOT_FOUND"
+    assert _get(client, context.vacancy.id).json() == {"entries": []}
 
 
 def test_save_rejects_shell_and_suspended_candidates(

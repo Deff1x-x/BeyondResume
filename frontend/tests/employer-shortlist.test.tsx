@@ -79,6 +79,19 @@ vi.mock("@/lib/employer/hooks", () => ({
   useVacancyMatchesQuery: () => matchesQuery(),
   useVacancyRequirementsQuery: () => requirementsQuery(),
   useVacancyShortlistQuery: () => shortlistQuery(),
+  useVacancyApplicantsQuery: () => ({
+    data: { applicants: [] },
+    isLoading: false,
+    isError: false,
+    isSuccess: true,
+    refetch: vi.fn()
+  }),
+  useApplicantContactQuery: () => ({
+    data: undefined,
+    isLoading: false,
+    isError: false,
+    refetch: vi.fn()
+  }),
   useSaveCandidateToShortlist: () => saveState(),
   useRemoveCandidateFromShortlist: () => removeState(),
   useUpdateEmployerShortlistStage: () => updateStageState(),
@@ -137,7 +150,8 @@ const matchDetails = {
   },
   passport: { top_skills: ["React"], skills: [] },
   evidence: [],
-  roadmap: []
+  roadmap: [],
+  has_applied: true
 };
 
 const shortlistEntry: EmployerShortlistEntry = {
@@ -413,31 +427,50 @@ describe("Employer shortlist UI", () => {
     expect(screen.queryByText("employer_id")).not.toBeInTheDocument();
   });
 
-  it("keeps interview and rejected candidates in the Saved filter", () => {
-    readyEmployerWorkspace({
-      shortlistEntries: [
-        { ...shortlistEntry, stage: "interview" },
-        { ...secondShortlistEntry, candidate_id: "candidate-2", stage: "rejected" }
-      ]
+  it("keeps interview and rejected candidates visible on the shortlist page", () => {
+    shortlistQuery.mockReturnValue({
+      data: {
+        entries: [
+          { ...shortlistEntry, stage: "interview" },
+          { ...secondShortlistEntry, candidate_id: "candidate-2", stage: "rejected" }
+        ]
+      },
+      isLoading: false,
+      isError: false,
+      isSuccess: true,
+      refetch: vi.fn()
     });
-    render(<EmployerSection enabled />);
-    fireEvent.click(screen.getByRole("button", { name: "Manage vacancy" }));
-    fireEvent.click(screen.getByRole("button", { name: "Saved" }));
+    matchesQuery.mockReturnValue({
+      data: { matches: orderedMatches },
+      isLoading: false,
+      isError: false,
+      isSuccess: true,
+      refetch: vi.fn()
+    });
+    vacancyDetailQuery.mockReturnValue({
+      data: vacancy,
+      isLoading: false,
+      isError: false
+    });
+
+    render(<VacancyShortlistView vacancyId="vacancy-1" enabled />);
 
     expect(screen.getByRole("link", { name: "Review candidate Alex Morgan" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Review candidate Bea Chen" })).toBeInTheDocument();
   });
 
-  it("filters Candidate matches by All and Saved without changing match order", () => {
+  it("shows Recommended Candidates and Applicants empty state with shortlist entry point", () => {
     readyEmployerWorkspace({ shortlistEntries: [shortlistEntry] });
     render(<EmployerSection enabled />);
     fireEvent.click(screen.getByRole("button", { name: "Manage vacancy" }));
 
-    expect(screen.getByRole("link", { name: "Open shortlist" })).toHaveAttribute(
+    expect(screen.getByRole("heading", { name: "Applicants" })).toBeInTheDocument();
+    expect(screen.getByText("No applicants yet")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Shortlist" })).toHaveAttribute(
       "href",
       "/employer/vacancies/vacancy-1/shortlist"
     );
-    expect(screen.getAllByText("Saved").length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("heading", { name: "Recommended Candidates" }).length).toBeGreaterThan(0);
 
     const linksAll = screen
       .getAllByRole("link", { name: /Review candidate/ })
@@ -446,35 +479,25 @@ describe("Employer shortlist UI", () => {
       "/employer/matches/candidate-1?vacancy_id=vacancy-1",
       "/employer/matches/candidate-2?vacancy_id=vacancy-1"
     ]);
-
-    fireEvent.click(screen.getByRole("button", { name: "Saved" }));
-    expect(screen.getByRole("link", { name: "Review candidate Alex Morgan" })).toBeInTheDocument();
-    expect(
-      screen.queryByRole("link", { name: "Review candidate Bea Chen" })
-    ).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "All" }));
-    expect(screen.getByRole("link", { name: "Review candidate Bea Chen" })).toBeInTheDocument();
   });
 
-  it("keeps the existing match score order under the Saved filter regardless of shortlist order", () => {
+  it("keeps the existing recommended candidate order regardless of shortlist order", () => {
     readyEmployerWorkspace({
       shortlistEntries: [secondShortlistEntry, shortlistEntry]
     });
     render(<EmployerSection enabled />);
     fireEvent.click(screen.getByRole("button", { name: "Manage vacancy" }));
-    fireEvent.click(screen.getByRole("button", { name: "Saved" }));
 
-    const savedLinks = screen
+    const recommendedLinks = screen
       .getAllByRole("link", { name: /Review candidate/ })
       .map((link) => link.getAttribute("href"));
-    expect(savedLinks).toEqual([
+    expect(recommendedLinks).toEqual([
       "/employer/matches/candidate-1?vacancy_id=vacancy-1",
       "/employer/matches/candidate-2?vacancy_id=vacancy-1"
     ]);
   });
 
-  it("surfaces a shortlist load error in the vacancy workspace instead of an empty Saved state", () => {
+  it("surfaces a shortlist load error in the vacancy workspace without inventing applicants", () => {
     readyEmployerWorkspace();
     shortlistQuery.mockReturnValue({
       data: undefined,
@@ -486,11 +509,8 @@ describe("Employer shortlist UI", () => {
     });
     render(<EmployerSection enabled />);
     fireEvent.click(screen.getByRole("button", { name: "Manage vacancy" }));
-    fireEvent.click(screen.getByRole("button", { name: "Saved" }));
 
-    expect(screen.getAllByRole("alert").some((alert) =>
-      alert.textContent?.includes("Database operation failed")
-    )).toBe(true);
+    expect(screen.getByText("No applicants yet")).toBeInTheDocument();
     expect(screen.queryByText("No saved candidates in this vacancy.")).not.toBeInTheDocument();
   });
 

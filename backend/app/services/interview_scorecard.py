@@ -8,6 +8,10 @@ from sqlalchemy.orm import Session
 
 from app.models.employer_interview_scorecard import EmployerInterviewScorecard
 from app.models.vacancy import Vacancy
+from app.services.employer_applications import (
+    ApplicantNotFoundError,
+    require_active_application,
+)
 from app.services.employer_candidate_eligibility import (
     EmployerCandidateUnavailableError,
     require_employer_eligible_candidate,
@@ -26,10 +30,13 @@ class ScorecardPersistenceError(Exception):
     pass
 
 
-def _require_candidate(session: Session, candidate_id: UUID) -> None:
+def _require_applicant_candidate(
+    session: Session, *, vacancy: Vacancy, candidate_id: UUID
+) -> None:
     try:
         require_employer_eligible_candidate(session, candidate_id)
-    except EmployerCandidateUnavailableError as error:
+        require_active_application(session, vacancy=vacancy, candidate_id=candidate_id)
+    except (EmployerCandidateUnavailableError, ApplicantNotFoundError) as error:
         raise ScorecardCandidateNotFoundError from error
 
 
@@ -39,8 +46,8 @@ def get_interview_scorecard(
     vacancy: Vacancy,
     candidate_id: UUID,
 ) -> EmployerInterviewScorecard:
-    """Load one scorecard for an owned vacancy and eligible candidate."""
-    _require_candidate(session, candidate_id)
+    """Load one scorecard for an owned vacancy and active applicant."""
+    _require_applicant_candidate(session, vacancy=vacancy, candidate_id=candidate_id)
     entry = session.execute(
         select(EmployerInterviewScorecard).where(
             EmployerInterviewScorecard.employer_id == vacancy.employer_id,
@@ -66,8 +73,8 @@ def upsert_interview_scorecard(
     interview_notes: str | None,
     recommendation: str,
 ) -> EmployerInterviewScorecard:
-    """Create or fully replace one interview scorecard for an eligible candidate."""
-    _require_candidate(session, candidate_id)
+    """Create or fully replace one interview scorecard for an active applicant."""
+    _require_applicant_candidate(session, vacancy=vacancy, candidate_id=candidate_id)
 
     entry = session.execute(
         select(EmployerInterviewScorecard).where(

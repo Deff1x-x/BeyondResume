@@ -29,7 +29,7 @@ export function InteractiveCard({
   return (
     <div
       className={cn(
-        "rounded-card border border-border bg-surface text-ink shadow-card transition duration-normal ease-standard hover:-translate-y-px hover:border-border-strong hover:shadow-card-hover",
+        "rounded-card border border-border bg-surface text-ink shadow-card surface-lift",
         "focus-within:ring-2 focus-within:ring-focus-ring focus-within:ring-offset-2",
         className
       )}

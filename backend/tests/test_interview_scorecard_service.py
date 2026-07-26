@@ -10,6 +10,7 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.db.session import engine
+from app.models.application import Application
 from app.models.candidate_profile import CandidateProfile, OnboardingStatus
 from app.models.employer_candidate_shortlist import EmployerCandidateShortlist
 from app.models.employer_interview_scorecard import EmployerInterviewScorecard
@@ -79,7 +80,27 @@ def scorecard_service_ctx() -> Generator[ScorecardServiceContext, None, None]:
         )
         for index, user in enumerate(candidate_users, start=1)
     ]
-    setup.add_all([employer_user, *candidate_users, employer, vacancy, second_vacancy, *candidates])
+    applications = [
+        Application(
+            id=uuid4(),
+            vacancy_id=owned_vacancy.id,
+            candidate_id=candidate.id,
+            status="applied",
+        )
+        for owned_vacancy in (vacancy, second_vacancy)
+        for candidate in candidates
+    ]
+    setup.add_all(
+        [
+            employer_user,
+            *candidate_users,
+            employer,
+            vacancy,
+            second_vacancy,
+            *candidates,
+            *applications,
+        ]
+    )
     setup.commit()
     setup.close()
 

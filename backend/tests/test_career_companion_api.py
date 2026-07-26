@@ -243,6 +243,92 @@ def test_generate_target_role_payload_contract(
     CareerCompanionPlanResponse.model_validate(body)
 
 
+def test_generate_forwards_each_mode_without_stale_target_role(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Each selector mode must reach the service with only its own target field."""
+    from app.api.v1 import career_companion
+    from types import SimpleNamespace
+
+    user = make_user()
+    profile = make_profile(user.id)
+    authorize_candidate(user)
+    monkeypatch.setattr(career_companion, "get_candidate_profile", lambda *_a, **_k: profile)
+    monkeypatch.setattr(
+        career_companion,
+        "build_companion_context",
+        lambda *_a, **_k: SimpleNamespace(projects=[], vacancy_matches=[]),
+    )
+
+    captured: dict = {}
+    vacancy_id = uuid4()
+
+    def _plan(mode: str, target_role: str | None, target_vacancy_id):
+        return SimpleNamespace(
+            id=uuid4(),
+            mode=mode,
+            target_vacancy_id=target_vacancy_id,
+            target_role=target_role,
+            status="active",
+            generation_mode="fallback",
+            summary={"headline": "ok"},
+            current_position={
+                "goal_label": "x",
+                "verified_skills": [],
+                "missing_required_skills": [],
+                "readiness": "not_ready",
+                "strongest_projects": [],
+            },
+            actions=[],
+            progress_events=[],
+            chat_messages=[],
+        )
+
+    def _generate(*_a, **kwargs):
+        captured.clear()
+        captured.update(kwargs)
+        return _plan(
+            kwargs["mode"], kwargs.get("target_role"), kwargs.get("target_vacancy_id")
+        )
+
+    monkeypatch.setattr(career_companion, "generate_plan", _generate)
+
+    cases = [
+        ({"mode": "target_vacancy", "target_vacancy_id": str(vacancy_id), "target_role": None}, vacancy_id, None),
+        ({"mode": "target_role", "target_vacancy_id": None, "target_role": "Backend Developer"}, None, "Backend Developer"),
+        ({"mode": "career_growth", "target_vacancy_id": None, "target_role": None}, None, None),
+        ({"mode": "explore_direction", "target_vacancy_id": None, "target_role": None}, None, None),
+    ]
+
+    for payload, expected_vacancy, expected_role in cases:
+        monkeypatch.setattr(
+            career_companion,
+            "get_active_plan",
+            lambda *_a, **_k: _plan(
+                payload["mode"], expected_role, expected_vacancy
+            ),
+        )
+        response = client.post(
+            "/api/v1/candidate/career-companion/generate", json=payload
+        )
+        assert response.status_code == 200, response.text
+        body = response.json()
+        assert body["mode"] == payload["mode"]
+        assert captured["mode"] == payload["mode"]
+        assert captured["target_vacancy_id"] == expected_vacancy
+        assert captured["target_role"] == expected_role
+        CareerCompanionPlanResponse.model_validate(body)
+
+
+def test_generate_rejects_unknown_mode(client: TestClient) -> None:
+    authorize_candidate(make_user())
+    response = client.post(
+        "/api/v1/candidate/career-companion/generate",
+        json={"mode": "explore_directions", "target_role": None},
+    )
+    assert response.status_code == 422
+
+
 def test_generate_enqueue_failure_still_returns_plan(
     client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:

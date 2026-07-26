@@ -34,7 +34,10 @@ export function useGenerateCareerCompanion() {
   return useMutation({
     mutationFn: (payload: CareerCompanionGenerateRequest) => generateCareerCompanionPlan(payload),
     onSuccess: (plan) => {
+      // Seed the freshly generated plan, then refetch so the cache never keeps a
+      // plan from the previously selected mode.
       queryClient.setQueryData(careerCompanionQueryKey, plan);
+      void queryClient.invalidateQueries({ queryKey: careerCompanionQueryKey });
     }
   });
 }

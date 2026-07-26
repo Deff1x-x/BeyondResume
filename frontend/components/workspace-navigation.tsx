@@ -2,11 +2,27 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent
+} from "react";
 
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { BrandMark } from "@/components/ui/icon";
+import { useScrollSpy } from "@/hooks/use-scroll-spy";
+import { useCandidateOnboarding } from "@/hooks/use-candidate-onboarding";
 import { cn } from "@/lib/cn";
 import { useLogout } from "@/lib/auth/hooks";
+import {
+  resolveScrollBehavior,
+  scrollToSectionId,
+  sectionIdFromHash
+} from "@/lib/navigation/scroll-spy";
 
 type WorkspaceRole = "candidate" | "employer";
 
@@ -14,6 +30,8 @@ type NavigationItem = {
   href: string;
   label: string;
   kind: "route" | "anchor";
+  /** Overview-page section observed for scroll-aware highlighting. */
+  sectionId?: string;
 };
 
 type NavigationGroup = {
@@ -25,18 +43,23 @@ const candidateNavigation: NavigationGroup[] = [
   {
     label: "Workspace",
     items: [
-      { href: "/", label: "Overview", kind: "route" },
-      { href: "/skill-passport", label: "Skill Passport", kind: "route" },
-      { href: "/vacancies", label: "Opportunities", kind: "route" }
+      { href: "/", label: "Overview", kind: "route", sectionId: "overview-section" },
+      { href: "/skill-passport", label: "Skill Passport", kind: "route", sectionId: "skill-passport-section" },
+      { href: "/vacancies", label: "Opportunities", kind: "route", sectionId: "opportunities-section" }
     ]
   },
   {
     label: "Evidence & development",
     items: [
-      { href: "/#github-section-title", label: "GitHub", kind: "anchor" },
-      { href: "/#resume-section-title", label: "Resume", kind: "anchor" },
-      { href: "/#evidence-hub-section-title", label: "Evidence", kind: "anchor" },
-      { href: "/#career-companion-section", label: "Career Companion", kind: "anchor" }
+      { href: "/#resume-section", label: "Resume", kind: "anchor", sectionId: "resume-section" },
+      { href: "/#github-section", label: "GitHub", kind: "anchor", sectionId: "github-section" },
+      { href: "/#evidence-section", label: "Evidence", kind: "anchor", sectionId: "evidence-section" },
+      {
+        href: "/#career-companion-section",
+        label: "Career Companion",
+        kind: "anchor",
+        sectionId: "career-companion-section"
+      }
     ]
   },
   {
@@ -49,10 +72,15 @@ const employerNavigation: NavigationGroup[] = [
   {
     label: "Workspace",
     items: [
-      { href: "/", label: "Overview", kind: "route" },
-      { href: "/#employer-vacancies", label: "Vacancies", kind: "anchor" },
-      { href: "/#top-matches-by-vacancy", label: "Matches", kind: "anchor" },
-      { href: "/#employer-company", label: "Company", kind: "anchor" }
+      { href: "/", label: "Overview", kind: "route", sectionId: "overview-section" },
+      { href: "/#employer-vacancies", label: "Vacancies", kind: "anchor", sectionId: "employer-vacancies" },
+      {
+        href: "/#top-matches-by-vacancy",
+        label: "Recommended",
+        kind: "anchor",
+        sectionId: "top-matches-by-vacancy"
+      },
+      { href: "/#employer-company", label: "Company", kind: "anchor", sectionId: "employer-company" }
     ]
   }
 ];
@@ -61,12 +89,155 @@ function navigationFor(role: WorkspaceRole): NavigationGroup[] {
   return role === "candidate" ? candidateNavigation : employerNavigation;
 }
 
-function isActiveRoute(pathname: string, item: NavigationItem): boolean {
-  return item.kind === "route" && pathname === item.href;
+function flatNavigationItems(role: WorkspaceRole): NavigationItem[] {
+  return navigationFor(role).flatMap((group) => group.items);
+}
+
+function isOverviewPath(pathname: string): boolean {
+  return pathname === "/";
+}
+
+function isActiveNavItem(
+  item: NavigationItem,
+  pathname: string,
+  activeSectionId: string | null
+): boolean {
+  // Dedicated routes remain the source of truth off Overview.
+  if (!isOverviewPath(pathname)) {
+    return item.kind === "route" && pathname === item.href;
+  }
+
+  // On Overview, visible section position drives the active item.
+  if (activeSectionId) {
+    return item.sectionId === activeSectionId;
+  }
+
+  return item.kind === "route" && item.href === "/";
+}
+
+function ariaCurrentFor(
+  item: NavigationItem,
+  active: boolean,
+  onOverview: boolean
+): "page" | "location" | undefined {
+  if (!active) {
+    return undefined;
+  }
+  if (onOverview && item.sectionId) {
+    return "location";
+  }
+  return "page";
 }
 
 function NavigationGroups({ role, mobile = false }: Readonly<{ role: WorkspaceRole; mobile?: boolean }>) {
   const pathname = usePathname();
+  const onOverview = isOverviewPath(pathname);
+  const { incompleteNavLabels, markVacanciesExplored } = useCandidateOnboarding();
+  const items = useMemo(() => flatNavigationItems(role), [role]);
+  const sectionIds = useMemo(
+    () => items.map((item) => item.sectionId).filter((id): id is string => Boolean(id)),
+    [items]
+  );
+
+  const [lockedSectionId, setLockedSectionId] = useState<string | null>(null);
+  const unlockTimerRef = useRef<number | null>(null);
+
+  const clearUnlockTimer = useCallback(() => {
+    if (unlockTimerRef.current != null) {
+      window.clearTimeout(unlockTimerRef.current);
+      unlockTimerRef.current = null;
+    }
+  }, []);
+
+  const lockSection = useCallback(
+    (sectionId: string) => {
+      clearUnlockTimer();
+      setLockedSectionId(sectionId);
+      const release = () => {
+        setLockedSectionId((current) => (current === sectionId ? null : current));
+        window.removeEventListener("scrollend", release);
+      };
+      window.addEventListener("scrollend", release, { once: true });
+      unlockTimerRef.current = window.setTimeout(
+        release,
+        resolveScrollBehavior() === "auto" ? 50 : 900
+      );
+    },
+    [clearUnlockTimer]
+  );
+
+  useEffect(() => () => clearUnlockTimer(), [clearUnlockTimer]);
+
+  const activeSectionId = useScrollSpy({
+    sectionIds,
+    enabled: onOverview,
+    lockedSectionId
+  });
+
+  // After navigating to Overview with a hash, scroll once the target exists.
+  useEffect(() => {
+    if (!onOverview) {
+      return;
+    }
+    const hashId = sectionIdFromHash(window.location.hash);
+    if (!hashId || !sectionIds.includes(hashId)) {
+      return;
+    }
+
+    let attempts = 0;
+    let frame = 0;
+    const tryScroll = () => {
+      attempts += 1;
+      if (scrollToSectionId(hashId, { behavior: "auto" })) {
+        lockSection(hashId);
+        return;
+      }
+      if (attempts < 40) {
+        frame = requestAnimationFrame(tryScroll);
+      }
+    };
+    frame = requestAnimationFrame(tryScroll);
+    return () => cancelAnimationFrame(frame);
+  }, [onOverview, pathname, sectionIds, lockSection]);
+
+  function onSectionNavClick(event: ReactMouseEvent<HTMLAnchorElement>, item: NavigationItem) {
+    if (item.label === "Opportunities") {
+      markVacanciesExplored();
+    }
+    if (!item.sectionId) {
+      return;
+    }
+    if (
+      event.defaultPrevented ||
+      event.button !== 0 ||
+      event.metaKey ||
+      event.ctrlKey ||
+      event.shiftKey ||
+      event.altKey
+    ) {
+      return;
+    }
+
+    // Off Overview, keep normal route / hash navigation to dedicated destinations.
+    if (!onOverview) {
+      return;
+    }
+
+    // On Overview, scroll to the matching section when it exists on this page.
+    const target = document.getElementById(item.sectionId);
+    if (!target) {
+      return;
+    }
+
+    event.preventDefault();
+    lockSection(item.sectionId);
+    const nextUrl =
+      item.href === "/"
+        ? `${window.location.pathname}${window.location.search}`
+        : `${window.location.pathname}${window.location.search}#${item.sectionId}`;
+    window.history.replaceState(null, "", nextUrl);
+    scrollToSectionId(item.sectionId);
+  }
 
   return (
     <div className={cn("space-y-6", mobile && "space-y-5")}>
@@ -82,10 +253,10 @@ function NavigationGroups({ role, mobile = false }: Readonly<{ role: WorkspaceRo
           </p>
           <ul className="space-y-1">
             {group.items.map((item) => {
-              const active = isActiveRoute(pathname, item);
+              const active = isActiveNavItem(item, pathname, activeSectionId);
               const isAiItem = item.label === "Career Companion";
               const className = cn(
-                "relative flex min-h-10 items-center rounded-control px-3 text-sm font-medium transition-all duration-fast ease-standard",
+                "relative flex min-h-10 items-center gap-2 rounded-control px-3 text-sm font-medium transition-all duration-fast ease-standard",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
                 mobile
                   ? cn(
@@ -103,15 +274,49 @@ function NavigationGroups({ role, mobile = false }: Readonly<{ role: WorkspaceRo
                           : "text-primary-200 hover:translate-x-0.5 hover:bg-primary-foreground/10 hover:text-primary-foreground motion-reduce:hover:translate-x-0"
                     )
               );
+              const ariaCurrent = ariaCurrentFor(item, active, onOverview);
+              const showGettingStarted = role === "candidate" && incompleteNavLabels.has(item.label);
               return (
                 <li key={item.href}>
                   {item.kind === "route" ? (
-                    <Link href={item.href} className={className} aria-current={active ? "page" : undefined}>
-                      {item.label}
+                    <Link
+                      href={item.href}
+                      className={className}
+                      aria-current={ariaCurrent}
+                      onClick={(event) => onSectionNavClick(event, item)}
+                    >
+                      <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                      {showGettingStarted ? (
+                        <Badge
+                          variant={mobile ? "accent" : "accent"}
+                          className={cn(
+                            "ml-2 shrink-0 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
+                            !mobile && "border-accent/50 bg-accent/20 text-accent"
+                          )}
+                        >
+                          Getting Started
+                        </Badge>
+                      ) : null}
                     </Link>
                   ) : (
-                    <a href={item.href} className={className}>
-                      {item.label}
+                    <a
+                      href={item.href}
+                      className={className}
+                      aria-current={ariaCurrent}
+                      onClick={(event) => onSectionNavClick(event, item)}
+                    >
+                      <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                      {showGettingStarted ? (
+                        <Badge
+                          variant="accent"
+                          className={cn(
+                            "ml-2 shrink-0 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
+                            !mobile && "border-accent/50 bg-accent/20 text-accent"
+                          )}
+                        >
+                          Getting Started
+                        </Badge>
+                      ) : null}
                     </a>
                   )}
                 </li>
@@ -195,3 +400,12 @@ export function WorkspaceNavigation({ role, email }: Readonly<{ role: WorkspaceR
     </>
   );
 }
+
+/** Exported for unit tests. */
+export const __testing = {
+  candidateNavigation,
+  employerNavigation,
+  isActiveNavItem,
+  ariaCurrentFor,
+  isOverviewPath
+};

@@ -165,11 +165,16 @@ function SkillEvidenceDialog({ skill, onClose }: Readonly<{ skill: SkillPassport
 function SkillCard({ skill, onOpenEvidence }: Readonly<{ skill: SkillPassportSkill; onOpenEvidence: (skill: SkillPassportSkill) => void }>) {
   const sources = uniqueSources(skill);
   const strength = strengthFor(skill.evidence_confidence);
-  const strengthClass: Record<Strength, string> = { strong: "bg-success", moderate: "bg-primary", limited: "bg-muted" };
-  const badgeVariant = strength === "strong" ? "success" : strength === "moderate" ? "primary" : "neutral";
+  // Match active filter CTAs (Electric Lime accent), not ink primary.
+  const strengthClass: Record<Strength, string> = {
+    strong: "bg-accent",
+    moderate: "bg-accent",
+    limited: "bg-accent/55"
+  };
+  const badgeVariant = strength === "strong" ? "accent" : strength === "moderate" ? "accent" : "neutral";
 
   return (
-    <li className="flex min-h-72 flex-col rounded-card border border-border bg-background p-5 shadow-card sm:p-6">
+    <li className="surface-lift flex min-h-72 flex-col rounded-card border border-border bg-background p-5 shadow-card sm:p-6">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 className="break-words text-lg font-semibold tracking-tight text-ink">{skill.name}</h3>
@@ -186,7 +191,7 @@ function SkillCard({ skill, onOpenEvidence }: Readonly<{ skill: SkillPassportSki
           <Badge variant={badgeVariant}>{strength}</Badge>
         </div>
         <div className="mt-4 h-2 overflow-hidden rounded-full bg-surface-subtle" role="progressbar" aria-label={`${skill.name} evidence strength`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(skill.evidence_confidence * 100)}>
-          <div className={`h-full rounded-full ${strengthClass[strength]}`} style={{ width: `${Math.round(skill.evidence_confidence * 100)}%` }} />
+          <div className={`progress-fill h-full rounded-full ${strengthClass[strength]}`} style={{ width: `${Math.round(skill.evidence_confidence * 100)}%` }} />
         </div>
       </div>
 
@@ -197,7 +202,7 @@ function SkillCard({ skill, onOpenEvidence }: Readonly<{ skill: SkillPassportSki
         </div>
       </div>
 
-      <Button type="button" variant="secondary" size="sm" className="mt-auto self-start pt-5" onClick={() => onOpenEvidence(skill)} aria-haspopup="dialog">
+      <Button type="button" variant="secondary" size="sm" className="mt-auto self-start" onClick={() => onOpenEvidence(skill)} aria-haspopup="dialog">
         Open evidence
       </Button>
     </li>
@@ -205,7 +210,7 @@ function SkillCard({ skill, onOpenEvidence }: Readonly<{ skill: SkillPassportSki
 }
 
 function Metric({ label, value, detail }: Readonly<{ label: string; value: string | number; detail: string }>) {
-  return <Card className="bg-background"><CardContent className="p-4"><p className="text-sm text-secondary">{label}</p><p className="mt-2 text-2xl font-semibold tracking-tight text-ink">{value}</p><p className="mt-1 text-xs leading-5 text-muted">{detail}</p></CardContent></Card>;
+  return <Card className="surface-lift bg-background"><CardContent className="p-4"><p className="text-sm text-secondary">{label}</p><p className="mt-2 text-2xl font-semibold tracking-tight text-ink">{value}</p><p className="mt-1 text-xs leading-5 text-muted">{detail}</p></CardContent></Card>;
 }
 
 function PassportEmptyState() {
@@ -213,10 +218,10 @@ function PassportEmptyState() {
     <EmptyState
       className="py-12"
       icon={<Icon name="passport" className="h-7 w-7" />}
-      title="No skills in your Skill Passport yet"
-      description="Connect GitHub or upload evidence to begin building your Skill Passport."
-      primaryAction={<Link href="/#github-section-title" className={primaryActionClass}>Connect GitHub</Link>}
-      secondaryAction={<Link href="/#resume-section-title" className="inline-flex min-h-control items-center rounded-button border border-border bg-surface px-4 text-sm font-medium text-ink transition hover:bg-surface-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2">Upload resume</Link>}
+      title="You haven't generated your Skill Passport yet."
+      description="Skill Passport turns verified evidence into a clear skills profile employers can trust."
+      primaryAction={<Link href="/#github-section" className={primaryActionClass}>Connect GitHub</Link>}
+      secondaryAction={<Link href="/#resume-section" className="inline-flex min-h-control items-center rounded-button border border-border bg-surface px-4 text-sm font-medium text-ink transition hover:bg-surface-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2">Upload resume</Link>}
     />
   );
 }

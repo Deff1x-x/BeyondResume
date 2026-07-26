@@ -300,7 +300,12 @@ export function EmployerInterviewScorecardWorkspace({
         description="Manual interviewer assessment for the selected candidate and vacancy."
         breadcrumb={breadcrumb}
       />
-      <MatchReviewNavigation candidateId={candidateId} vacancyId={vacancyId} active="scorecard" />
+      <MatchReviewNavigation
+        candidateId={candidateId}
+        vacancyId={vacancyId}
+        active="scorecard"
+        hasApplied={details.has_applied}
+      />
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
         <main>

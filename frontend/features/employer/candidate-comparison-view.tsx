@@ -6,7 +6,7 @@ import { useMemo } from "react";
 import { AiCandidateCompareSection } from "@/features/employer/ai-candidate-compare-section";
 import { CompareFlowSteps } from "@/features/employer/compare-flow-chrome";
 import { Badge } from "@/components/ui/badge";
-import { Button, primaryActionClass } from "@/components/ui/button";
+import { Button, primaryActionClass, secondaryActionClass } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Icon } from "@/components/ui/icon";
 import { PageHeader } from "@/components/ui/page-header";
@@ -22,6 +22,7 @@ import {
   useVacancyMatchesQuery,
   useVacancyShortlistQuery
 } from "@/lib/employer/hooks";
+import { cn } from "@/lib/cn";
 
 const MAX_COMPARE_CANDIDATES = 4;
 const MIN_COMPARE_CANDIDATES = 2;
@@ -277,7 +278,7 @@ export function CandidateComparisonView({
         actions={
           <a
             href="#ai-hiring-analysis"
-            className="inline-flex min-h-control items-center gap-2 rounded-button border border-border bg-surface px-4 text-sm font-medium text-ink shadow-sm transition duration-200 hover:-translate-y-px hover:border-border-strong hover:bg-surface-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2"
+            className={cn(secondaryActionClass, "gap-2")}
           >
             <Icon name="spark" className="h-4 w-4 text-ai-muted" aria-hidden="true" />
             Jump to AI Hiring Analysis
@@ -293,7 +294,7 @@ export function CandidateComparisonView({
         </p>
       ) : null}
 
-      <section className="space-y-5" aria-labelledby="deterministic-comparison-heading">
+      <section className="space-y-6 rounded-card border border-border bg-surface p-5 shadow-card sm:p-6" aria-labelledby="deterministic-comparison-heading">
         <SectionHeader
           titleId="deterministic-comparison-heading"
           title="Deterministic comparison"
@@ -308,7 +309,7 @@ export function CandidateComparisonView({
         />
 
       <div
-        className="overflow-x-auto rounded-card border border-border bg-surface shadow-card"
+        className="overflow-x-auto rounded-card border border-border bg-background"
         role="region"
         aria-label="Candidate comparison table"
         tabIndex={0}

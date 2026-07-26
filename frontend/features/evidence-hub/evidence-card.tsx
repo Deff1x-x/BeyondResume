@@ -28,7 +28,7 @@ export function EvidenceCard({ item }: Readonly<{ item: EvidenceHubItem }>) {
   const title = item.title?.trim() || item.source.label;
 
   return (
-    <Card className="bg-background">
+    <Card className="surface-lift bg-background">
       <CardContent className="px-4 py-4 sm:px-4 sm:pb-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">

@@ -6,7 +6,7 @@ from collections import Counter
 from dataclasses import dataclass
 from uuid import UUID
 
-from app.services.career_companion.context import CompanionContext, SkillFrequency
+from app.services.career_companion.context import CompanionContext
 
 
 @dataclass(frozen=True, slots=True)
@@ -55,6 +55,20 @@ def analyze_gaps(context: CompanionContext) -> tuple[SkillGap, ...]:
     return tuple(_dedupe(gaps))
 
 
+def analyze_mode_gaps(context: CompanionContext) -> tuple[SkillGap, ...]:
+    """Mode-aware gap spine.
+
+    career_growth ranks next-level vacancy skills; every other mode ranks the
+    current target. Falls back to current-target gaps when no next-level
+    vacancy data exists.
+    """
+    if context.mode == "career_growth":
+        growth = analyze_growth_gaps(context)
+        if growth:
+            return growth
+    return analyze_gaps(context)
+
+
 def analyze_growth_gaps(context: CompanionContext) -> tuple[SkillGap, ...]:
     present = {name.strip().lower() for name in context.verified_skill_names}
     counter: Counter[str] = Counter()
@@ -96,8 +110,17 @@ def analyze_growth_gaps(context: CompanionContext) -> tuple[SkillGap, ...]:
 
 
 def build_current_position(context: CompanionContext, gaps: tuple[SkillGap, ...]) -> dict:
-    missing_required = [g.skill_name for g in gaps if g.kind == "required"]
-    missing_preferred = [g.skill_name for g in gaps if g.kind == "preferred"]
+    # `growth` gaps come from next-level vacancies and carry their own counts.
+    missing_required = [
+        g.skill_name
+        for g in gaps
+        if g.kind == "required" or (g.kind == "growth" and g.required_count > 0)
+    ]
+    missing_preferred = [
+        g.skill_name
+        for g in gaps
+        if g.kind == "preferred" or (g.kind == "growth" and g.required_count == 0)
+    ]
     readiness = "not_ready"
     if context.target_match is not None:
         score = context.target_match.match.score
@@ -117,11 +140,7 @@ def build_current_position(context: CompanionContext, gaps: tuple[SkillGap, ...]
         for project in context.projects[:5]
     ]
 
-    goal_label = context.target_role or "Career development"
-    if context.target_match is not None:
-        goal_label = (
-            f"{context.target_match.vacancy.title} at {context.target_match.company_name}"
-        )
+    goal_label = _goal_label(context)
 
     return {
         "goal_label": goal_label,
@@ -143,6 +162,31 @@ def build_current_position(context: CompanionContext, gaps: tuple[SkillGap, ...]
             item.vacancy.title for item in context.next_level_vacancies[:5]
         ],
     }
+
+
+def _goal_label(context: CompanionContext) -> str:
+    """Mode-specific goal so each mode's result is visibly distinct."""
+    if context.target_match is not None:
+        return (
+            f"{context.target_match.vacancy.title} at {context.target_match.company_name}"
+        )
+    if context.mode == "explore_direction":
+        directions = list(context.explore_directions)
+        if directions:
+            return f"Possible directions: {', '.join(directions[:3])}"
+        return "Possible career directions"
+    if context.mode == "career_growth":
+        next_title = (
+            context.next_level_vacancies[0].vacancy.title
+            if context.next_level_vacancies
+            else None
+        )
+        if next_title:
+            return f"Next level: {next_title}"
+        if context.target_role:
+            return f"Next level after {context.target_role}"
+        return "Next career level"
+    return context.target_role or "Career development"
 
 
 def _gap_from_name(

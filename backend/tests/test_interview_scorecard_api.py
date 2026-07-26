@@ -14,6 +14,7 @@ from app.api.dependencies import require_employer
 from app.api.errors import api_error
 from app.db.session import engine, get_db
 from app.main import app
+from app.models.application import Application
 from app.models.candidate_profile import CandidateProfile, OnboardingStatus
 from app.models.employer_candidate_shortlist import EmployerCandidateShortlist
 from app.models.employer_interview_scorecard import EmployerInterviewScorecard
@@ -106,6 +107,15 @@ def scorecard_client() -> Generator[tuple[TestClient, ScorecardApiContext], None
         )
         for index, user in enumerate(candidate_users, start=1)
     ]
+    applications = [
+        Application(
+            id=uuid4(),
+            vacancy_id=vacancy.id,
+            candidate_id=candidate.id,
+            status="applied",
+        )
+        for candidate in candidates
+    ]
     setup.add_all(
         [
             employer_user,
@@ -116,6 +126,7 @@ def scorecard_client() -> Generator[tuple[TestClient, ScorecardApiContext], None
             vacancy,
             foreign_vacancy,
             *candidates,
+            *applications,
         ]
     )
     setup.commit()

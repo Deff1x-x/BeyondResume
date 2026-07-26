@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from app.api.dependencies import require_employer
 from app.db.session import engine, get_db
 from app.main import app
+from app.models.application import Application
 from app.models.candidate_profile import CandidateProfile, OnboardingStatus
 from app.models.employer_candidate_shortlist import EmployerCandidateShortlist
 from app.models.employer_interview_scorecard import EmployerInterviewScorecard
@@ -130,6 +131,12 @@ def company_vacancy_client() -> Generator[tuple[TestClient, CompanyVacancyContex
         stage="shortlisted",
         note="Keep for interview",
     )
+    application = Application(
+        id=uuid4(),
+        vacancy_id=vacancy.id,
+        candidate_id=candidate.id,
+        status="applied",
+    )
     scorecard = EmployerInterviewScorecard(
         id=uuid4(),
         employer_id=employer.id,
@@ -176,6 +183,7 @@ def company_vacancy_client() -> Generator[tuple[TestClient, CompanyVacancyContex
         [
             requirement,
             shortlist,
+            application,
             scorecard,
             foreign_requirement,
             second_requirement,
@@ -441,6 +449,14 @@ def test_owner_can_delete_vacancy_and_related_rows(
             )
             == 0
         )
+        assert (
+            session.scalar(
+                select(func.count())
+                .select_from(Application)
+                .where(Application.vacancy_id == ctx.vacancy.id)
+            )
+            == 0
+        )
         assert session.get(Vacancy, ctx.second_vacancy.id) is not None
         assert session.get(Vacancy, ctx.foreign_vacancy.id) is not None
         assert (
@@ -507,6 +523,14 @@ def test_delete_vacancy_rolls_back_all_child_deletes_on_failure(
                 select(func.count())
                 .select_from(EmployerInterviewScorecard)
                 .where(EmployerInterviewScorecard.vacancy_id == ctx.vacancy.id)
+            )
+            == 1
+        )
+        assert (
+            session.scalar(
+                select(func.count())
+                .select_from(Application)
+                .where(Application.vacancy_id == ctx.vacancy.id)
             )
             == 1
         )

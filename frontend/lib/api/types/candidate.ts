@@ -16,6 +16,8 @@ export type CandidateProfileResponse = {
   relocation_readiness: boolean | null;
   portfolio_url: string | null;
   linkedin_url: string | null;
+  phone: string | null;
+  telegram: string | null;
 };
 
 export type CandidateProfilePatchRequest = {
@@ -32,4 +34,6 @@ export type CandidateProfilePatchRequest = {
   relocation_readiness?: boolean | null;
   portfolio_url?: string | null;
   linkedin_url?: string | null;
+  phone?: string | null;
+  telegram?: string | null;
 };

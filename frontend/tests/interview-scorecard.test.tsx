@@ -53,7 +53,8 @@ const details = {
   },
   passport: { top_skills: [], skills: [] },
   evidence: [],
-  roadmap: []
+  roadmap: [],
+  has_applied: true
 };
 
 const scorecard: InterviewScorecard = {
@@ -520,7 +521,12 @@ describe("EmployerInterviewScorecardWorkspace", () => {
 describe("MatchReviewNavigation scorecard tab", () => {
   it("includes Interview Scorecard and preserves vacancy_id with correct active states", () => {
     const { rerender } = render(
-      <MatchReviewNavigation candidateId="candidate-1" vacancyId="vacancy-1" active="scorecard" />
+      <MatchReviewNavigation
+        candidateId="candidate-1"
+        vacancyId="vacancy-1"
+        active="scorecard"
+        hasApplied
+      />
     );
 
     expect(screen.getByRole("link", { name: "Interview Scorecard" })).toHaveAttribute(
@@ -545,18 +551,35 @@ describe("MatchReviewNavigation scorecard tab", () => {
     );
 
     rerender(
-      <MatchReviewNavigation candidateId="candidate-1" vacancyId="vacancy-1" active="review" />
+      <MatchReviewNavigation
+        candidateId="candidate-1"
+        vacancyId="vacancy-1"
+        active="review"
+        hasApplied
+      />
     );
     expect(screen.getByRole("link", { name: "Candidate Review" })).toHaveAttribute(
       "aria-current",
       "page"
     );
 
-    rerender(<MatchReviewNavigation candidateId="candidate-1" vacancyId="vacancy-1" active="ai" />);
+    rerender(
+      <MatchReviewNavigation
+        candidateId="candidate-1"
+        vacancyId="vacancy-1"
+        active="ai"
+        hasApplied
+      />
+    );
     expect(screen.getByRole("link", { name: "AI Hiring" })).toHaveAttribute("aria-current", "page");
 
     rerender(
-      <MatchReviewNavigation candidateId="candidate-1" vacancyId="vacancy-1" active="questions" />
+      <MatchReviewNavigation
+        candidateId="candidate-1"
+        vacancyId="vacancy-1"
+        active="questions"
+        hasApplied
+      />
     );
     expect(screen.getByRole("link", { name: "Questions" })).toHaveAttribute("aria-current", "page");
   });

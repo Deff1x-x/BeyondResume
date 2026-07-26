@@ -50,10 +50,10 @@ export function EvidenceEmptyState({
   return (
     <EmptyState
       title="No evidence yet"
-      description="Connect GitHub or upload a resume to start collecting evidence."
+      description="Evidence confirms the skills in your profile. Connect GitHub or upload a resume to start collecting it."
       primaryAction={
         <a
-          href="#github-section-title"
+          href="#github-section"
           className="inline-flex min-h-control items-center rounded-button border border-border bg-surface px-4 text-sm font-medium text-ink transition-colors hover:bg-surface-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2"
         >
           Connect GitHub
@@ -61,7 +61,7 @@ export function EvidenceEmptyState({
       }
       secondaryAction={
         <a
-          href="#resume-section-title"
+          href="#resume-section"
           className="inline-flex min-h-control items-center rounded-button border border-border bg-surface px-4 text-sm font-medium text-ink transition-colors hover:bg-surface-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2"
         >
           Upload resume

@@ -8,7 +8,7 @@ from typing import Any
 
 from app.core.config import settings
 from app.services.career_companion.context import CompanionContext
-from app.services.career_companion.fallback import DraftAction, DraftActionSkill
+from app.services.career_companion.fallback import DraftAction
 from app.services.career_companion.validation import validate_ai_actions
 
 

@@ -44,6 +44,19 @@ vi.mock("@/lib/employer/hooks", () => ({
     isSuccess: true,
     refetch: vi.fn()
   }),
+  useVacancyApplicantsQuery: () => ({
+    data: { applicants: [] },
+    isLoading: false,
+    isError: false,
+    isSuccess: true,
+    refetch: vi.fn()
+  }),
+  useApplicantContactQuery: () => ({
+    data: undefined,
+    isLoading: false,
+    isError: false,
+    refetch: vi.fn()
+  }),
   useSaveCandidateToShortlist: () => ({
     mutate: vi.fn(),
     isPending: false,
@@ -158,7 +171,9 @@ describe("Employer vacancy workflow", () => {
     expect(screen.getByRole("heading", { name: "Requirements" })).toBeInTheDocument();
     expect(screen.getAllByText("Required skills")).toHaveLength(3);
     expect(screen.getAllByText("Preferred skills")).toHaveLength(3);
-    expect(screen.getAllByRole("heading", { name: "Candidate matches" })).toHaveLength(2);
+    expect(screen.getAllByRole("heading", { name: "Recommended Candidates" })).toHaveLength(2);
+    expect(screen.getByRole("heading", { name: "Applicants" })).toBeInTheDocument();
+    expect(screen.getByText("No applicants yet")).toBeInTheDocument();
     expect(screen.getByRole("progressbar", { name: "Alex Morgan vacancy match" })).toHaveAttribute("aria-valuenow", "82");
     expect(screen.getByRole("link", { name: "Review candidate Alex Morgan" })).toHaveAttribute("href", "/employer/matches/candidate-1?vacancy_id=vacancy-1");
     expect(screen.queryByRole("button", { name: /supporting evidence/i })).not.toBeInTheDocument();
@@ -177,7 +192,8 @@ describe("Employer vacancy workflow", () => {
     fireEvent.click(screen.getByRole("button", { name: "Manage vacancy" }));
 
     expect(screen.getByText("Requirements are not configured")).toBeInTheDocument();
-    expect(screen.getByText("No candidate matches yet")).toBeInTheDocument();
+    expect(screen.getByText("No recommended candidates yet")).toBeInTheDocument();
+    expect(screen.getByText("No applicants yet")).toBeInTheDocument();
     expect(screen.queryByText(/processing/i)).not.toBeInTheDocument();
   });
 

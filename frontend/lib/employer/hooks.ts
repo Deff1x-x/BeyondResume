@@ -15,6 +15,8 @@ import {
   listEmployerSkills,
   listEmployerVacancies,
   listVacancyMatches,
+  listVacancyApplicants,
+  getApplicantContact,
   listVacancyRequirements,
   listVacancyShortlist,
   removeCandidateFromShortlist,
@@ -47,6 +49,14 @@ export function vacancyRequirementsQueryKey(vacancyId: string) {
 
 export function vacancyMatchesQueryKey(vacancyId: string) {
   return ["employer", "vacancy", vacancyId, "matches"] as const;
+}
+
+export function vacancyApplicantsQueryKey(vacancyId: string) {
+  return ["employer", "vacancy", vacancyId, "applicants"] as const;
+}
+
+export function applicantContactQueryKey(vacancyId: string, candidateId: string) {
+  return ["employer", "vacancy", vacancyId, "applicants", candidateId, "contact"] as const;
 }
 
 export function vacancyShortlistQueryKey(vacancyId: string) {
@@ -122,6 +132,8 @@ export function useDeleteEmployerVacancy() {
       queryClient.removeQueries({ queryKey: vacancyRequirementsQueryKey(vacancyId) });
       queryClient.removeQueries({ queryKey: vacancyMatchesQueryKey(vacancyId) });
       queryClient.removeQueries({ queryKey: vacancyShortlistQueryKey(vacancyId) });
+      queryClient.removeQueries({ queryKey: vacancyApplicantsQueryKey(vacancyId) });
+      queryClient.removeQueries({ queryKey: vacancyMatchesQueryKey(vacancyId) });
       void queryClient.invalidateQueries({ queryKey: employerVacanciesQueryKey });
     }
   });
@@ -198,6 +210,30 @@ export function useVacancyMatchesQuery(vacancyId: string, enabled: boolean) {
     enabled,
     staleTime: 30_000,
     gcTime: 300_000
+  });
+}
+
+export function useVacancyApplicantsQuery(vacancyId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: vacancyApplicantsQueryKey(vacancyId),
+    queryFn: () => listVacancyApplicants(vacancyId),
+    enabled,
+    staleTime: 30_000,
+    gcTime: 300_000
+  });
+}
+
+export function useApplicantContactQuery(
+  vacancyId: string,
+  candidateId: string,
+  enabled: boolean
+) {
+  return useQuery({
+    queryKey: applicantContactQueryKey(vacancyId, candidateId),
+    queryFn: () => getApplicantContact(vacancyId, candidateId),
+    enabled: enabled && vacancyId.length > 0 && candidateId.length > 0,
+    staleTime: 30_000,
+    retry: false
   });
 }
 

@@ -9,6 +9,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base, TimestampMixin
 
 if TYPE_CHECKING:
+    from app.models.application import Application
     from app.models.evidence_unit import EvidenceUnit
     from app.models.evidence_skill_link import EvidenceSkillLink
     from app.models.github_repository import GitHubRepository
@@ -48,11 +49,16 @@ class CandidateProfile(TimestampMixin, Base):
     relocation_readiness: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     portfolio_url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
     linkedin_url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
+    phone: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    telegram: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
     user: Mapped["User"] = relationship(back_populates="candidate_profile")
     resumes: Mapped[list["Resume"]] = relationship(back_populates="candidate_profile")
     github_repositories: Mapped[list["GitHubRepository"]] = relationship(back_populates="candidate_profile")
     evidence_units: Mapped[list["EvidenceUnit"]] = relationship(back_populates="candidate_profile")
     evidence_skill_links: Mapped[list["EvidenceSkillLink"]] = relationship(
+        back_populates="candidate_profile"
+    )
+    applications: Mapped[list["Application"]] = relationship(
         back_populates="candidate_profile"
     )

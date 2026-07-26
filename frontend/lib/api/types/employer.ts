@@ -158,6 +158,33 @@ export type MatchDetailsResponse = {
   passport: MatchDetailsPassport;
   evidence: MatchDetailsEvidence[];
   roadmap: MatchDetailsRoadmapItem[];
+  has_applied?: boolean;
+};
+
+export type ApplicationStatus = "applied" | "withdrawn";
+
+export type EmployerApplicant = {
+  application_id: string;
+  candidate_id: string;
+  candidate_name: string;
+  status: ApplicationStatus;
+  applied_at: string;
+  score: number;
+  required: MatchSkillGroup;
+  preferred: MatchSkillGroup;
+};
+
+export type EmployerApplicantsResponse = {
+  applicants: EmployerApplicant[];
+};
+
+export type ApplicantContact = {
+  email: string;
+  phone: string | null;
+  telegram: string | null;
+  linkedin_url: string | null;
+  portfolio_url: string | null;
+  location: string | null;
 };
 
 export type AiMatchExplanation = {

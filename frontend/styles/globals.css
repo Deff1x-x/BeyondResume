@@ -91,6 +91,14 @@
 
   html {
     @apply scroll-smooth;
+    --workspace-scroll-offset: 1rem;
+    scroll-padding-top: var(--workspace-scroll-offset);
+  }
+
+  @media (max-width: 1023px) {
+    html {
+      --workspace-scroll-offset: 5rem;
+    }
   }
 
   @media (prefers-reduced-motion: reduce) {

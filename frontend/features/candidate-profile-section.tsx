@@ -16,6 +16,7 @@ import {
   useCandidateProfileQuery,
   useUpdateCandidateProfile
 } from "@/lib/candidate/hooks";
+import { useCurrentUserQuery } from "@/lib/auth/hooks";
 
 type NullableBooleanInput = "" | "true" | "false";
 
@@ -33,6 +34,8 @@ type ProfileFormValues = {
   relocation_readiness: NullableBooleanInput;
   portfolio_url: string;
   linkedin_url: string;
+  phone: string;
+  telegram: string;
 };
 
 type StringFieldName = Exclude<
@@ -40,15 +43,16 @@ type StringFieldName = Exclude<
   "summary" | "data_processing_consent" | "relocation_readiness"
 >;
 
-const textFields: ReadonlyArray<{
+type TextField = {
   name: StringFieldName;
   label: string;
   maxLength?: number;
-  type?: "text" | "url";
-}> = [
+  type?: "email" | "tel" | "text" | "url";
+};
+
+const careerFields: ReadonlyArray<TextField> = [
   { name: "display_name", label: "Display name", maxLength: 150 },
   { name: "target_role", label: "Target role", maxLength: 80 },
-  { name: "location", label: "Location", maxLength: 80 },
   { name: "remote_preference", label: "Remote preference", maxLength: 50 },
   { name: "english_level", label: "English level", maxLength: 50 },
   { name: "availability", label: "Availability", maxLength: 100 },
@@ -57,10 +61,18 @@ const textFields: ReadonlyArray<{
     name: "preferred_employment_type",
     label: "Preferred employment type",
     maxLength: 50
-  },
-  { name: "portfolio_url", label: "Portfolio URL", type: "url" },
-  { name: "linkedin_url", label: "LinkedIn URL", type: "url" }
+  }
 ];
+
+const contactFields: ReadonlyArray<TextField> = [
+  { name: "phone", label: "Phone", type: "tel", maxLength: 50 },
+  { name: "telegram", label: "Telegram", maxLength: 100 },
+  { name: "linkedin_url", label: "LinkedIn", type: "url" },
+  { name: "portfolio_url", label: "Portfolio", type: "url" },
+  { name: "location", label: "Location", maxLength: 80 }
+];
+
+const textFields = [...careerFields, ...contactFields];
 
 function toBooleanInput(value: boolean | null): NullableBooleanInput {
   if (value === null) {
@@ -100,7 +112,9 @@ function toFormValues(profile: CandidateProfileResponse): ProfileFormValues {
     preferred_employment_type: profile.preferred_employment_type ?? "",
     relocation_readiness: toBooleanInput(profile.relocation_readiness),
     portfolio_url: profile.portfolio_url ?? "",
-    linkedin_url: profile.linkedin_url ?? ""
+    linkedin_url: profile.linkedin_url ?? "",
+    phone: profile.phone ?? "",
+    telegram: profile.telegram ?? ""
   };
 }
 
@@ -149,6 +163,7 @@ function errorMessage(error: unknown): string {
 }
 
 export function CandidateProfileSection({ enabled }: Readonly<{ enabled: boolean }>) {
+  const currentUserQuery = useCurrentUserQuery();
   const profileQuery = useCandidateProfileQuery(enabled);
   const updateMutation = useUpdateCandidateProfile();
   const [formValues, setFormValues] = useState<ProfileFormValues | null>(null);
@@ -255,7 +270,7 @@ export function CandidateProfileSection({ enabled }: Readonly<{ enabled: boolean
 
       <form className="mt-6 space-y-6" onSubmit={onSubmit}>
         <div className="grid gap-6 lg:grid-cols-2">
-          {textFields.map(({ name, label, maxLength, type = "text" }) => (
+          {careerFields.map(({ name, label, maxLength, type = "text" }) => (
             <div className="space-y-2" key={name}>
               <label htmlFor={`profile-${name}`} className="block text-sm font-medium text-ink">
                 {label}
@@ -271,6 +286,46 @@ export function CandidateProfileSection({ enabled }: Readonly<{ enabled: boolean
               />
             </div>
           ))}
+        </div>
+
+        <div className="space-y-4 border-t border-border pt-6">
+          <div>
+            <h3 className="text-lg font-semibold tracking-tight text-ink">Contact Information</h3>
+            <p className="mt-1 text-sm leading-6 text-secondary">
+              Keep your contact details current for employers reviewing your applications.
+            </p>
+          </div>
+          <div className="grid gap-6 lg:grid-cols-2">
+            <div className="space-y-2">
+              <label htmlFor="profile-email" className="block text-sm font-medium text-ink">
+                Email
+              </label>
+              <Input
+                id="profile-email"
+                name="email"
+                type="email"
+                value={currentUserQuery.data?.email ?? ""}
+                readOnly
+                disabled
+              />
+            </div>
+            {contactFields.map(({ name, label, maxLength, type = "text" }) => (
+              <div className="space-y-2" key={name}>
+                <label htmlFor={`profile-${name}`} className="block text-sm font-medium text-ink">
+                  {label}
+                </label>
+                <Input
+                  id={`profile-${name}`}
+                  name={name}
+                  type={type}
+                  maxLength={maxLength}
+                  value={formValues[name]}
+                  onChange={(event) => updateStringField(name, event.target.value)}
+                  disabled={isSaving}
+                />
+              </div>
+            ))}
+          </div>
         </div>
 
         <div className="space-y-2">

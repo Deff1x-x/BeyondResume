@@ -32,6 +32,7 @@ from app.schemas.ai_candidate_compare import (
     GroundedQuestion,
 )
 from app.schemas.employer import MatchDetailsEvidenceResponse, MatchDetailsResponse
+from app.services.candidate_applications import has_active_application
 from app.services.employer import get_vacancy, list_vacancy_requirements
 from app.services.employer_candidate_eligibility import (
     EmployerCandidateUnavailableError,
@@ -175,6 +176,10 @@ def build_ai_candidate_compare_context(
         except EmployerCandidateUnavailableError as error:
             raise AiCandidateCompareCandidateNotFoundError from error
         if not _is_shortlisted(session, vacancy=vacancy, candidate_id=candidate_id):
+            raise AiCandidateCompareCandidateNotFoundError
+        if not has_active_application(
+            session, vacancy_id=vacancy.id, candidate_id=candidate_id
+        ):
             raise AiCandidateCompareCandidateNotFoundError
 
     requirement_rows = list_vacancy_requirements(session, vacancy_id)

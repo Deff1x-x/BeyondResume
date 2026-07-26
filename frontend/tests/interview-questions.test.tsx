@@ -39,7 +39,8 @@ const details = {
   },
   passport: { top_skills: [], skills: [] },
   evidence: [],
-  roadmap: []
+  roadmap: [],
+  has_applied: true
 };
 
 const questions: InterviewQuestionsResponse = {
@@ -369,7 +370,12 @@ describe("InterviewQuestionsWorkspace", () => {
 describe("MatchReviewNavigation questions tab", () => {
   it("preserves vacancy_id across all tabs and marks Questions active", () => {
     render(
-      <MatchReviewNavigation candidateId="candidate-1" vacancyId="vacancy-9" active="questions" />
+      <MatchReviewNavigation
+        candidateId="candidate-1"
+        vacancyId="vacancy-9"
+        active="questions"
+        hasApplied
+      />
     );
 
     expect(screen.getByRole("link", { name: "Candidate Review" })).toHaveAttribute(

@@ -55,6 +55,7 @@ def test_candidate_vacancy_list_is_match_sorted(client, monkeypatch: pytest.Monk
     app.dependency_overrides[require_candidate] = lambda: user
     monkeypatch.setattr(candidate, "get_candidate_profile", lambda *_args: profile)
     monkeypatch.setattr(candidate, "list_candidate_vacancies", lambda *_args: [higher, lower])
+    monkeypatch.setattr(candidate, "map_applications_for_candidate", lambda *_args, **_kwargs: {})
 
     response = client.get("/api/v1/candidate/vacancies")
 
@@ -64,6 +65,7 @@ def test_candidate_vacancy_list_is_match_sorted(client, monkeypatch: pytest.Monk
     assert body[0]["required_skills"] == ["Python"]
     assert body[0]["preferred_skills"] == ["Redis"]
     assert body[0]["match"]["preferred"]["missing"] == ["Redis"]
+    assert body[0]["application"] is None
 
 
 def test_candidate_vacancy_details_include_match_skills_and_shared_roadmap(client, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -76,6 +78,7 @@ def test_candidate_vacancy_details_include_match_skills_and_shared_roadmap(clien
     app.dependency_overrides[require_candidate] = lambda: user
     monkeypatch.setattr(candidate, "get_candidate_profile", lambda *_args: profile)
     monkeypatch.setattr(candidate, "get_candidate_vacancy", lambda *_args: item)
+    monkeypatch.setattr(candidate, "get_application", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(candidate, "vacancy_roadmap", lambda *_args: RoadmapResponse(items=[RoadmapItemResponse(id="roadmap.vacancy_gap.csharp.v1", title="Build C# fundamentals", reason="Required by this vacancy.", priority="high", missing_skills=["C#"], related_skills=[])]))
 
     response = client.get(f"/api/v1/candidate/vacancies/{item.vacancy.id}")
@@ -87,3 +90,4 @@ def test_candidate_vacancy_details_include_match_skills_and_shared_roadmap(clien
     assert body["match"]["required"]["missing"] == ["C#"]
     assert body["match"]["preferred"]["missing"] == ["Redis"]
     assert body["roadmap"][0]["missing_skills"] == ["C#"]
+    assert body["application"] is None

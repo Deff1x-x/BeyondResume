@@ -45,7 +45,7 @@ describe("ResumeSection", () => {
 
     render(<ResumeSection enabled />);
 
-    expect(screen.getByText("No resume evidence added yet")).toBeInTheDocument();
+    expect(screen.getByText("No resume uploaded yet.")).toBeInTheDocument();
     expect(screen.getByText("PDF only · Maximum file size: 8 MiB")).toBeInTheDocument();
     const input = screen.getByLabelText("Resume file");
     const file = new File(["%PDF-1.4"], "resume.pdf", { type: "application/pdf" });

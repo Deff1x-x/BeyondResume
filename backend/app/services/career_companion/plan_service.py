@@ -13,9 +13,13 @@ from app.models.career_companion_action_skill import CareerCompanionActionSkill
 from app.models.career_companion_plan import CareerCompanionPlan
 from app.models.career_companion_progress_event import CareerCompanionProgressEvent
 from app.models.skill import Skill
-from app.services.career_companion.context import build_companion_context, resolve_skill_id
+from app.services.career_companion.context import (
+    CompanionContext,
+    build_companion_context,
+    resolve_skill_id,
+)
 from app.services.career_companion.fallback import DraftAction, assemble_fallback_actions
-from app.services.career_companion.gaps import analyze_gaps, build_current_position
+from app.services.career_companion.gaps import analyze_mode_gaps, build_current_position
 
 
 ALLOWED_MANUAL_STATUSES = {"accepted", "in_progress", "awaiting_evidence", "dismissed"}
@@ -73,7 +77,7 @@ def generate_plan(
             code="INVALID_COMPANION_TARGET",
         )
 
-    gaps = analyze_gaps(context)
+    gaps = analyze_mode_gaps(context)
     position = build_current_position(context, gaps)
     draft_actions = assemble_fallback_actions(context)
     generation_mode = "fallback"
@@ -114,7 +118,7 @@ def generate_plan(
         generation_mode=generation_mode,
         context_hash=context.context_hash,
         summary={
-            "headline": _headline(position, draft_actions),
+            "headline": _headline(position, draft_actions, context),
             "fix_now_count": sum(1 for a in draft_actions if a.horizon == "fix_now"),
             "build_next_count": sum(1 for a in draft_actions if a.horizon == "build_next"),
             "grow_further_count": sum(1 for a in draft_actions if a.horizon == "grow_further"),
@@ -304,13 +308,37 @@ def _status_rank(status: str) -> int:
         return -1
 
 
-def _headline(position: dict, actions: list[DraftAction]) -> str:
+def _headline(
+    position: dict,
+    actions: list[DraftAction],
+    context: CompanionContext | None = None,
+) -> str:
     missing = position.get("missing_required_skills") or []
+    next_step = f" Highest-leverage next step: {actions[0].title}." if actions else ""
+    mode = context.mode if context is not None else position.get("mode")
+
+    if mode == "explore_direction":
+        directions = list(context.explore_directions) if context else []
+        if directions:
+            return (
+                f"Your verified evidence currently supports {', '.join(directions[:3])}. "
+                f"Strongest supported direction: {directions[0]}.{next_step}"
+            )
+        return f"Connect more evidence to reveal supported directions.{next_step}"
+
+    if mode == "career_growth":
+        next_titles = position.get("next_level_titles") or []
+        target = next_titles[0] if next_titles else "stronger next-level vacancies"
+        if missing:
+            return (
+                f"To move toward {target} you still need {', '.join(missing[:3])}.{next_step}"
+            )
+        return f"You already cover the common requirements for {target}.{next_step}"
+
     if missing and actions:
-        top = actions[0]
         return (
-            f"You are missing {', '.join(missing[:3])} for your current target. "
-            f"Highest-leverage next step: {top.title}."
+            f"You are missing {', '.join(missing[:3])} for your current target."
+            f"{next_step}"
         )
     if actions:
         return f"Start with: {actions[0].title}."

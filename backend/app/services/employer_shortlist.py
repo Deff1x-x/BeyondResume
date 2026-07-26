@@ -7,10 +7,16 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
+from app.models.application import Application
 from app.models.candidate_profile import CandidateProfile
 from app.models.employer_candidate_shortlist import EmployerCandidateShortlist
 from app.models.user import User
 from app.models.vacancy import Vacancy
+from app.services.candidate_applications import ACTIVE_APPLICATION_STATUS
+from app.services.employer_applications import (
+    ApplicantNotFoundError,
+    require_active_application,
+)
 from app.services.employer_candidate_eligibility import (
     EmployerCandidateUnavailableError,
     employer_eligible_candidate_filters,
@@ -30,13 +36,20 @@ class ShortlistPersistenceError(Exception):
     pass
 
 
+def _require_applicant(session: Session, *, vacancy: Vacancy, candidate_id: UUID) -> None:
+    try:
+        require_active_application(session, vacancy=vacancy, candidate_id=candidate_id)
+    except ApplicantNotFoundError as error:
+        raise ShortlistCandidateNotFoundError from error
+
+
 def save_candidate_to_shortlist(
     session: Session,
     *,
     vacancy: Vacancy,
     candidate_id: UUID,
 ) -> EmployerCandidateShortlist:
-    """Idempotently save an employer-eligible candidate for an owned vacancy."""
+    """Idempotently save an active applicant for an owned vacancy."""
     employer_id = vacancy.employer_id
     vacancy_id = vacancy.id
 
@@ -44,6 +57,7 @@ def save_candidate_to_shortlist(
         require_employer_eligible_candidate(session, candidate_id)
     except EmployerCandidateUnavailableError as error:
         raise ShortlistCandidateNotFoundError from error
+    _require_applicant(session, vacancy=vacancy, candidate_id=candidate_id)
 
     statement = (
         insert(EmployerCandidateShortlist)
@@ -106,9 +120,10 @@ def list_shortlisted_candidates(
     *,
     vacancy: Vacancy,
 ) -> list[EmployerCandidateShortlist]:
-    """List eligible saved candidates newest-first for one owned vacancy.
+    """List eligible saved applicants newest-first for one owned vacancy.
 
-    Persisted ineligible rows are soft-filtered and left in the database.
+    Persisted ineligible or non-applicant rows are soft-filtered and left in the
+    database so re-application can restore them without recreating history.
     """
     return list(
         session.execute(
@@ -118,9 +133,15 @@ def list_shortlisted_candidates(
                 CandidateProfile.id == EmployerCandidateShortlist.candidate_id,
             )
             .join(User, User.id == CandidateProfile.user_id)
+            .join(
+                Application,
+                (Application.candidate_id == EmployerCandidateShortlist.candidate_id)
+                & (Application.vacancy_id == EmployerCandidateShortlist.vacancy_id),
+            )
             .where(
                 EmployerCandidateShortlist.employer_id == vacancy.employer_id,
                 EmployerCandidateShortlist.vacancy_id == vacancy.id,
+                Application.status == ACTIVE_APPLICATION_STATUS,
                 *employer_eligible_candidate_filters(),
             )
             .order_by(
@@ -158,7 +179,7 @@ def update_candidate_stage(
     candidate_id: UUID,
     stage: str,
 ) -> EmployerCandidateShortlist:
-    """Update hiring stage for an eligible shortlist entry on an owned vacancy."""
+    """Update hiring stage for an eligible applicant shortlist entry."""
     entry = _require_owned_shortlist_entry(
         session, vacancy=vacancy, candidate_id=candidate_id
     )
@@ -166,6 +187,7 @@ def update_candidate_stage(
         require_employer_eligible_candidate(session, candidate_id)
     except EmployerCandidateUnavailableError as error:
         raise ShortlistCandidateNotFoundError from error
+    _require_applicant(session, vacancy=vacancy, candidate_id=candidate_id)
 
     if entry.stage == stage:
         return entry
@@ -187,7 +209,7 @@ def update_candidate_note(
     candidate_id: UUID,
     note: str | None,
 ) -> EmployerCandidateShortlist:
-    """Update private employer note for an eligible shortlist entry."""
+    """Update private employer note for an eligible applicant shortlist entry."""
     entry = _require_owned_shortlist_entry(
         session, vacancy=vacancy, candidate_id=candidate_id
     )
@@ -195,6 +217,7 @@ def update_candidate_note(
         require_employer_eligible_candidate(session, candidate_id)
     except EmployerCandidateUnavailableError as error:
         raise ShortlistCandidateNotFoundError from error
+    _require_applicant(session, vacancy=vacancy, candidate_id=candidate_id)
 
     if entry.note == note:
         return entry

@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from app.api.dependencies import require_employer
 from app.db.session import engine, get_db
 from app.main import app
+from app.models.application import Application
 from app.models.candidate_profile import CandidateProfile, OnboardingStatus
 from app.models.employer_candidate_shortlist import EmployerCandidateShortlist
 from app.models.employer_profile import EmployerProfile
@@ -213,6 +214,15 @@ def compare_client() -> Generator[tuple[TestClient, CompareApiContext], None, No
         )
         for candidate in candidates
     ]
+    applications = [
+        Application(
+            id=uuid4(),
+            vacancy_id=vacancy.id,
+            candidate_id=candidate.id,
+            status="applied",
+        )
+        for candidate in candidates
+    ]
 
     setup.add_all(
         [
@@ -231,7 +241,7 @@ def compare_client() -> Generator[tuple[TestClient, CompareApiContext], None, No
         ]
     )
     setup.flush()
-    setup.add_all([requirement, *shortlists])
+    setup.add_all([requirement, *shortlists, *applications])
     setup.commit()
     setup.close()
 

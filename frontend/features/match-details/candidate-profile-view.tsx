@@ -19,7 +19,11 @@ import { RoadmapCard } from "@/features/match-details/roadmap-card";
 import { SkillsComparisonCard } from "@/features/match-details/skills-comparison-card";
 import { ApiClientError } from "@/lib/api/error";
 import type { MatchDetailsResponse } from "@/lib/api/types/employer";
-import { useMatchDetailsQuery, useVacancyShortlistQuery } from "@/lib/employer/hooks";
+import {
+  useApplicantContactQuery,
+  useMatchDetailsQuery,
+  useVacancyShortlistQuery
+} from "@/lib/employer/hooks";
 
 type CandidateProfileViewProps = Readonly<{ candidateId: string; vacancyId: string; enabled: boolean }>;
 
@@ -55,7 +59,8 @@ function MatchHero({
   candidateId
 }: Readonly<{ details: MatchDetailsResponse; vacancyId: string; candidateId: string }>) {
   const sources = [...new Set(details.evidence.map((item) => item.source_type))];
-  const shortlistQuery = useVacancyShortlistQuery(vacancyId, true);
+  const hasApplied = details.has_applied ?? false;
+  const shortlistQuery = useVacancyShortlistQuery(vacancyId, hasApplied);
   const savedEntry = shortlistQuery.data?.entries.find(
     (entry) => entry.candidate_id === candidateId
   );
@@ -141,29 +146,31 @@ function MatchHero({
         </div>
 
         {/* Actions */}
-        <div className="space-y-4 border-t border-border pt-6">
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-secondary">
-            Actions
-          </p>
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-            <ShortlistSaveButton
-              vacancyId={vacancyId}
-              candidateId={candidateId}
-              candidateName={details.candidate.name}
-            />
-            {savedEntry ? (
-              <ShortlistStageControl
+        {hasApplied ? (
+          <div className="space-y-4 border-t border-border pt-6">
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-secondary">
+              Actions
+            </p>
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+              <ShortlistSaveButton
                 vacancyId={vacancyId}
                 candidateId={candidateId}
-                stage={savedEntry.stage}
-                candidateLabel={details.candidate.name}
+                candidateName={details.candidate.name}
               />
-            ) : null}
+              {savedEntry ? (
+                <ShortlistStageControl
+                  vacancyId={vacancyId}
+                  candidateId={candidateId}
+                  stage={savedEntry.stage}
+                  candidateLabel={details.candidate.name}
+                />
+              ) : null}
+            </div>
           </div>
-        </div>
+        ) : null}
 
         {/* Private notes */}
-        {savedEntry ? (
+        {hasApplied && savedEntry ? (
           <div className="space-y-4 border-t border-border pt-6">
             <p className="text-xs font-semibold uppercase tracking-[0.12em] text-secondary">
               Private notes
@@ -181,6 +188,64 @@ function MatchHero({
         ) : null}
       </div>
     </section>
+  );
+}
+
+function ContactInformationCard({
+  vacancyId,
+  candidateId
+}: Readonly<{ vacancyId: string; candidateId: string }>) {
+  const contactQuery = useApplicantContactQuery(vacancyId, candidateId, true);
+
+  if (contactQuery.isLoading) {
+    return <SkeletonCard className="min-h-40" />;
+  }
+
+  if (contactQuery.isError || !contactQuery.data) {
+    return (
+      <Card aria-labelledby="contact-information-title">
+        <CardContent className="p-5 sm:p-6">
+          <h2 id="contact-information-title" className="text-lg font-semibold text-ink">
+            Contact Information
+          </h2>
+          <p className="mt-3 text-sm text-secondary">
+            Contact information is unavailable for this applicant.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const contact = contactQuery.data;
+  const rows = [
+    { label: "Email", value: contact.email },
+    { label: "Phone", value: contact.phone },
+    { label: "Telegram", value: contact.telegram },
+    { label: "LinkedIn", value: contact.linkedin_url },
+    { label: "Portfolio", value: contact.portfolio_url },
+    { label: "Location", value: contact.location }
+  ];
+
+  return (
+    <Card aria-labelledby="contact-information-title">
+      <CardContent className="p-5 sm:p-6">
+        <h2 id="contact-information-title" className="text-lg font-semibold text-ink">
+          Contact Information
+        </h2>
+        <dl className="mt-4 grid gap-4 sm:grid-cols-2">
+          {rows.map(({ label, value }) => (
+            <div key={label}>
+              <dt className="text-xs font-semibold uppercase tracking-wide text-secondary">
+                {label}
+              </dt>
+              <dd className="mt-1 break-words text-sm text-ink">
+                {value?.trim() ? value : "Not provided"}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -266,8 +331,16 @@ export function CandidateProfileView({ candidateId, vacancyId, enabled }: Candid
   return (
     <div className="space-y-8">
       <div className="text-sm">{backLink}</div>
-      <MatchReviewNavigation candidateId={candidateId} vacancyId={vacancyId} active="review" />
+      <MatchReviewNavigation
+        candidateId={candidateId}
+        vacancyId={vacancyId}
+        active="review"
+        hasApplied={details.has_applied}
+      />
       <MatchHero details={details} vacancyId={vacancyId} candidateId={candidateId} />
+      {details.has_applied ? (
+        <ContactInformationCard vacancyId={vacancyId} candidateId={candidateId} />
+      ) : null}
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_20rem] xl:gap-8">
         <div className="space-y-6">
           <EmployerSkillPassport

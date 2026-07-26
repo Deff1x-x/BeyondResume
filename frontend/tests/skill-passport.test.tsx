@@ -312,10 +312,10 @@ describe("SkillPassportWorkspace", () => {
   it("shows the empty state when the Skill Passport has no skills", () => {
     readyPassport({ skills: [], total_skills: 0, total_evidence: 0 });
     render(<SkillPassportWorkspace />);
-    expect(screen.getByText("No skills in your Skill Passport yet")).toBeInTheDocument();
+    expect(screen.getByText("You haven't generated your Skill Passport yet.")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Connect GitHub" })).toHaveAttribute(
       "href",
-      "/#github-section-title"
+      "/#github-section"
     );
   });
 
