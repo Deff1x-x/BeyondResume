@@ -1,6 +1,7 @@
 "use client";
 
 import type { AiHiringVerdict } from "@/lib/api/types/ai-hiring-intelligence";
+import { EvidenceIntelligenceFlow } from "@/components/evidence-intelligence-flow";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Icon, type IconName } from "@/components/ui/icon";
@@ -18,9 +19,9 @@ const VERDICT_LABELS: Record<AiHiringVerdict, string> = {
 };
 
 const VERDICT_DOT_CLASS: Record<AiHiringVerdict, string> = {
-  strong_hire: "bg-success",
-  hire: "bg-success",
-  consider: "bg-warning",
+  strong_hire: "bg-accent",
+  hire: "bg-accent",
+  consider: "bg-warning-emphasis",
   insufficient_evidence: "bg-muted",
   do_not_hire: "bg-danger"
 };
@@ -28,8 +29,8 @@ const VERDICT_DOT_CLASS: Record<AiHiringVerdict, string> = {
 type ListTone = "success" | "warning" | "primary";
 
 const TONE_CLASS: Record<ListTone, string> = {
-  success: "bg-success/10 text-success",
-  warning: "bg-warning/10 text-warning",
+  success: "bg-success-soft text-success",
+  warning: "bg-warning-soft text-warning",
   primary: "bg-primary/10 text-primary"
 };
 
@@ -42,7 +43,8 @@ export function AiHiringIntelligenceSection({
 
   if (query.isLoading) {
     return (
-      <div role="status">
+      <div role="status" className="space-y-4">
+        <EvidenceIntelligenceFlow state="loading" compact />
         <p className="text-sm text-secondary">Generating AI analysis...</p>
         <SkeletonCard />
       </div>
@@ -51,14 +53,18 @@ export function AiHiringIntelligenceSection({
 
   if (query.isError || !query.data) {
     return (
-      <div role="status" className="rounded-card border border-border bg-surface p-6 shadow-card">
+      <div role="status" className="space-y-4 rounded-card border border-border bg-surface p-6 shadow-card">
+        <EvidenceIntelligenceFlow state="error" compact />
         <p className="font-medium text-ink">AI analysis is temporarily unavailable.</p>
-        <p className="mt-2 text-sm leading-6 text-secondary">
+        <p className="text-sm leading-6 text-secondary">
           {unavailableMessage(query.error)}
+        </p>
+        <p className="text-sm leading-6 text-secondary">
+          Candidate match and evidence context remain available — only the AI interpretation failed.
         </p>
         <Button
           variant="secondary"
-          className="mt-4"
+          className="mt-2"
           onClick={() => {
             void query.refetch();
           }}
@@ -99,6 +105,8 @@ export function AiHiringIntelligenceSection({
               </p>
             </div>
           </div>
+
+          <EvidenceIntelligenceFlow state="success" className="mt-5" />
 
           <div className="mt-6 grid gap-6 border-t border-border pt-6 sm:grid-cols-2">
             <div>

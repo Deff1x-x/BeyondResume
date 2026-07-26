@@ -42,7 +42,7 @@ export default function LoginPage() {
     <AuthShell>
       <div className="mb-7 flex items-center justify-between gap-3">
         <Link
-          href="/"
+          href="/landing"
           className="inline-flex items-center gap-2 text-sm font-medium text-secondary transition-colors duration-fast hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
         >
           <span aria-hidden="true">←</span> Back to landing
@@ -55,7 +55,7 @@ export default function LoginPage() {
 
       <Card className="border-border bg-surface shadow-float">
         <CardContent className="p-6 sm:p-8">
-          <p className="text-xs font-semibold tracking-wide text-ai-muted">Welcome back</p>
+          <p className="text-xs font-semibold tracking-wide text-secondary">Welcome back</p>
           <h1 className="mt-3 font-display text-3xl font-semibold tracking-tight text-ink">
             Sign in to your workspace
           </h1>

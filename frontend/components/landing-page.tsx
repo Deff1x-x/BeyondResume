@@ -2,8 +2,10 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { EvidenceFlowVisual } from "@/components/evidence-flow-visual";
+import { EvidenceIntelligenceFlow } from "@/components/evidence-intelligence-flow";
 import { Reveal } from "@/components/reveal";
 import { BrandMark } from "@/components/ui/icon";
+import { primaryActionClass, secondaryActionClass } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 
 const trustValues = [
@@ -44,7 +46,7 @@ function LandingNav() {
   return (
     <header className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-5 py-5 sm:px-8">
       <Link
-        href="/"
+        href="/landing"
         className="flex items-center gap-3 rounded-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2"
       >
         <BrandMark />
@@ -77,7 +79,7 @@ function LandingNav() {
         </Link>
         <Link
           href="/register"
-          className="inline-flex min-h-10 items-center justify-center rounded-button border border-accent bg-accent px-3.5 text-sm font-semibold text-accent-foreground shadow-sm transition duration-fast hover:-translate-y-px hover:bg-accent-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 sm:min-h-control sm:px-4"
+          className={cn(primaryActionClass, "min-h-10 px-3.5 sm:min-h-control sm:px-4")}
         >
           Get started
         </Link>
@@ -94,7 +96,7 @@ function ProductMockCard({
   return (
     <article
       className={cn(
-        "rounded-card border border-border bg-surface p-5 shadow-card",
+        "surface-lift rounded-card border border-border bg-surface p-5 shadow-card",
         className
       )}
     >
@@ -116,7 +118,7 @@ export function LandingPage({ sessionError }: Readonly<{ sessionError: boolean }
       >
         <Reveal>
           <p className="inline-flex items-center gap-2 rounded-badge border border-border bg-surface px-3 py-1.5 text-xs font-medium text-secondary">
-            <span className="h-1.5 w-1.5 rounded-full bg-accent" aria-hidden="true" />
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent motion-reduce:animate-none" aria-hidden="true" />
             Evidence Intelligence
           </p>
           <h1 className="mt-6 max-w-2xl font-display text-4xl font-semibold tracking-[-0.04em] text-ink sm:text-5xl lg:text-6xl">
@@ -135,22 +137,26 @@ export function LandingPage({ sessionError }: Readonly<{ sessionError: boolean }
           <div className="mt-9 flex flex-wrap gap-3">
             <Link
               href="/register"
-              className="inline-flex min-h-control items-center justify-center rounded-button border border-accent bg-accent px-6 text-sm font-semibold text-accent-foreground shadow-sm shadow-accent/25 transition duration-fast hover:-translate-y-px hover:bg-accent-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2"
+              className={cn(primaryActionClass, "px-6 shadow-accent/25")}
             >
               Build your evidence profile
             </Link>
             <a
               href="#for-employers"
-              className="inline-flex min-h-control items-center justify-center rounded-button border border-border-strong bg-surface px-6 text-sm font-semibold text-ink transition duration-fast hover:-translate-y-px hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2"
+              className={cn(secondaryActionClass, "px-6")}
             >
               Explore employer workflow
             </a>
           </div>
         </Reveal>
 
-        <Reveal delay={100} className="mx-auto w-full max-w-xl">
-          <div className="rounded-card border border-border bg-surface p-5 shadow-float sm:p-6">
-            <div className="mb-4 flex items-center justify-between gap-3">
+        <Reveal delay={120} className="mx-auto w-full max-w-xl">
+          <div className="relative rounded-card border border-border bg-surface p-5 shadow-float sm:p-6">
+            <div
+              className="pointer-events-none absolute -inset-x-6 -top-8 h-24 rounded-full bg-accent/10 blur-3xl motion-reduce:hidden"
+              aria-hidden="true"
+            />
+            <div className="relative mb-4 flex items-center justify-between gap-3">
               <div>
                 <p className="font-display text-sm font-semibold text-ink">Evidence flow</p>
                 <p className="text-xs text-secondary">How proof becomes a hiring decision</p>
@@ -159,7 +165,9 @@ export function LandingPage({ sessionError }: Readonly<{ sessionError: boolean }
                 Live product path
               </span>
             </div>
-            <EvidenceFlowVisual />
+            <div className="relative">
+              <EvidenceFlowVisual />
+            </div>
           </div>
         </Reveal>
       </section>
@@ -258,6 +266,12 @@ export function LandingPage({ sessionError }: Readonly<{ sessionError: boolean }
               Run the real BeyondResume hiring path: deterministic evidence first, then AI as a
               second opinion that stays tied to the facts you already reviewed.
             </p>
+            <EvidenceIntelligenceFlow
+              state="success"
+              inverted
+              compact
+              className="mt-8 max-w-3xl"
+            />
           </Reveal>
 
           <div className="mt-12 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -284,7 +298,7 @@ export function LandingPage({ sessionError }: Readonly<{ sessionError: boolean }
       {/* How it works */}
       <section id="how-it-works" className="mx-auto max-w-7xl px-5 py-20 sm:px-8 lg:py-24">
         <Reveal>
-          <p className="text-xs font-semibold tracking-wide text-ai-muted">How it works</p>
+          <p className="text-xs font-semibold tracking-wide text-secondary">How it works</p>
           <h2 className="mt-3 max-w-xl font-display text-3xl font-semibold tracking-tight text-ink sm:text-4xl">
             From scattered signals to a clear decision.
           </h2>

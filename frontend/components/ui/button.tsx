@@ -2,7 +2,7 @@ import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from "react";
 
 import { cn } from "@/lib/cn";
 
-type ButtonVariant = "primary" | "accent" | "secondary" | "ghost" | "destructive";
+type ButtonVariant = "primary" | "ink" | "secondary" | "ghost" | "destructive";
 type ButtonSize = "sm" | "md";
 
 export type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
@@ -13,20 +13,21 @@ export type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
 };
 
 /**
- * Shared visual recipes for Button and link-as-button CTAs.
- * Foreground colors are explicit so text never inherits parent ink on filled surfaces.
+ * Product CTA language matches Landing:
+ * Lime fill + Navy label + soft lift on hover.
+ * `ink` is reserved for rare high-contrast dark actions.
  */
 export const buttonVariantClass: Record<ButtonVariant, string> = {
   primary:
-    "border border-primary bg-primary text-primary-foreground shadow-sm hover:-translate-y-px hover:bg-primary-hover hover:shadow-md disabled:border-border disabled:bg-surface-subtle disabled:text-secondary disabled:shadow-none disabled:hover:translate-y-0",
-  accent:
-    "border border-accent bg-accent text-accent-foreground shadow-sm shadow-accent/30 hover:-translate-y-px hover:bg-accent-hover hover:shadow-md disabled:border-border disabled:bg-surface-subtle disabled:text-secondary disabled:shadow-none disabled:hover:translate-y-0",
+    "border border-accent bg-accent text-accent-foreground shadow-sm shadow-accent/25 hover:-translate-y-px hover:bg-accent-hover hover:shadow-md active:translate-y-0 active:shadow-sm disabled:border-border disabled:bg-surface-subtle disabled:text-secondary disabled:shadow-none disabled:hover:translate-y-0",
+  ink:
+    "border border-primary bg-primary text-primary-foreground shadow-sm hover:-translate-y-px hover:bg-primary-hover hover:shadow-md active:translate-y-0 active:shadow-sm disabled:border-border disabled:bg-surface-subtle disabled:text-secondary disabled:shadow-none disabled:hover:translate-y-0",
   secondary:
-    "border border-border-strong bg-surface text-ink shadow-sm hover:-translate-y-px hover:border-ink/20 hover:bg-background hover:shadow-md disabled:border-border disabled:bg-surface-subtle disabled:text-secondary",
+    "border border-border-strong bg-surface text-ink shadow-sm hover:-translate-y-px hover:border-ink/20 hover:bg-background hover:shadow-md active:translate-y-0 active:shadow-sm disabled:border-border disabled:bg-surface-subtle disabled:text-secondary",
   ghost:
     "border border-transparent bg-transparent text-secondary hover:bg-surface-subtle hover:text-ink disabled:text-muted",
   destructive:
-    "border border-danger bg-danger text-danger-foreground shadow-sm hover:-translate-y-px hover:bg-danger/90 hover:shadow-md disabled:border-border disabled:bg-surface-subtle disabled:text-secondary disabled:shadow-none"
+    "border border-danger bg-danger text-danger-foreground shadow-sm hover:-translate-y-px hover:bg-danger/90 hover:shadow-md active:translate-y-0 active:shadow-sm disabled:border-border disabled:bg-surface-subtle disabled:text-secondary disabled:shadow-none"
 };
 
 export const buttonSizeClass: Record<ButtonSize, string> = {
@@ -35,12 +36,12 @@ export const buttonSizeClass: Record<ButtonSize, string> = {
 };
 
 export const buttonBaseClass = cn(
-  "relative inline-flex items-center justify-center gap-2 rounded-button font-medium transition-all duration-200",
+  "relative inline-flex items-center justify-center gap-2 rounded-button font-semibold tracking-tight transition-all duration-200 ease-out",
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2",
-  "disabled:cursor-not-allowed"
+  "disabled:cursor-not-allowed motion-reduce:transition-none motion-reduce:hover:translate-y-0"
 );
 
-/** Link / anchor that should look like a primary Button. */
+/** Link / anchor that should look like a primary Landing CTA. */
 export const primaryActionClass = cn(
   buttonBaseClass,
   buttonVariantClass.primary,
@@ -52,6 +53,9 @@ export const secondaryActionClass = cn(
   buttonVariantClass.secondary,
   buttonSizeClass.md
 );
+
+/** @deprecated Prefer `primary` — kept as alias for gradual call-site cleanup. */
+export const accentActionClass = primaryActionClass;
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
   {

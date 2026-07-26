@@ -133,7 +133,7 @@ function MatchHero({
               aria-valuenow={details.match.score}
             >
               <div
-                className="h-full rounded-full bg-success"
+                className="h-full rounded-full bg-accent"
                 style={{ width: `${details.match.score}%` }}
               />
             </div>

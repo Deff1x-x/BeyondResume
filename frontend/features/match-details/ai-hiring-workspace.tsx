@@ -76,6 +76,7 @@ export function AiHiringWorkspace({ candidateId, vacancyId, enabled }: AiHiringW
       <div className="space-y-8">
         <PageHeader
           eyebrow="AI Hiring"
+          eyebrowTone="ai"
           title="AI Hiring"
           description="AI-generated hiring analysis for the selected candidate and vacancy."
           breadcrumb={breadcrumb}
@@ -90,6 +91,7 @@ export function AiHiringWorkspace({ candidateId, vacancyId, enabled }: AiHiringW
       <div className="space-y-8">
         <PageHeader
           eyebrow="AI Hiring"
+          eyebrowTone="ai"
           title="AI Hiring"
           description="AI-generated hiring analysis for the selected candidate and vacancy."
           breadcrumb={breadcrumb}
@@ -113,6 +115,7 @@ export function AiHiringWorkspace({ candidateId, vacancyId, enabled }: AiHiringW
     <div className="space-y-8">
       <PageHeader
         eyebrow="AI Hiring"
+        eyebrowTone="ai"
         title="AI Hiring"
         description={PAGE_DESCRIPTION}
         breadcrumb={breadcrumb}

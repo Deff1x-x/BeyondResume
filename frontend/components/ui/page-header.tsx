@@ -6,6 +6,8 @@ export type PageHeaderProps = {
   title: string;
   description?: string;
   eyebrow?: string;
+  /** Cyan is reserved for AI surfaces only. */
+  eyebrowTone?: "default" | "ai";
   actions?: ReactNode;
   breadcrumb?: ReactNode;
   className?: string;
@@ -16,6 +18,7 @@ export function PageHeader({
   title,
   description,
   eyebrow,
+  eyebrowTone = "default",
   actions,
   breadcrumb,
   className,
@@ -31,7 +34,14 @@ export function PageHeader({
       <div className="min-w-0 space-y-2">
         {breadcrumb ? <div className="text-sm text-secondary">{breadcrumb}</div> : null}
         {eyebrow ? (
-          <p className="text-xs font-semibold tracking-wide text-ai-muted">{eyebrow}</p>
+          <p
+            className={cn(
+              "text-xs font-semibold tracking-wide",
+              eyebrowTone === "ai" ? "text-ai-muted" : "text-secondary"
+            )}
+          >
+            {eyebrow}
+          </p>
         ) : null}
         <h1 id={titleId} className="type-page-title sm:text-[2.25rem]">
           {title}

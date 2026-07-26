@@ -72,18 +72,36 @@ function NavigationGroups({ role, mobile = false }: Readonly<{ role: WorkspaceRo
     <div className={cn("space-y-6", mobile && "space-y-5")}>
       {navigationFor(role).map((group) => (
         <section key={group.label} aria-label={group.label}>
-          <p className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted">
+          <p
+            className={cn(
+              "mb-2 px-3 text-[11px] font-semibold uppercase tracking-[0.14em]",
+              mobile ? "text-muted" : "text-primary-200"
+            )}
+          >
             {group.label}
           </p>
           <ul className="space-y-1">
             {group.items.map((item) => {
               const active = isActiveRoute(pathname, item);
+              const isAiItem = item.label === "Career Companion";
               const className = cn(
                 "relative flex min-h-10 items-center rounded-control px-3 text-sm font-medium transition-all duration-fast ease-standard",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2",
-                active
-                  ? "bg-surface text-ink shadow-sm before:absolute before:inset-y-1.5 before:left-0 before:w-[3px] before:rounded-full before:bg-accent"
-                  : "text-secondary hover:translate-x-0.5 hover:bg-surface hover:text-ink motion-reduce:hover:translate-x-0"
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
+                mobile
+                  ? cn(
+                      "focus-visible:ring-focus-ring focus-visible:ring-offset-surface",
+                      active
+                        ? "bg-surface-subtle text-ink shadow-sm before:absolute before:inset-y-1.5 before:left-0 before:w-[3px] before:rounded-full before:bg-accent"
+                        : "text-secondary hover:translate-x-0.5 hover:bg-surface-subtle hover:text-ink motion-reduce:hover:translate-x-0"
+                    )
+                  : cn(
+                      "focus-visible:ring-primary-foreground/40 focus-visible:ring-offset-primary",
+                      active
+                        ? "bg-primary-foreground/10 text-primary-foreground shadow-sm before:absolute before:inset-y-1.5 before:left-0 before:w-[3px] before:rounded-full before:bg-accent"
+                        : isAiItem
+                          ? "text-ai hover:translate-x-0.5 hover:bg-primary-foreground/10 hover:text-ai motion-reduce:hover:translate-x-0"
+                          : "text-primary-200 hover:translate-x-0.5 hover:bg-primary-foreground/10 hover:text-primary-foreground motion-reduce:hover:translate-x-0"
+                    )
               );
               return (
                 <li key={item.href}>
@@ -118,21 +136,33 @@ export function WorkspaceNavigation({ role, email }: Readonly<{ role: WorkspaceR
 
   return (
     <>
-      <aside className="hidden min-h-screen border-r border-border bg-background px-4 py-6 lg:flex lg:h-screen lg:w-72 lg:shrink-0 lg:sticky lg:top-0 lg:flex-col lg:overflow-y-auto">
-        <Link href="/" className="flex items-center gap-3 rounded-control px-2 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2">
+      <aside className="hidden min-h-screen border-r border-primary-hover bg-primary px-4 py-6 text-primary-foreground lg:flex lg:h-screen lg:w-72 lg:shrink-0 lg:sticky lg:top-0 lg:flex-col lg:overflow-y-auto">
+        <Link
+          href="/"
+          className="flex items-center gap-3 rounded-control px-2 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/40 focus-visible:ring-offset-2 focus-visible:ring-offset-primary"
+        >
           <BrandMark />
-          <span className="text-sm font-semibold text-ink">BeyondResume</span>
+          <span className="text-sm font-semibold text-primary-foreground">BeyondResume</span>
         </Link>
-        <div className="mx-2 mt-8 rounded-card border border-border bg-surface px-3 py-3 shadow-sm">
-          <p className="text-xs font-semibold tracking-wide text-accent-muted">{role}</p>
-          <p className="mt-1 text-sm font-medium text-ink">{workspaceName}</p>
+        <div className="mx-2 mt-8 rounded-card border border-primary-foreground/15 bg-primary-foreground/5 px-3 py-3">
+          <p className="text-xs font-semibold tracking-wide text-accent">{role}</p>
+          <p className="mt-1 text-sm font-medium text-primary-foreground">{workspaceName}</p>
         </div>
         <nav className="mt-8 flex-1" aria-label={`${workspaceName} navigation`}>
           <NavigationGroups role={role} />
         </nav>
-        <div className="border-t border-border pt-4">
-          {email ? <p className="truncate px-3 pb-3 text-sm text-secondary" title={email}>{email}</p> : null}
-          <Button type="button" variant="ghost" className="w-full justify-start" onClick={onLogout}>
+        <div className="border-t border-primary-foreground/15 pt-4">
+          {email ? (
+            <p className="truncate px-3 pb-3 text-sm text-primary-200" title={email}>
+              {email}
+            </p>
+          ) : null}
+          <Button
+            type="button"
+            variant="ghost"
+            className="w-full justify-start text-primary-200 hover:bg-primary-foreground/10 hover:text-primary-foreground"
+            onClick={onLogout}
+          >
             Log out
           </Button>
         </div>

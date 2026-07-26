@@ -15,12 +15,12 @@ type BadgeVariant =
 const badgeVariantClass: Record<BadgeVariant, string> = {
   neutral: "border-border bg-surface-subtle text-secondary",
   primary: "border-primary/15 bg-primary/5 text-primary",
-  accent: "border-accent/40 bg-accent/20 text-accent-muted",
-  verified: "border-verified/40 bg-verified/20 text-verified-muted",
-  ai: "border-ai/40 bg-ai/15 text-ai-muted",
-  success: "border-success/25 bg-success/10 text-success-muted",
-  warning: "border-warning/30 bg-warning/10 text-warning-muted",
-  danger: "border-danger/20 bg-danger/10 text-danger-muted"
+  accent: "border-accent/40 bg-accent-soft text-accent-muted",
+  verified: "border-verified/40 bg-verified-soft text-verified-muted",
+  ai: "border-ai/40 bg-ai-soft text-ai-muted",
+  success: "border-success/25 bg-success-soft text-success",
+  warning: "border-warning/30 bg-warning-soft text-warning",
+  danger: "border-danger/20 bg-danger-soft text-danger"
 };
 
 export type BadgeProps = HTMLAttributes<HTMLSpanElement> & {
@@ -37,7 +37,7 @@ export function Badge({
   return (
     <span
       className={cn(
-        "inline-flex max-w-full items-center truncate rounded-badge border px-2.5 py-1 text-xs font-semibold tracking-wide",
+        "badge-pop inline-flex max-w-full items-center truncate rounded-badge border px-2.5 py-1 text-xs font-semibold tracking-wide",
         badgeVariantClass[variant],
         className
       )}

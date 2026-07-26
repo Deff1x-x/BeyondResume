@@ -95,7 +95,7 @@ export default function RegisterPage() {
     <AuthShell>
       <div className="mb-7 flex items-center justify-between gap-3">
         <Link
-          href="/"
+          href="/landing"
           className="inline-flex items-center gap-2 text-sm font-medium text-secondary transition-colors duration-fast hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
         >
           <span aria-hidden="true">←</span> Back to landing
@@ -300,7 +300,7 @@ export default function RegisterPage() {
 
             <Button
               type="submit"
-              variant="accent"
+              variant="primary"
               className="w-full"
               loading={isSubmitting}
               disabled={!isFormValid}
