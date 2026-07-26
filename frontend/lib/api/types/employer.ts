@@ -159,6 +159,7 @@ export type MatchDetailsResponse = {
   evidence: MatchDetailsEvidence[];
   roadmap: MatchDetailsRoadmapItem[];
   has_applied?: boolean;
+  is_shortlisted?: boolean;
 };
 
 export type ApplicationStatus = "applied" | "withdrawn";
@@ -226,6 +227,8 @@ export type EmployerShortlistEntry = {
   candidate_id: string;
   stage: EmployerCandidateStage;
   note: string | null;
+  scorecard_status?: "none" | "draft" | "completed";
+  scorecard_recommendation?: "strong_yes" | "yes" | "mixed" | "no" | null;
   created_at: string;
   updated_at: string;
 };

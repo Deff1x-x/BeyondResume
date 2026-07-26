@@ -60,11 +60,14 @@ function MatchHero({
 }: Readonly<{ details: MatchDetailsResponse; vacancyId: string; candidateId: string }>) {
   const sources = [...new Set(details.evidence.map((item) => item.source_type))];
   const hasApplied = details.has_applied ?? false;
-  const shortlistQuery = useVacancyShortlistQuery(vacancyId, hasApplied);
+  const shortlistQuery = useVacancyShortlistQuery(vacancyId, true);
   const savedEntry = shortlistQuery.data?.entries.find(
     (entry) => entry.candidate_id === candidateId
   );
-  const isSaved = savedEntry !== undefined;
+  const isSaved = savedEntry !== undefined || (details.is_shortlisted ?? false);
+  const questionsHref = `/employer/matches/${encodeURIComponent(candidateId)}/interview-questions?vacancy_id=${encodeURIComponent(vacancyId)}`;
+  const scorecardHref = `/employer/matches/${encodeURIComponent(candidateId)}/scorecard?vacancy_id=${encodeURIComponent(vacancyId)}`;
+  const showInterviewActions = hasApplied || isSaved;
 
   return (
     <section
@@ -72,12 +75,12 @@ function MatchHero({
       className="overflow-hidden rounded-card border border-border bg-surface shadow-card"
     >
       <div className="space-y-6 p-5 sm:p-6">
-        {/* Candidate header */}
         <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between lg:gap-8">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant="success">Match evaluated</Badge>
-              {isSaved ? <Badge variant="neutral">Saved</Badge> : null}
+              {isSaved ? <Badge variant="neutral">Shortlisted</Badge> : null}
+              {hasApplied ? <Badge variant="primary">Applicant</Badge> : null}
               {sources.map((source) => (
                 <Badge key={source} variant="neutral">
                   {sourceLabel(source)}
@@ -145,32 +148,44 @@ function MatchHero({
           </div>
         </div>
 
-        {/* Actions */}
-        {hasApplied ? (
-          <div className="space-y-4 border-t border-border pt-6">
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-secondary">
-              Actions
-            </p>
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-              <ShortlistSaveButton
+        <div className="space-y-4 border-t border-border pt-6">
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-secondary">
+            Hiring actions
+          </p>
+          <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center">
+            <ShortlistSaveButton
+              vacancyId={vacancyId}
+              candidateId={candidateId}
+              candidateName={details.candidate.name}
+            />
+            {savedEntry ? (
+              <ShortlistStageControl
                 vacancyId={vacancyId}
                 candidateId={candidateId}
-                candidateName={details.candidate.name}
+                stage={savedEntry.stage}
+                candidateLabel={details.candidate.name}
               />
-              {savedEntry ? (
-                <ShortlistStageControl
-                  vacancyId={vacancyId}
-                  candidateId={candidateId}
-                  stage={savedEntry.stage}
-                  candidateLabel={details.candidate.name}
-                />
-              ) : null}
-            </div>
+            ) : null}
+            {showInterviewActions ? (
+              <>
+                <Link
+                  href={questionsHref}
+                  className="inline-flex min-h-control items-center rounded-button border border-border bg-surface px-4 text-sm font-medium text-ink shadow-sm transition duration-200 hover:-translate-y-px hover:border-border-strong hover:bg-surface-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2"
+                >
+                  Interview questions
+                </Link>
+                <Link
+                  href={scorecardHref}
+                  className="inline-flex min-h-control items-center rounded-button border border-border bg-surface px-4 text-sm font-medium text-ink shadow-sm transition duration-200 hover:-translate-y-px hover:border-border-strong hover:bg-surface-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2"
+                >
+                  Interview scorecard
+                </Link>
+              </>
+            ) : null}
           </div>
-        ) : null}
+        </div>
 
-        {/* Private notes */}
-        {hasApplied && savedEntry ? (
+        {savedEntry ? (
           <div className="space-y-4 border-t border-border pt-6">
             <p className="text-xs font-semibold uppercase tracking-[0.12em] text-secondary">
               Private notes
@@ -336,6 +351,7 @@ export function CandidateProfileView({ candidateId, vacancyId, enabled }: Candid
         vacancyId={vacancyId}
         active="review"
         hasApplied={details.has_applied}
+        isShortlisted={details.is_shortlisted}
       />
       <MatchHero details={details} vacancyId={vacancyId} candidateId={candidateId} />
       {details.has_applied ? (

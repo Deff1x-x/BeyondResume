@@ -84,6 +84,8 @@ function ApplicantCard({
   saved
 }: Readonly<{ applicant: EmployerApplicant; vacancyId: string; saved: boolean }>) {
   const shortlistHref = `/employer/vacancies/${encodeURIComponent(vacancyId)}/shortlist`;
+  const questionsHref = `/employer/matches/${encodeURIComponent(applicant.candidate_id)}/interview-questions?vacancy_id=${encodeURIComponent(vacancyId)}`;
+  const scorecardHref = `/employer/matches/${encodeURIComponent(applicant.candidate_id)}/scorecard?vacancy_id=${encodeURIComponent(vacancyId)}`;
 
   return (
     <div className="space-y-4">
@@ -96,7 +98,14 @@ function ApplicantCard({
             <ShortlistSaveButton
               vacancyId={vacancyId}
               candidateId={applicant.candidate_id}
+              candidateName={applicant.candidate_name}
             />
+            <Link href={questionsHref} className={secondaryActionClass}>
+              Interview questions
+            </Link>
+            <Link href={scorecardHref} className={secondaryActionClass}>
+              Scorecard
+            </Link>
             <Link href={shortlistHref} className={secondaryActionClass}>
               Open shortlist
             </Link>

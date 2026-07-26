@@ -140,7 +140,7 @@ describe("InterviewQuestionsWorkspace", () => {
       "href",
       "/employer/matches/candidate-1/scorecard?vacancy_id=vacancy-1"
     );
-    expect(screen.getByRole("link", { name: "Questions" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("link", { name: "Interview" })).toHaveAttribute("aria-current", "page");
     expect(screen.queryByLabelText(/technical competency/i)).not.toBeInTheDocument();
     expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
   });
@@ -378,7 +378,7 @@ describe("MatchReviewNavigation questions tab", () => {
       />
     );
 
-    expect(screen.getByRole("link", { name: "Candidate Review" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Overview" })).toHaveAttribute(
       "href",
       "/employer/matches/candidate-1?vacancy_id=vacancy-9"
     );
@@ -386,14 +386,14 @@ describe("MatchReviewNavigation questions tab", () => {
       "href",
       "/employer/matches/candidate-1/ai-hiring?vacancy_id=vacancy-9"
     );
-    expect(screen.getByRole("link", { name: "Questions" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Interview" })).toHaveAttribute(
       "href",
       "/employer/matches/candidate-1/interview-questions?vacancy_id=vacancy-9"
     );
-    expect(screen.getByRole("link", { name: "Interview Scorecard" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Scorecard" })).toHaveAttribute(
       "href",
       "/employer/matches/candidate-1/scorecard?vacancy_id=vacancy-9"
     );
-    expect(screen.getByRole("link", { name: "Questions" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("link", { name: "Interview" })).toHaveAttribute("aria-current", "page");
   });
 });

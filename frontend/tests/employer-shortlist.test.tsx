@@ -324,8 +324,8 @@ describe("Employer shortlist UI", () => {
       />
     );
 
-    const saveButton = screen.getByRole("button", { name: "Save Alex Morgan to shortlist" });
-    expect(saveButton).toHaveTextContent("Save");
+    const saveButton = screen.getByRole("button", { name: "Add Alex Morgan to shortlist" });
+    expect(saveButton).toHaveTextContent("Add to shortlist");
     fireEvent.click(saveButton);
     expect(saveMutate).toHaveBeenCalledWith("candidate-1");
     expect(removeMutate).not.toHaveBeenCalled();
@@ -350,7 +350,7 @@ describe("Employer shortlist UI", () => {
     const savedButton = screen.getByRole("button", {
       name: "Remove Alex Morgan from shortlist"
     });
-    expect(savedButton).toHaveTextContent("Saved");
+    expect(savedButton).toHaveTextContent("Remove from shortlist");
     fireEvent.click(savedButton);
     expect(removeMutate).toHaveBeenCalledWith("candidate-1");
     expect(saveMutate).not.toHaveBeenCalled();
@@ -374,7 +374,7 @@ describe("Employer shortlist UI", () => {
       />
     );
 
-    const button = screen.getByRole("button", { name: "Save Alex Morgan to shortlist" });
+    const button = screen.getByRole("button", { name: "Add Alex Morgan to shortlist" });
     expect(button).toBeDisabled();
     expect(button).toHaveAttribute("aria-busy", "true");
     fireEvent.click(button);
@@ -404,7 +404,7 @@ describe("Employer shortlist UI", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("Database operation failed");
   });
 
-  it("shows Saved badge and stage control in Candidate Review when the backend shortlist includes the candidate", () => {
+  it("shows Shortlisted badge and stage control in Candidate Review when the backend shortlist includes the candidate", () => {
     shortlistQuery.mockReturnValue({
       data: { entries: [shortlistEntry] },
       isLoading: false,
@@ -416,7 +416,6 @@ describe("Employer shortlist UI", () => {
       <CandidateProfileView candidateId="candidate-1" vacancyId="vacancy-1" enabled />
     );
 
-    expect(screen.getAllByText("Saved").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("Shortlisted").length).toBeGreaterThanOrEqual(1);
     expect(
       screen.getByRole("combobox", { name: "Hiring stage for Alex Morgan" })
@@ -531,7 +530,7 @@ describe("Employer shortlist UI", () => {
       />
     );
 
-    const button = screen.getByRole("button", { name: "Save Alex Morgan to shortlist" });
+    const button = screen.getByRole("button", { name: "Add Alex Morgan to shortlist" });
     expect(button).toBeDisabled();
     expect(screen.getByRole("alert")).toHaveTextContent("Database operation failed");
     fireEvent.click(button);
@@ -554,7 +553,7 @@ describe("Employer shortlist UI", () => {
       />
     );
 
-    const button = screen.getByRole("button", { name: "Save Alex Morgan to shortlist" });
+    const button = screen.getByRole("button", { name: "Add Alex Morgan to shortlist" });
     expect(button).toBeDisabled();
     fireEvent.click(button);
     expect(saveMutate).not.toHaveBeenCalled();
@@ -793,7 +792,7 @@ describe("Employer shortlist UI", () => {
     );
 
     expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Save Alex Morgan to shortlist" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add Alex Morgan to shortlist" })).toBeInTheDocument();
 
     shortlistQuery.mockReturnValue({
       data: { entries: [shortlistEntry] },

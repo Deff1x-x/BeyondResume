@@ -8,6 +8,7 @@ import type {
   InterviewScorecard,
   InterviewScorecardInput
 } from "@/lib/api/types/interview-scorecard";
+import { vacancyShortlistQueryKey } from "@/lib/employer/hooks";
 
 export function interviewScorecardQueryKey(vacancyId: string, candidateId: string) {
   return ["employer", "vacancy", vacancyId, "scorecard", candidateId] as const;
@@ -55,6 +56,9 @@ export function useSaveInterviewScorecardMutation(vacancyId: string, candidateId
         interviewScorecardQueryKey(vacancyId, candidateId),
         scorecard
       );
+      void queryClient.invalidateQueries({
+        queryKey: vacancyShortlistQueryKey(vacancyId)
+      });
     }
   });
 }

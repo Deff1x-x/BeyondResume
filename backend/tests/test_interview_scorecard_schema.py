@@ -8,12 +8,14 @@ from pydantic import ValidationError
 
 from app.schemas.interview_scorecard import (
     InterviewScorecardResponse,
+    InterviewScorecardSummary,
     InterviewScorecardUpsertRequest,
 )
 
 
 def _valid_payload(**overrides: object) -> dict[str, object]:
     payload: dict[str, object] = {
+        "status": "completed",
         "technical_competency": 4,
         "experience_relevance": 3,
         "communication": 5,
@@ -28,11 +30,41 @@ def _valid_payload(**overrides: object) -> dict[str, object]:
 
 def test_valid_request_accepted() -> None:
     body = InterviewScorecardUpsertRequest.model_validate(_valid_payload())
+    assert body.status == "completed"
     assert body.technical_competency == 4
     assert body.recommendation == "yes"
 
 
-def test_all_four_scores_required() -> None:
+def test_status_defaults_to_draft() -> None:
+    payload = _valid_payload()
+    del payload["status"]
+    body = InterviewScorecardUpsertRequest.model_validate(payload)
+    assert body.status == "draft"
+
+
+def test_draft_allows_missing_ratings_and_recommendation() -> None:
+    body = InterviewScorecardUpsertRequest.model_validate(
+        {
+            "status": "draft",
+            "technical_competency": 4,
+        }
+    )
+    assert body.status == "draft"
+    assert body.technical_competency == 4
+    assert body.experience_relevance is None
+    assert body.communication is None
+    assert body.ownership is None
+    assert body.recommendation is None
+
+
+def test_empty_draft_allowed() -> None:
+    body = InterviewScorecardUpsertRequest.model_validate({"status": "draft"})
+    assert body.status == "draft"
+    assert body.technical_competency is None
+    assert body.recommendation is None
+
+
+def test_all_four_scores_required_when_completed() -> None:
     for field in (
         "technical_competency",
         "experience_relevance",
@@ -45,11 +77,23 @@ def test_all_four_scores_required() -> None:
             InterviewScorecardUpsertRequest.model_validate(payload)
 
 
-def test_recommendation_required() -> None:
+def test_recommendation_required_when_completed() -> None:
     payload = _valid_payload()
     del payload["recommendation"]
     with pytest.raises(ValidationError):
         InterviewScorecardUpsertRequest.model_validate(payload)
+
+
+def test_completed_with_null_rating_rejected() -> None:
+    with pytest.raises(ValidationError):
+        InterviewScorecardUpsertRequest.model_validate(
+            _valid_payload(communication=None)
+        )
+
+
+def test_invalid_status_rejected() -> None:
+    with pytest.raises(ValidationError):
+        InterviewScorecardUpsertRequest.model_validate(_valid_payload(status="final"))
 
 
 def test_scores_one_and_five_accepted() -> None:
@@ -128,6 +172,7 @@ def test_response_excludes_employer_id() -> None:
         id=uuid4(),
         vacancy_id=uuid4(),
         candidate_id=uuid4(),
+        status="completed",
         technical_competency=3,
         experience_relevance=3,
         communication=3,
@@ -135,7 +180,74 @@ def test_response_excludes_employer_id() -> None:
         interview_summary=None,
         interview_notes=None,
         recommendation="mixed",
+        summary=InterviewScorecardSummary(
+            status="completed",
+            completed_criteria_count=4,
+            total_criteria_count=4,
+            average_rating=3.0,
+            strongest_dimensions=[
+                "Technical Competency",
+                "Experience Relevance",
+                "Communication",
+                "Ownership",
+            ],
+            weakest_dimensions=[
+                "Technical Competency",
+                "Experience Relevance",
+                "Communication",
+                "Ownership",
+            ],
+            unanswered_dimensions=[],
+            recommendation="mixed",
+        ),
         created_at=now,
         updated_at=now,
     )
-    assert "employer_id" not in response.model_dump()
+    dumped = response.model_dump()
+    assert "employer_id" not in dumped
+    assert dumped["status"] == "completed"
+    assert dumped["summary"]["completed_criteria_count"] == 4
+    assert dumped["summary"]["average_rating"] == 3.0
+
+
+def test_response_summary_defaults_for_draft() -> None:
+    now = datetime.now(UTC)
+    response = InterviewScorecardResponse(
+        id=uuid4(),
+        vacancy_id=uuid4(),
+        candidate_id=uuid4(),
+        status="draft",
+        technical_competency=None,
+        experience_relevance=None,
+        communication=None,
+        ownership=None,
+        interview_summary=None,
+        interview_notes=None,
+        recommendation=None,
+        summary=InterviewScorecardSummary(
+            status="draft",
+            completed_criteria_count=0,
+            total_criteria_count=4,
+            average_rating=None,
+            strongest_dimensions=[],
+            weakest_dimensions=[],
+            unanswered_dimensions=[
+                "Technical Competency",
+                "Experience Relevance",
+                "Communication",
+                "Ownership",
+            ],
+            recommendation=None,
+        ),
+        created_at=now,
+        updated_at=now,
+    )
+    dumped = response.model_dump()
+    assert dumped["status"] == "draft"
+    assert dumped["summary"]["average_rating"] is None
+    assert dumped["summary"]["unanswered_dimensions"] == [
+        "Technical Competency",
+        "Experience Relevance",
+        "Communication",
+        "Ownership",
+    ]

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
 import { Button, primaryActionClass } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Icon } from "@/components/ui/icon";
 import { PageHeader } from "@/components/ui/page-header";
@@ -26,6 +27,7 @@ import {
   EMPLOYER_CANDIDATE_STAGE_LABELS,
   EMPLOYER_CANDIDATE_STAGES
 } from "@/lib/api/types/employer";
+import { INTERVIEW_RECOMMENDATION_LABELS } from "@/lib/api/types/interview-scorecard";
 import {
   useEmployerVacancyQuery,
   useRemoveCandidateFromShortlist,
@@ -397,14 +399,22 @@ export function VacancyShortlistView({ vacancyId, enabled }: VacancyShortlistVie
                           candidateLabel={match.candidate_name}
                           compact
                         />
-                        {entry.stage === "interview" ? (
-                          <Link
-                            href={`/employer/matches/${encodeURIComponent(entry.candidate_id)}/scorecard?vacancy_id=${encodeURIComponent(vacancyId)}`}
-                            className="inline-flex min-h-control items-center rounded-button border border-border bg-surface px-4 text-sm font-medium text-ink shadow-sm transition duration-200 hover:-translate-y-px hover:border-border-strong hover:bg-surface-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2"
-                          >
-                            Open interview scorecard
-                          </Link>
-                        ) : null}
+                        <Link
+                          href={`/employer/matches/${encodeURIComponent(entry.candidate_id)}/interview-questions?vacancy_id=${encodeURIComponent(vacancyId)}`}
+                          className="inline-flex min-h-control items-center rounded-button border border-border bg-surface px-4 text-sm font-medium text-ink shadow-sm transition duration-200 hover:-translate-y-px hover:border-border-strong hover:bg-surface-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2"
+                        >
+                          Interview questions
+                        </Link>
+                        <Link
+                          href={`/employer/matches/${encodeURIComponent(entry.candidate_id)}/scorecard?vacancy_id=${encodeURIComponent(vacancyId)}`}
+                          className="inline-flex min-h-control items-center rounded-button border border-border bg-surface px-4 text-sm font-medium text-ink shadow-sm transition duration-200 hover:-translate-y-px hover:border-border-strong hover:bg-surface-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2"
+                        >
+                          {entry.scorecard_status === "completed"
+                            ? "Open scorecard"
+                            : entry.scorecard_status === "draft"
+                              ? "Continue scorecard draft"
+                              : "Open interview scorecard"}
+                        </Link>
                         <ShortlistRemoveButton
                           vacancyId={vacancyId}
                           candidateId={entry.candidate_id}
@@ -414,12 +424,29 @@ export function VacancyShortlistView({ vacancyId, enabled }: VacancyShortlistVie
                       </>
                     }
                     notes={
-                      <ShortlistNoteEditor
-                        vacancyId={vacancyId}
-                        candidateId={entry.candidate_id}
-                        note={entry.note}
-                        candidateLabel={match.candidate_name}
-                      />
+                      <div className="space-y-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge variant="neutral">
+                            Scorecard:{" "}
+                            {entry.scorecard_status === "completed"
+                              ? "Completed"
+                              : entry.scorecard_status === "draft"
+                                ? "Draft"
+                                : "Not started"}
+                          </Badge>
+                          {entry.scorecard_recommendation ? (
+                            <Badge variant="primary">
+                              {INTERVIEW_RECOMMENDATION_LABELS[entry.scorecard_recommendation]}
+                            </Badge>
+                          ) : null}
+                        </div>
+                        <ShortlistNoteEditor
+                          vacancyId={vacancyId}
+                          candidateId={entry.candidate_id}
+                          note={entry.note}
+                          candidateLabel={match.candidate_name}
+                        />
+                      </div>
                     }
                   />
                 );

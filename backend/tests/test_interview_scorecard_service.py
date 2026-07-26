@@ -24,6 +24,8 @@ from app.services.employer_shortlist import (
 from app.services.interview_scorecard import (
     ScorecardCandidateNotFoundError,
     ScorecardNotFoundError,
+    ScorecardValidationError,
+    build_scorecard_summary,
     get_interview_scorecard,
     upsert_interview_scorecard,
 )
@@ -126,7 +128,8 @@ def _upsert(
     candidate_id: UUID,
     **overrides: object,
 ) -> EmployerInterviewScorecard:
-    payload = {
+    payload: dict[str, object] = {
+        "status": "completed",
         "technical_competency": 4,
         "experience_relevance": 3,
         "communication": 5,
@@ -136,17 +139,24 @@ def _upsert(
         "recommendation": "yes",
     }
     payload.update(overrides)
+
+    def _opt_int(value: object) -> int | None:
+        return None if value is None else int(value)  # type: ignore[arg-type]
+
     return upsert_interview_scorecard(
         session,
         vacancy=vacancy,
         candidate_id=candidate_id,
-        technical_competency=int(payload["technical_competency"]),  # type: ignore[arg-type]
-        experience_relevance=int(payload["experience_relevance"]),  # type: ignore[arg-type]
-        communication=int(payload["communication"]),  # type: ignore[arg-type]
-        ownership=int(payload["ownership"]),  # type: ignore[arg-type]
+        status=str(payload["status"]),
+        technical_competency=_opt_int(payload["technical_competency"]),
+        experience_relevance=_opt_int(payload["experience_relevance"]),
+        communication=_opt_int(payload["communication"]),
+        ownership=_opt_int(payload["ownership"]),
         interview_summary=payload["interview_summary"],  # type: ignore[arg-type]
         interview_notes=payload["interview_notes"],  # type: ignore[arg-type]
-        recommendation=str(payload["recommendation"]),
+        recommendation=(
+            None if payload["recommendation"] is None else str(payload["recommendation"])
+        ),
     )
 
 
@@ -327,6 +337,7 @@ def test_get_missing_raises(scorecard_service_ctx: ScorecardServiceContext) -> N
                 session,
                 vacancy=scorecard_service_ctx.vacancy,
                 candidate_id=uuid4(),
+                status="completed",
                 technical_competency=3,
                 experience_relevance=3,
                 communication=3,
@@ -335,5 +346,182 @@ def test_get_missing_raises(scorecard_service_ctx: ScorecardServiceContext) -> N
                 interview_notes=None,
                 recommendation="yes",
             )
+    finally:
+        session.close()
+
+
+def test_create_draft_scorecard_allows_null_ratings(
+    scorecard_service_ctx: ScorecardServiceContext,
+) -> None:
+    session = scorecard_service_ctx.new_session()
+    try:
+        entry = _upsert(
+            session,
+            scorecard_service_ctx.vacancy,
+            scorecard_service_ctx.candidate_ids[0],
+            status="draft",
+            technical_competency=4,
+            experience_relevance=None,
+            communication=None,
+            ownership=None,
+            interview_summary=None,
+            interview_notes=None,
+            recommendation=None,
+        )
+        assert entry.status == "draft"
+        assert entry.technical_competency == 4
+        assert entry.experience_relevance is None
+        assert entry.communication is None
+        assert entry.ownership is None
+        assert entry.recommendation is None
+    finally:
+        session.close()
+
+
+def test_completed_scorecard_requires_all_ratings(
+    scorecard_service_ctx: ScorecardServiceContext,
+) -> None:
+    session = scorecard_service_ctx.new_session()
+    try:
+        with pytest.raises(ScorecardValidationError):
+            _upsert(
+                session,
+                scorecard_service_ctx.vacancy,
+                scorecard_service_ctx.candidate_ids[0],
+                status="completed",
+                communication=None,
+            )
+        with pytest.raises(ScorecardValidationError):
+            _upsert(
+                session,
+                scorecard_service_ctx.vacancy,
+                scorecard_service_ctx.candidate_ids[0],
+                status="completed",
+                recommendation=None,
+            )
+    finally:
+        session.close()
+
+
+def test_draft_then_complete_updates_same_row(
+    scorecard_service_ctx: ScorecardServiceContext,
+) -> None:
+    session = scorecard_service_ctx.new_session()
+    try:
+        draft = _upsert(
+            session,
+            scorecard_service_ctx.vacancy,
+            scorecard_service_ctx.candidate_ids[0],
+            status="draft",
+            experience_relevance=None,
+            communication=None,
+            ownership=None,
+            recommendation=None,
+            interview_summary=None,
+            interview_notes=None,
+        )
+        draft_id = draft.id
+        completed = _upsert(
+            session,
+            scorecard_service_ctx.vacancy,
+            scorecard_service_ctx.candidate_ids[0],
+            status="completed",
+        )
+        assert completed.id == draft_id
+        assert completed.status == "completed"
+        assert completed.recommendation == "yes"
+    finally:
+        session.close()
+
+
+def test_build_scorecard_summary_completed(
+    scorecard_service_ctx: ScorecardServiceContext,
+) -> None:
+    session = scorecard_service_ctx.new_session()
+    try:
+        entry = _upsert(
+            session,
+            scorecard_service_ctx.vacancy,
+            scorecard_service_ctx.candidate_ids[0],
+            status="completed",
+            technical_competency=4,
+            experience_relevance=3,
+            communication=5,
+            ownership=4,
+            recommendation="yes",
+        )
+        summary = build_scorecard_summary(entry)
+        assert summary["status"] == "completed"
+        assert summary["completed_criteria_count"] == 4
+        assert summary["total_criteria_count"] == 4
+        assert summary["average_rating"] == 4.0
+        assert summary["strongest_dimensions"] == ["Communication"]
+        assert summary["weakest_dimensions"] == ["Experience Relevance"]
+        assert summary["unanswered_dimensions"] == []
+        assert summary["recommendation"] == "yes"
+    finally:
+        session.close()
+
+
+def test_build_scorecard_summary_partial_draft(
+    scorecard_service_ctx: ScorecardServiceContext,
+) -> None:
+    session = scorecard_service_ctx.new_session()
+    try:
+        entry = _upsert(
+            session,
+            scorecard_service_ctx.vacancy,
+            scorecard_service_ctx.candidate_ids[0],
+            status="draft",
+            technical_competency=2,
+            experience_relevance=4,
+            communication=None,
+            ownership=None,
+            recommendation=None,
+            interview_summary=None,
+            interview_notes=None,
+        )
+        summary = build_scorecard_summary(entry)
+        assert summary["status"] == "draft"
+        assert summary["completed_criteria_count"] == 2
+        assert summary["total_criteria_count"] == 4
+        assert summary["average_rating"] == 3.0
+        assert summary["strongest_dimensions"] == ["Experience Relevance"]
+        assert summary["weakest_dimensions"] == ["Technical Competency"]
+        assert summary["unanswered_dimensions"] == ["Communication", "Ownership"]
+        assert summary["recommendation"] is None
+    finally:
+        session.close()
+
+
+def test_build_scorecard_summary_empty_draft(
+    scorecard_service_ctx: ScorecardServiceContext,
+) -> None:
+    session = scorecard_service_ctx.new_session()
+    try:
+        entry = _upsert(
+            session,
+            scorecard_service_ctx.vacancy,
+            scorecard_service_ctx.candidate_ids[0],
+            status="draft",
+            technical_competency=None,
+            experience_relevance=None,
+            communication=None,
+            ownership=None,
+            recommendation=None,
+            interview_summary=None,
+            interview_notes=None,
+        )
+        summary = build_scorecard_summary(entry)
+        assert summary["completed_criteria_count"] == 0
+        assert summary["average_rating"] is None
+        assert summary["strongest_dimensions"] == []
+        assert summary["weakest_dimensions"] == []
+        assert summary["unanswered_dimensions"] == [
+            "Technical Competency",
+            "Experience Relevance",
+            "Communication",
+            "Ownership",
+        ]
     finally:
         session.close()

@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Annotated, Literal
+from typing import Annotated, Literal, Self
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 InterviewRecommendation = Literal["strong_yes", "yes", "mixed", "no"]
+InterviewScorecardStatus = Literal["draft", "completed"]
 
 ScoreRating = Annotated[int, Field(ge=1, le=5)]
 
@@ -32,13 +33,14 @@ class InterviewScorecardUpsertRequest(BaseModel):
 
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
-    technical_competency: ScoreRating
-    experience_relevance: ScoreRating
-    communication: ScoreRating
-    ownership: ScoreRating
+    status: InterviewScorecardStatus = "draft"
+    technical_competency: ScoreRating | None = None
+    experience_relevance: ScoreRating | None = None
+    communication: ScoreRating | None = None
+    ownership: ScoreRating | None = None
     interview_summary: str | None = None
     interview_notes: str | None = None
-    recommendation: InterviewRecommendation
+    recommendation: InterviewRecommendation | None = None
 
     @field_validator("interview_summary", mode="before")
     @classmethod
@@ -50,6 +52,37 @@ class InterviewScorecardUpsertRequest(BaseModel):
     def normalize_notes(cls, value: object) -> str | None:
         return _normalize_optional_text(value, max_length=5000)
 
+    @model_validator(mode="after")
+    def require_completed_fields(self) -> Self:
+        if self.status != "completed":
+            return self
+        if (
+            self.technical_competency is None
+            or self.experience_relevance is None
+            or self.communication is None
+            or self.ownership is None
+            or self.recommendation is None
+        ):
+            raise ValueError(
+                "Completed scorecards require all ratings and a recommendation"
+            )
+        return self
+
+
+class InterviewScorecardSummary(BaseModel):
+    """Deterministic summary of employer-entered scorecard ratings."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    status: InterviewScorecardStatus
+    completed_criteria_count: int
+    total_criteria_count: int
+    average_rating: float | None
+    strongest_dimensions: list[str]
+    weakest_dimensions: list[str]
+    unanswered_dimensions: list[str]
+    recommendation: InterviewRecommendation | None
+
 
 class InterviewScorecardResponse(BaseModel):
     """Public interview scorecard DTO."""
@@ -59,12 +92,14 @@ class InterviewScorecardResponse(BaseModel):
     id: UUID
     vacancy_id: UUID
     candidate_id: UUID
-    technical_competency: int
-    experience_relevance: int
-    communication: int
-    ownership: int
+    status: InterviewScorecardStatus
+    technical_competency: int | None
+    experience_relevance: int | None
+    communication: int | None
+    ownership: int | None
     interview_summary: str | None
     interview_notes: str | None
-    recommendation: InterviewRecommendation
+    recommendation: InterviewRecommendation | None
+    summary: InterviewScorecardSummary
     created_at: datetime
     updated_at: datetime

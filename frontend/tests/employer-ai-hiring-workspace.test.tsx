@@ -51,7 +51,7 @@ describe("AiHiringWorkspace", () => {
 
     expect(screen.getByText("Alex Morgan")).toBeInTheDocument();
     expect(screen.getByText("Vacancy match 82%")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Candidate Review" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Overview" })).toHaveAttribute(
       "href",
       "/employer/matches/candidate-1?vacancy_id=vacancy-1"
     );

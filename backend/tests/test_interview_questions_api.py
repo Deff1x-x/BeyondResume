@@ -17,6 +17,7 @@ from app.db.session import engine, get_db
 from app.main import app
 from app.models.application import Application
 from app.models.candidate_profile import CandidateProfile, OnboardingStatus
+from app.models.employer_candidate_shortlist import EmployerCandidateShortlist
 from app.models.employer_profile import EmployerProfile
 from app.models.skill import Skill
 from app.models.user import User
@@ -192,7 +193,7 @@ def test_missing_candidate_returns_404(
     client, context = interview_questions_client
     response = client.get(_path(uuid4(), context.vacancy.id))
     assert response.status_code == 404
-    assert response.json()["error"]["code"] == "APPLICANT_NOT_FOUND"
+    assert response.json()["error"]["code"] == "CANDIDATE_NOT_FOUND"
 
 
 def test_foreign_vacancy_hidden(
@@ -226,7 +227,7 @@ def test_missing_candidate_does_not_call_provider(
     monkeypatch.setattr("app.api.v1.employer.build_interview_questions_context", spy)
     response = client.get(_path(uuid4(), context.vacancy.id))
     assert response.status_code == 404
-    assert response.json()["error"]["code"] == "APPLICANT_NOT_FOUND"
+    assert response.json()["error"]["code"] == "CANDIDATE_NOT_FOUND"
     spy.assert_not_called()
 
 
@@ -283,3 +284,65 @@ def test_no_post_put_patch_delete_routes(
     assert client.put(path).status_code == 405
     assert client.patch(path).status_code == 405
     assert client.delete(path).status_code == 405
+
+
+def _create_eligible_candidate_without_application(
+    context: InterviewQuestionsApiContext,
+) -> UUID:
+    session = context.new_session()
+    try:
+        user = User(
+            id=uuid4(),
+            email=f"iq-no-app-{uuid4()}@example.com",
+            password_hash="hash",
+            role="candidate",
+            status="active",
+        )
+        profile = CandidateProfile(
+            id=uuid4(),
+            user_id=user.id,
+            display_name="No Application Candidate",
+            onboarding_status=OnboardingStatus.PROFILE_REQUIRED,
+        )
+        session.add_all([user, profile])
+        session.commit()
+        return profile.id
+    finally:
+        session.close()
+
+
+def test_non_applicant_not_shortlisted_returns_candidate_not_found(
+    interview_questions_client: tuple[TestClient, InterviewQuestionsApiContext],
+) -> None:
+    client, context = interview_questions_client
+    candidate_id = _create_eligible_candidate_without_application(context)
+
+    response = client.get(_path(candidate_id, context.vacancy.id))
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "CANDIDATE_NOT_FOUND"
+
+
+def test_shortlisted_non_applicant_can_access_questions(
+    interview_questions_client: tuple[TestClient, InterviewQuestionsApiContext],
+) -> None:
+    """Interview questions are available to shortlisted candidates without an application."""
+    client, context = interview_questions_client
+    candidate_id = _create_eligible_candidate_without_application(context)
+
+    session = context.new_session()
+    try:
+        session.add(
+            EmployerCandidateShortlist(
+                id=uuid4(),
+                employer_id=context.employer.id,
+                vacancy_id=context.vacancy.id,
+                candidate_id=candidate_id,
+            )
+        )
+        session.commit()
+    finally:
+        session.close()
+
+    response = client.get(_path(candidate_id, context.vacancy.id))
+    assert response.status_code == 200
+    assert set(response.json().keys()) == RESPONSE_KEYS

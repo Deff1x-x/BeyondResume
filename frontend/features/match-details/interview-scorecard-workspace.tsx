@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -15,11 +16,14 @@ import { ApiClientError } from "@/lib/api/error";
 import type {
   InterviewRecommendation,
   InterviewScorecard,
-  InterviewScorecardInput
+  InterviewScorecardInput,
+  InterviewScorecardStatus,
+  InterviewScorecardSummary
 } from "@/lib/api/types/interview-scorecard";
 import {
   INTERVIEW_RECOMMENDATION_LABELS,
-  INTERVIEW_RECOMMENDATIONS
+  INTERVIEW_RECOMMENDATIONS,
+  INTERVIEW_SCORECARD_STATUS_LABELS
 } from "@/lib/api/types/interview-scorecard";
 import { useMatchDetailsQuery } from "@/lib/employer/hooks";
 import {
@@ -30,6 +34,12 @@ import {
 const SUMMARY_MAX_LENGTH = 1200;
 const NOTES_MAX_LENGTH = 5000;
 const SCORE_OPTIONS = [1, 2, 3, 4, 5] as const;
+const DIMENSIONS = [
+  { key: "technical_competency", label: "Technical Competency" },
+  { key: "experience_relevance", label: "Experience Relevance" },
+  { key: "communication", label: "Communication" },
+  { key: "ownership", label: "Ownership / Accountability" }
+] as const;
 
 type EmployerInterviewScorecardWorkspaceProps = Readonly<{
   candidateId: string;
@@ -76,17 +86,24 @@ function normalizeOptionalText(value: string): string | null {
   return trimmed === "" ? null : trimmed;
 }
 
-function formToPayload(form: FormState): InterviewScorecardInput | null {
-  if (
-    form.technical_competency === null ||
-    form.experience_relevance === null ||
-    form.communication === null ||
-    form.ownership === null ||
-    form.recommendation === null
-  ) {
-    return null;
+function formToPayload(
+  form: FormState,
+  status: InterviewScorecardStatus
+): InterviewScorecardInput | null {
+  if (status === "completed") {
+    if (
+      form.technical_competency === null ||
+      form.experience_relevance === null ||
+      form.communication === null ||
+      form.ownership === null ||
+      form.recommendation === null
+    ) {
+      return null;
+    }
   }
+
   return {
+    status,
     technical_competency: form.technical_competency,
     experience_relevance: form.experience_relevance,
     communication: form.communication,
@@ -99,13 +116,15 @@ function formToPayload(form: FormState): InterviewScorecardInput | null {
 
 function samePayload(
   form: FormState,
+  status: InterviewScorecardStatus,
   scorecard: InterviewScorecard | null | undefined
 ): boolean {
-  const payload = formToPayload(form);
+  const payload = formToPayload(form, status);
   if (!payload || !scorecard) {
     return false;
   }
   return (
+    payload.status === scorecard.status &&
     payload.technical_competency === scorecard.technical_competency &&
     payload.experience_relevance === scorecard.experience_relevance &&
     payload.communication === scorecard.communication &&
@@ -114,6 +133,39 @@ function samePayload(
     payload.interview_notes === scorecard.interview_notes &&
     payload.recommendation === scorecard.recommendation
   );
+}
+
+function buildLocalSummary(
+  form: FormState,
+  status: InterviewScorecardStatus
+): InterviewScorecardSummary {
+  const rated = DIMENSIONS.flatMap((dimension) => {
+    const value = form[dimension.key];
+    return value === null ? [] : [{ label: dimension.label, score: value }];
+  });
+  const unanswered = DIMENSIONS.filter((dimension) => form[dimension.key] === null).map(
+    (dimension) => dimension.label
+  );
+  const average =
+    rated.length === 0
+      ? null
+      : Math.round((rated.reduce((sum, item) => sum + item.score, 0) / rated.length) * 100) /
+        100;
+  const maxScore = rated.length === 0 ? null : Math.max(...rated.map((item) => item.score));
+  const minScore = rated.length === 0 ? null : Math.min(...rated.map((item) => item.score));
+
+  return {
+    status,
+    completed_criteria_count: rated.length,
+    total_criteria_count: DIMENSIONS.length,
+    average_rating: average,
+    strongest_dimensions:
+      maxScore === null ? [] : rated.filter((item) => item.score === maxScore).map((item) => item.label),
+    weakest_dimensions:
+      minScore === null ? [] : rated.filter((item) => item.score === minScore).map((item) => item.label),
+    unanswered_dimensions: unanswered,
+    recommendation: form.recommendation
+  };
 }
 
 function errorMessage(error: unknown): string {
@@ -156,7 +208,75 @@ function ScoreSelect({
           </option>
         ))}
       </Select>
+      <p className="text-xs text-muted">
+        1 insufficient · 2 below · 3 meets · 4 strong · 5 exceptional
+      </p>
     </div>
+  );
+}
+
+function ScorecardSummaryPanel({
+  summary
+}: Readonly<{ summary: InterviewScorecardSummary }>) {
+  return (
+    <Card aria-labelledby="scorecard-summary-title">
+      <CardContent className="space-y-4 p-5">
+        <div className="flex flex-wrap items-center gap-2">
+          <h2 id="scorecard-summary-title" className="text-lg font-semibold text-ink">
+            Scorecard summary
+          </h2>
+          <Badge variant={summary.status === "completed" ? "success" : "neutral"}>
+            {INTERVIEW_SCORECARD_STATUS_LABELS[summary.status]}
+          </Badge>
+        </div>
+        <dl className="space-y-3 text-sm">
+          <div>
+            <dt className="text-secondary">Completed criteria</dt>
+            <dd className="mt-1 font-medium text-ink">
+              {summary.completed_criteria_count} of {summary.total_criteria_count}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-secondary">Average rating</dt>
+            <dd className="mt-1 font-medium tabular-nums text-ink">
+              {summary.average_rating === null ? "—" : summary.average_rating.toFixed(2)}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-secondary">Strongest</dt>
+            <dd className="mt-1 text-ink">
+              {summary.strongest_dimensions.length > 0
+                ? summary.strongest_dimensions.join(", ")
+                : "—"}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-secondary">Weakest</dt>
+            <dd className="mt-1 text-ink">
+              {summary.weakest_dimensions.length > 0
+                ? summary.weakest_dimensions.join(", ")
+                : "—"}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-secondary">Unanswered</dt>
+            <dd className="mt-1 text-ink">
+              {summary.unanswered_dimensions.length > 0
+                ? summary.unanswered_dimensions.join(", ")
+                : "None"}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-secondary">Final recommendation</dt>
+            <dd className="mt-1 font-medium text-ink">
+              {summary.recommendation
+                ? INTERVIEW_RECOMMENDATION_LABELS[summary.recommendation]
+                : "Not set"}
+            </dd>
+          </div>
+        </dl>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -171,7 +291,7 @@ export function EmployerInterviewScorecardWorkspace({
   const formId = useId();
   const [form, setForm] = useState<FormState>(emptyForm);
   const [syncedKey, setSyncedKey] = useState("");
-  const [savedNotice, setSavedNotice] = useState(false);
+  const [savedNotice, setSavedNotice] = useState<string | null>(null);
 
   const identityKey = `${vacancyId}:${candidateId}`;
 
@@ -179,13 +299,12 @@ export function EmployerInterviewScorecardWorkspace({
     if (!scorecardQuery.isSuccess) {
       return;
     }
-    // Hydrate only when vacancy/candidate identity changes. Refetch must not wipe a dirty draft.
     if (syncedKey === identityKey) {
       return;
     }
     setSyncedKey(identityKey);
     setForm(scorecardQuery.data ? formFromScorecard(scorecardQuery.data) : emptyForm());
-    setSavedNotice(false);
+    setSavedNotice(null);
   }, [identityKey, scorecardQuery.data, scorecardQuery.isSuccess, syncedKey]);
 
   const breadcrumb = (
@@ -207,6 +326,15 @@ export function EmployerInterviewScorecardWorkspace({
       </span>
       <span className="text-secondary">Interview scorecard</span>
     </nav>
+  );
+
+  const localSummary = useMemo(
+    () =>
+      buildLocalSummary(
+        form,
+        scorecardQuery.data?.status === "completed" ? "completed" : "draft"
+      ),
+    [form, scorecardQuery.data?.status]
   );
 
   if (!enabled) {
@@ -257,6 +385,17 @@ export function EmployerInterviewScorecardWorkspace({
     );
   }
 
+  const details = detailsQuery.data;
+  const draftPayload = formToPayload(form, "draft");
+  const completePayload = formToPayload(form, "completed");
+  const draftUnchanged = samePayload(form, "draft", scorecardQuery.data);
+  const completeUnchanged = samePayload(form, "completed", scorecardQuery.data);
+  const canSaveDraft = draftPayload !== null && !draftUnchanged && !saveMutation.isPending;
+  const canComplete =
+    completePayload !== null && !completeUnchanged && !saveMutation.isPending;
+  const shortlistHref = `/employer/vacancies/${encodeURIComponent(vacancyId)}/shortlist`;
+  const summary = scorecardQuery.data?.summary ?? localSummary;
+
   if (scorecardQuery.isError) {
     return (
       <div className="space-y-8">
@@ -266,7 +405,13 @@ export function EmployerInterviewScorecardWorkspace({
           description="Record how the interviewer assessed this candidate."
           breadcrumb={breadcrumb}
         />
-        <MatchReviewNavigation candidateId={candidateId} vacancyId={vacancyId} active="scorecard" />
+        <MatchReviewNavigation
+          candidateId={candidateId}
+          vacancyId={vacancyId}
+          active="scorecard"
+          hasApplied={details.has_applied}
+          isShortlisted={details.is_shortlisted}
+        />
         <EmptyState
           role="alert"
           title="Interview scorecard unavailable"
@@ -286,18 +431,12 @@ export function EmployerInterviewScorecardWorkspace({
     );
   }
 
-  const details = detailsQuery.data;
-  const payload = formToPayload(form);
-  const unchanged = samePayload(form, scorecardQuery.data);
-  const canSave = payload !== null && !unchanged && !saveMutation.isPending;
-  const shortlistHref = `/employer/vacancies/${encodeURIComponent(vacancyId)}/shortlist`;
-
   return (
     <div className="space-y-8">
       <PageHeader
         eyebrow="Interview Scorecard"
         title="Interview Scorecard"
-        description="Manual interviewer assessment for the selected candidate and vacancy."
+        description="Manual interviewer assessment for the selected candidate and vacancy. Match Score stays separate."
         breadcrumb={breadcrumb}
       />
       <MatchReviewNavigation
@@ -305,69 +444,52 @@ export function EmployerInterviewScorecardWorkspace({
         vacancyId={vacancyId}
         active="scorecard"
         hasApplied={details.has_applied}
+        isShortlisted={details.is_shortlisted}
       />
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
         <main>
           <Card>
             <CardContent className="space-y-6 p-5 sm:p-6">
-              <div>
+              <div className="flex flex-wrap items-center gap-2">
                 <h2 className="text-lg font-semibold text-ink">Ratings</h2>
-                <p className="mt-1 text-sm text-secondary">
-                  Score each dimension from 1 to 5 based on the interview.
-                </p>
+                {scorecardQuery.data ? (
+                  <Badge
+                    variant={
+                      scorecardQuery.data.status === "completed" ? "success" : "neutral"
+                    }
+                  >
+                    {INTERVIEW_SCORECARD_STATUS_LABELS[scorecardQuery.data.status]}
+                  </Badge>
+                ) : (
+                  <Badge variant="neutral">Not started</Badge>
+                )}
               </div>
+              <p className="text-sm text-secondary">
+                Score each dimension from 1 to 5 based on the interview. Incomplete drafts can be
+                saved and reopened later.
+              </p>
 
               <div className="grid gap-4 sm:grid-cols-2">
-                <ScoreSelect
-                  id={`${formId}-technical`}
-                  label="Technical Competency"
-                  value={form.technical_competency}
-                  disabled={saveMutation.isPending}
-                  onChange={(value) => {
-                    setSavedNotice(false);
-                    setForm((current) => ({ ...current, technical_competency: value }));
-                  }}
-                />
-                <ScoreSelect
-                  id={`${formId}-experience`}
-                  label="Experience Relevance"
-                  value={form.experience_relevance}
-                  disabled={saveMutation.isPending}
-                  onChange={(value) => {
-                    setSavedNotice(false);
-                    setForm((current) => ({ ...current, experience_relevance: value }));
-                  }}
-                />
-                <ScoreSelect
-                  id={`${formId}-communication`}
-                  label="Communication"
-                  value={form.communication}
-                  disabled={saveMutation.isPending}
-                  onChange={(value) => {
-                    setSavedNotice(false);
-                    setForm((current) => ({ ...current, communication: value }));
-                  }}
-                />
-                <ScoreSelect
-                  id={`${formId}-ownership`}
-                  label="Ownership / Accountability"
-                  value={form.ownership}
-                  disabled={saveMutation.isPending}
-                  onChange={(value) => {
-                    setSavedNotice(false);
-                    setForm((current) => ({ ...current, ownership: value }));
-                  }}
-                />
+                {DIMENSIONS.map((dimension) => (
+                  <ScoreSelect
+                    key={dimension.key}
+                    id={`${formId}-${dimension.key}`}
+                    label={dimension.label}
+                    value={form[dimension.key]}
+                    disabled={saveMutation.isPending}
+                    onChange={(value) => {
+                      setSavedNotice(null);
+                      setForm((current) => ({ ...current, [dimension.key]: value }));
+                    }}
+                  />
+                ))}
               </div>
 
               <div className="space-y-2">
                 <label htmlFor={`${formId}-summary`} className="block text-sm font-medium text-ink">
                   Interview Summary
                 </label>
-                <p className="text-sm text-secondary">
-                  Concise final assessment from the interview
-                </p>
                 <Textarea
                   id={`${formId}-summary`}
                   value={form.interview_summary}
@@ -376,7 +498,7 @@ export function EmployerInterviewScorecardWorkspace({
                   disabled={saveMutation.isPending}
                   className="min-h-20"
                   onChange={(event) => {
-                    setSavedNotice(false);
+                    setSavedNotice(null);
                     setForm((current) => ({
                       ...current,
                       interview_summary: event.target.value
@@ -392,9 +514,6 @@ export function EmployerInterviewScorecardWorkspace({
                 <label htmlFor={`${formId}-notes`} className="block text-sm font-medium text-ink">
                   Interview Notes
                 </label>
-                <p className="text-sm text-secondary">
-                  Detailed notes captured during or after the interview
-                </p>
                 <Textarea
                   id={`${formId}-notes`}
                   value={form.interview_notes}
@@ -403,7 +522,7 @@ export function EmployerInterviewScorecardWorkspace({
                   disabled={saveMutation.isPending}
                   className="min-h-24"
                   onChange={(event) => {
-                    setSavedNotice(false);
+                    setSavedNotice(null);
                     setForm((current) => ({
                       ...current,
                       interview_notes: event.target.value
@@ -435,7 +554,7 @@ export function EmployerInterviewScorecardWorkspace({
                           checked={form.recommendation === option}
                           disabled={saveMutation.isPending}
                           onChange={() => {
-                            setSavedNotice(false);
+                            setSavedNotice(null);
                             setForm((current) => ({ ...current, recommendation: option }));
                           }}
                         />
@@ -449,23 +568,43 @@ export function EmployerInterviewScorecardWorkspace({
               <div className="flex flex-wrap items-center gap-3 border-t border-border pt-4">
                 <Button
                   type="button"
-                  variant="primary"
+                  variant="secondary"
                   loading={saveMutation.isPending}
-                  disabled={!canSave}
+                  disabled={!canSaveDraft}
                   onClick={() => {
-                    const nextPayload = formToPayload(form);
+                    const nextPayload = formToPayload(form, "draft");
                     if (!nextPayload || saveMutation.isPending) {
                       return;
                     }
                     saveMutation.reset();
                     saveMutation.mutate(nextPayload, {
                       onSuccess: () => {
-                        setSavedNotice(true);
+                        setSavedNotice("Draft scorecard saved.");
                       }
                     });
                   }}
                 >
-                  {saveMutation.isPending ? "Saving..." : "Save"}
+                  {saveMutation.isPending ? "Saving..." : "Save draft"}
+                </Button>
+                <Button
+                  type="button"
+                  variant="primary"
+                  loading={saveMutation.isPending}
+                  disabled={!canComplete}
+                  onClick={() => {
+                    const nextPayload = formToPayload(form, "completed");
+                    if (!nextPayload || saveMutation.isPending) {
+                      return;
+                    }
+                    saveMutation.reset();
+                    saveMutation.mutate(nextPayload, {
+                      onSuccess: () => {
+                        setSavedNotice("Interview scorecard completed.");
+                      }
+                    });
+                  }}
+                >
+                  {saveMutation.isPending ? "Saving..." : "Complete scorecard"}
                 </Button>
                 <Link href={shortlistHref} className="app-link text-sm">
                   Open shortlist
@@ -474,7 +613,7 @@ export function EmployerInterviewScorecardWorkspace({
 
               {savedNotice && !saveMutation.isError ? (
                 <p className="text-sm text-success" role="status">
-                  Interview scorecard saved.
+                  {savedNotice}
                 </p>
               ) : null}
               {saveMutation.isError ? (
@@ -487,6 +626,7 @@ export function EmployerInterviewScorecardWorkspace({
         </main>
 
         <aside className="space-y-8">
+          <ScorecardSummaryPanel summary={summary} />
           <Card aria-labelledby="scorecard-context-title">
             <CardContent className="p-5">
               <p className="text-sm font-semibold uppercase tracking-[0.14em] text-primary">
@@ -503,8 +643,8 @@ export function EmployerInterviewScorecardWorkspace({
                   "Manual interviewer assessment for this vacancy."}
               </p>
               <p className="mt-4 text-sm leading-6 text-secondary">
-                This scorecard records interviewer judgment. It does not change pipeline stage or
-                replace AI Hiring.
+                Match Score: {details.match.score}%. This scorecard does not change Match Score or
+                invent evidence.
               </p>
             </CardContent>
           </Card>

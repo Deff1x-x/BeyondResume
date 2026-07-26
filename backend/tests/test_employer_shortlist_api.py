@@ -203,6 +203,8 @@ SHORTLIST_RESPONSE_KEYS = {
     "candidate_id",
     "stage",
     "note",
+    "scorecard_status",
+    "scorecard_recommendation",
     "created_at",
     "updated_at",
 }
@@ -701,7 +703,7 @@ def test_note_migration_contract_and_single_head() -> None:
     config = Config(str(Path(__file__).parents[1] / "alembic.ini"))
     script = ScriptDirectory.from_config(config)
     heads = script.get_heads()
-    assert heads == ["20260726_0021"]
+    assert heads == ["20260726_0022"]
     assert 'down_revision: Union[str, None] = "20260726_0018"' in (
         Path(__file__).parents[1]
         / "alembic"
@@ -719,6 +721,12 @@ def test_note_migration_contract_and_single_head() -> None:
         / "alembic"
         / "versions"
         / "20260726_0021_applications_and_candidate_contacts.py"
+    ).read_text(encoding="utf-8")
+    assert 'down_revision: Union[str, None] = "20260726_0021"' in (
+        Path(__file__).parents[1]
+        / "alembic"
+        / "versions"
+        / "20260726_0022_interview_scorecard_draft_status.py"
     ).read_text(encoding="utf-8")
 
 
@@ -1340,9 +1348,10 @@ def _add_ineligible_candidate(
     return profile.id
 
 
-def test_save_rejects_candidate_without_active_application(
+def test_save_accepts_eligible_candidate_without_application(
     shortlist_client: tuple[TestClient, ShortlistContext],
 ) -> None:
+    """Shortlisting no longer requires an active application for the vacancy."""
     client, context = shortlist_client
     session = context.new_session()
     try:
@@ -1365,10 +1374,30 @@ def test_save_rejects_candidate_without_active_application(
     finally:
         session.close()
 
+    # The candidate has no application for this vacancy.
+    session = context.new_session()
+    try:
+        application_count = session.scalar(
+            select(func.count())
+            .select_from(Application)
+            .where(
+                Application.vacancy_id == context.vacancy.id,
+                Application.candidate_id == candidate_id,
+            )
+        )
+    finally:
+        session.close()
+    assert application_count == 0
+
     response = _put(client, context.vacancy.id, candidate_id)
-    assert response.status_code == 404
-    assert response.json()["error"]["code"] == "CANDIDATE_NOT_FOUND"
-    assert _get(client, context.vacancy.id).json() == {"entries": []}
+    assert response.status_code == 200
+    assert response.json()["candidate_id"] == str(candidate_id)
+    assert response.json()["stage"] == "shortlisted"
+
+    listed = _get(client, context.vacancy.id)
+    assert listed.status_code == 200
+    listed_ids = {entry["candidate_id"] for entry in listed.json()["entries"]}
+    assert str(candidate_id) in listed_ids
 
 
 def test_save_rejects_shell_and_suspended_candidates(

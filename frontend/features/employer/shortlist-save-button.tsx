@@ -49,30 +49,40 @@ export function ShortlistSaveButton({
   return (
     <div className="space-y-2">
       {isSaved ? (
-        <Button
-          type="button"
-          variant="secondary"
-          loading={removingThis}
-          disabled={isBusy || stateUnknown}
-          aria-label={`Remove ${labelTarget} from shortlist`}
-          onClick={() => {
-            if (isBusy) {
-              return;
-            }
-            removeMutation.reset();
-            saveMutation.reset();
-            removeMutation.mutate(candidateId);
-          }}
-        >
-          {removingThis ? "Removing..." : "Saved"}
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            variant="secondary"
+            disabled
+            aria-label={`${labelTarget} is shortlisted`}
+          >
+            Shortlisted
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            loading={removingThis}
+            disabled={isBusy || stateUnknown}
+            aria-label={`Remove ${labelTarget} from shortlist`}
+            onClick={() => {
+              if (isBusy) {
+                return;
+              }
+              removeMutation.reset();
+              saveMutation.reset();
+              removeMutation.mutate(candidateId);
+            }}
+          >
+            {removingThis ? "Removing..." : "Remove from shortlist"}
+          </Button>
+        </div>
       ) : (
         <Button
           type="button"
           variant="primary"
           loading={savingThis}
           disabled={isBusy || stateUnknown}
-          aria-label={`Save ${labelTarget} to shortlist`}
+          aria-label={`Add ${labelTarget} to shortlist`}
           onClick={() => {
             if (isBusy) {
               return;
@@ -82,7 +92,7 @@ export function ShortlistSaveButton({
             saveMutation.mutate(candidateId);
           }}
         >
-          {savingThis ? "Saving..." : "Save"}
+          {savingThis ? "Adding..." : "Add to shortlist"}
         </Button>
       )}
       {error ? (

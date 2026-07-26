@@ -39,6 +39,7 @@ RESPONSE_KEYS = {
     "id",
     "vacancy_id",
     "candidate_id",
+    "status",
     "technical_competency",
     "experience_relevance",
     "communication",
@@ -46,8 +47,20 @@ RESPONSE_KEYS = {
     "interview_summary",
     "interview_notes",
     "recommendation",
+    "summary",
     "created_at",
     "updated_at",
+}
+
+SUMMARY_KEYS = {
+    "status",
+    "completed_criteria_count",
+    "total_criteria_count",
+    "average_rating",
+    "strongest_dimensions",
+    "weakest_dimensions",
+    "unanswered_dimensions",
+    "recommendation",
 }
 
 
@@ -169,6 +182,7 @@ def _path(vacancy_id: UUID, candidate_id: UUID) -> str:
 
 def _payload(**overrides: object) -> dict[str, object]:
     body: dict[str, object] = {
+        "status": "completed",
         "technical_competency": 4,
         "experience_relevance": 3,
         "communication": 5,
@@ -206,6 +220,10 @@ def test_put_create_get_and_replace(
     assert body["candidate_id"] == str(context.candidate_ids[0])
     assert body["technical_competency"] == 4
     assert body["recommendation"] == "yes"
+    assert body["status"] == "completed"
+    assert set(body["summary"].keys()) == SUMMARY_KEYS
+    assert body["summary"]["status"] == "completed"
+    assert body["summary"]["completed_criteria_count"] == 4
 
     fetched = client.get(_path(context.vacancy.id, context.candidate_ids[0]))
     assert fetched.status_code == 200
@@ -405,3 +423,164 @@ def test_scorecard_rejects_shell_and_suspended_candidates(
         assert put_response.json()["error"]["code"] == "CANDIDATE_NOT_FOUND"
         assert get_response.status_code == 404
         assert get_response.json()["error"]["code"] == "CANDIDATE_NOT_FOUND"
+
+
+def test_put_draft_allows_partial_ratings_and_reports_summary(
+    scorecard_client: tuple[TestClient, ScorecardApiContext],
+) -> None:
+    client, context = scorecard_client
+    response = client.put(
+        _path(context.vacancy.id, context.candidate_ids[0]),
+        json={
+            "status": "draft",
+            "technical_competency": 4,
+            "experience_relevance": 2,
+        },
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert set(body.keys()) == RESPONSE_KEYS
+    assert body["status"] == "draft"
+    assert body["technical_competency"] == 4
+    assert body["experience_relevance"] == 2
+    assert body["communication"] is None
+    assert body["ownership"] is None
+    assert body["recommendation"] is None
+
+    summary = body["summary"]
+    assert set(summary.keys()) == SUMMARY_KEYS
+    assert summary["status"] == "draft"
+    assert summary["completed_criteria_count"] == 2
+    assert summary["total_criteria_count"] == 4
+    assert summary["average_rating"] == 3.0
+    assert summary["strongest_dimensions"] == ["Technical Competency"]
+    assert summary["weakest_dimensions"] == ["Experience Relevance"]
+    assert summary["unanswered_dimensions"] == ["Communication", "Ownership"]
+    assert summary["recommendation"] is None
+
+
+def test_put_empty_draft_allowed(
+    scorecard_client: tuple[TestClient, ScorecardApiContext],
+) -> None:
+    client, context = scorecard_client
+    response = client.put(
+        _path(context.vacancy.id, context.candidate_ids[0]),
+        json={"status": "draft"},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "draft"
+    assert body["technical_competency"] is None
+    assert body["summary"]["completed_criteria_count"] == 0
+    assert body["summary"]["average_rating"] is None
+
+
+def test_put_status_defaults_to_draft_when_omitted(
+    scorecard_client: tuple[TestClient, ScorecardApiContext],
+) -> None:
+    client, context = scorecard_client
+    response = client.put(
+        _path(context.vacancy.id, context.candidate_ids[0]),
+        json={"technical_competency": 3},
+    )
+    assert response.status_code == 200
+    assert response.json()["status"] == "draft"
+
+
+def test_put_completed_missing_rating_returns_422(
+    scorecard_client: tuple[TestClient, ScorecardApiContext],
+) -> None:
+    client, context = scorecard_client
+    response = client.put(
+        _path(context.vacancy.id, context.candidate_ids[0]),
+        json=_payload(communication=None),
+    )
+    assert response.status_code == 422
+
+    missing_field = client.put(
+        _path(context.vacancy.id, context.candidate_ids[0]),
+        json={
+            "status": "completed",
+            "technical_competency": 4,
+            "experience_relevance": 3,
+            "communication": 5,
+            "ownership": 4,
+        },
+    )
+    assert missing_field.status_code == 422
+
+    # Nothing persisted from the invalid completed submissions.
+    assert (
+        client.get(_path(context.vacancy.id, context.candidate_ids[0])).status_code == 404
+    )
+
+
+def test_draft_then_completed_replaces_same_scorecard(
+    scorecard_client: tuple[TestClient, ScorecardApiContext],
+) -> None:
+    client, context = scorecard_client
+    draft = client.put(
+        _path(context.vacancy.id, context.candidate_ids[0]),
+        json={"status": "draft", "technical_competency": 4},
+    )
+    assert draft.status_code == 200
+    draft_id = draft.json()["id"]
+
+    completed = client.put(
+        _path(context.vacancy.id, context.candidate_ids[0]),
+        json=_payload(),
+    )
+    assert completed.status_code == 200
+    assert completed.json()["id"] == draft_id
+    assert completed.json()["status"] == "completed"
+    assert completed.json()["created_at"] == draft.json()["created_at"]
+
+
+def test_scorecard_access_via_shortlist_without_application(
+    scorecard_client: tuple[TestClient, ScorecardApiContext],
+) -> None:
+    """Scorecard access follows eligible + (application OR shortlisted)."""
+    client, context = scorecard_client
+    session = context.new_session()
+    try:
+        user = User(
+            id=uuid4(),
+            email=f"scorecard-no-app-{uuid4()}@example.com",
+            password_hash="hash",
+            role="candidate",
+            status="active",
+        )
+        profile = CandidateProfile(
+            id=uuid4(),
+            user_id=user.id,
+            display_name="Shortlisted No App",
+            onboarding_status=OnboardingStatus.PROFILE_REQUIRED,
+        )
+        session.add_all([user, profile])
+        session.commit()
+        candidate_id = profile.id
+    finally:
+        session.close()
+
+    # Eligible but neither applied nor shortlisted -> no interview access.
+    blocked = client.put(_path(context.vacancy.id, candidate_id), json=_payload())
+    assert blocked.status_code == 404
+    assert blocked.json()["error"]["code"] == "CANDIDATE_NOT_FOUND"
+
+    session = context.new_session()
+    try:
+        session.add(
+            EmployerCandidateShortlist(
+                id=uuid4(),
+                employer_id=context.employer.id,
+                vacancy_id=context.vacancy.id,
+                candidate_id=candidate_id,
+            )
+        )
+        session.commit()
+    finally:
+        session.close()
+
+    allowed = client.put(_path(context.vacancy.id, candidate_id), json=_payload())
+    assert allowed.status_code == 200
+    assert allowed.json()["candidate_id"] == str(candidate_id)

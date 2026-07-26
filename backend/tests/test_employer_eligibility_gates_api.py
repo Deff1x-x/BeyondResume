@@ -16,6 +16,7 @@ from app.api.dependencies import require_employer
 from app.db.session import engine, get_db
 from app.main import app
 from app.models.candidate_profile import CandidateProfile, OnboardingStatus
+from app.models.employer_candidate_shortlist import EmployerCandidateShortlist
 from app.models.employer_profile import EmployerProfile
 from app.models.user import User
 from app.models.vacancy import Vacancy
@@ -168,6 +169,32 @@ def test_match_details_allows_valid_named_zero_percent_candidate(
     assert body["candidate"]["name"] == "Eligible Candidate"
     assert "Unnamed" not in body["candidate"]["name"]
     assert body["match"]["score"] == 0
+    assert body["has_applied"] is False
+    assert body["is_shortlisted"] is False
+
+
+def test_match_details_is_shortlisted_true_when_shortlisted(
+    eligibility_client: tuple[TestClient, EligibilityApiContext],
+) -> None:
+    client, context = eligibility_client
+    session = context.new_session()
+    try:
+        session.add(
+            EmployerCandidateShortlist(
+                id=uuid4(),
+                employer_id=context.vacancy.employer_id,
+                vacancy_id=context.vacancy.id,
+                candidate_id=context.eligible_id,
+            )
+        )
+        session.commit()
+    finally:
+        session.close()
+
+    response = client.get(_match_path(context.eligible_id, context.vacancy.id))
+    assert response.status_code == 200
+    body = response.json()
+    assert body["is_shortlisted"] is True
     assert body["has_applied"] is False
 
 

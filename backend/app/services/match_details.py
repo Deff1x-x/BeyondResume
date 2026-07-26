@@ -13,6 +13,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.models.employer_candidate_shortlist import EmployerCandidateShortlist
 from app.models.evidence_skill_link import EvidenceSkillLink
 from app.schemas.employer import (
     EvidenceSuggestionResponse,
@@ -155,6 +156,13 @@ def build_match_details(
         has_applied=has_active_application(
             session, vacancy_id=vacancy_id, candidate_id=candidate_id
         ),
+        is_shortlisted=session.execute(
+            select(EmployerCandidateShortlist.id).where(
+                EmployerCandidateShortlist.vacancy_id == vacancy_id,
+                EmployerCandidateShortlist.candidate_id == candidate_id,
+            )
+        ).scalar_one_or_none()
+        is not None,
     )
 
 

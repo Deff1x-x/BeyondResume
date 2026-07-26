@@ -6,7 +6,10 @@ import { VacancyShortlistView } from "@/features/employer/vacancy-shortlist-view
 import { EmployerInterviewScorecardWorkspace } from "@/features/match-details/interview-scorecard-workspace";
 import { MatchReviewNavigation } from "@/features/match-details/match-review-navigation";
 import { ApiClientError } from "@/lib/api/error";
-import type { InterviewScorecard } from "@/lib/api/types/interview-scorecard";
+import type {
+  InterviewScorecard,
+  InterviewScorecardInput
+} from "@/lib/api/types/interview-scorecard";
 import type { EmployerShortlistEntry, VacancyMatch } from "@/lib/api/types/employer";
 
 const apiMocks = vi.hoisted(() => ({
@@ -36,7 +39,13 @@ vi.mock("@/lib/employer/hooks", () => ({
   useVacancyShortlistQuery: () => employerHooks.shortlistQuery(),
   useRemoveCandidateFromShortlist: () => employerHooks.removeState(),
   useUpdateEmployerShortlistStage: () => employerHooks.updateStageState(),
-  useUpdateEmployerShortlistNote: () => employerHooks.updateNoteState()
+  useUpdateEmployerShortlistNote: () => employerHooks.updateNoteState(),
+  vacancyShortlistQueryKey: (vacancyId: string) => [
+    "employer",
+    "vacancy",
+    vacancyId,
+    "shortlist"
+  ]
 }));
 
 const details = {
@@ -61,6 +70,7 @@ const scorecard: InterviewScorecard = {
   id: "scorecard-1",
   vacancy_id: "vacancy-1",
   candidate_id: "candidate-1",
+  status: "completed",
   technical_competency: 4,
   experience_relevance: 3,
   communication: 5,
@@ -68,6 +78,16 @@ const scorecard: InterviewScorecard = {
   interview_summary: "Solid depth",
   interview_notes: "Discussed systems design",
   recommendation: "yes",
+  summary: {
+    status: "completed",
+    completed_criteria_count: 4,
+    total_criteria_count: 4,
+    average_rating: 4,
+    strongest_dimensions: ["Communication"],
+    weakest_dimensions: ["Experience Relevance"],
+    unanswered_dimensions: [],
+    recommendation: "yes"
+  },
   created_at: "2026-07-25T10:00:00Z",
   updated_at: "2026-07-25T10:00:00Z"
 };
@@ -172,7 +192,8 @@ describe("EmployerInterviewScorecardWorkspace", () => {
       expect(screen.getByLabelText("Technical Competency")).toHaveValue("");
     });
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Complete scorecard" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Save draft" })).toBeInTheDocument();
     expect(screen.getByText("Ownership / Accountability")).toBeInTheDocument();
     expect(screen.getByText("Interviewer Recommendation")).toBeInTheDocument();
     expect(screen.getByLabelText("Strong yes")).toBeInTheDocument();
@@ -250,7 +271,7 @@ describe("EmployerInterviewScorecardWorkspace", () => {
     fireEvent.change(screen.getByLabelText("Interview Summary"), {
       target: { value: "Draft that must survive refetch" }
     });
-    expect(screen.getByRole("button", { name: "Save" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Save draft" })).toBeEnabled();
 
     apiMocks.getInterviewScorecard.mockResolvedValue({
       ...scorecard,
@@ -267,7 +288,7 @@ describe("EmployerInterviewScorecardWorkspace", () => {
     expect(screen.getByLabelText("Interview Summary")).toHaveValue(
       "Draft that must survive refetch"
     );
-    expect(screen.getByRole("button", { name: "Save" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Save draft" })).toBeEnabled();
   });
 
   it("resets the form when vacancy or candidate identity changes", async () => {
@@ -348,7 +369,7 @@ describe("EmployerInterviewScorecardWorkspace", () => {
     expect(screen.getByLabelText("Interview Summary")).toHaveValue("Solid depth");
     expect(screen.getByLabelText("Interview Notes")).toHaveValue("Discussed systems design");
     expect(screen.getByLabelText("Yes")).toBeChecked();
-    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Complete scorecard" })).toBeDisabled();
 
     fireEvent.change(screen.getByLabelText("Technical Competency"), {
       target: { value: "5" }
@@ -361,14 +382,15 @@ describe("EmployerInterviewScorecardWorkspace", () => {
     });
     fireEvent.click(screen.getByLabelText("Strong yes"));
 
-    const saveButton = screen.getByRole("button", { name: "Save" });
-    expect(saveButton).toBeEnabled();
-    fireEvent.click(saveButton);
+    const completeButton = screen.getByRole("button", { name: "Complete scorecard" });
+    expect(completeButton).toBeEnabled();
+    fireEvent.click(completeButton);
 
     await waitFor(() => {
       expect(apiMocks.putInterviewScorecard).toHaveBeenCalledTimes(1);
     });
     expect(apiMocks.putInterviewScorecard).toHaveBeenCalledWith("vacancy-1", "candidate-1", {
+      status: "completed",
       technical_competency: 5,
       experience_relevance: 3,
       communication: 5,
@@ -378,9 +400,59 @@ describe("EmployerInterviewScorecardWorkspace", () => {
       recommendation: "strong_yes"
     });
     await waitFor(() => {
-      expect(screen.getByText("Interview scorecard saved.")).toBeInTheDocument();
+      expect(screen.getByText("Interview scorecard completed.")).toBeInTheDocument();
     });
     expect(apiMocks.putInterviewScorecard.mock.calls[0]?.[2]).not.toHaveProperty("stage");
+  });
+
+  it("saves an incomplete draft via Save draft with the draft status payload", async () => {
+    apiMocks.getInterviewScorecard.mockRejectedValue(
+      new ApiClientError({
+        status: 404,
+        code: "SCORECARD_NOT_FOUND",
+        message: "Interview scorecard not found"
+      })
+    );
+    apiMocks.putInterviewScorecard.mockImplementation(
+      async (_vacancyId: string, _candidateId: string, payload: InterviewScorecardInput) => ({
+        ...scorecard,
+        ...payload,
+        status: "draft" as const,
+        summary: {
+          ...scorecard.summary,
+          status: "draft" as const
+        }
+      })
+    );
+
+    renderWorkspace();
+    await waitFor(() => {
+      expect(screen.getByLabelText("Technical Competency")).toBeInTheDocument();
+    });
+
+    fireEvent.change(screen.getByLabelText("Technical Competency"), { target: { value: "3" } });
+
+    const draftButton = screen.getByRole("button", { name: "Save draft" });
+    expect(draftButton).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Complete scorecard" })).toBeDisabled();
+    fireEvent.click(draftButton);
+
+    await waitFor(() => {
+      expect(apiMocks.putInterviewScorecard).toHaveBeenCalledTimes(1);
+    });
+    expect(apiMocks.putInterviewScorecard).toHaveBeenCalledWith("vacancy-1", "candidate-1", {
+      status: "draft",
+      technical_competency: 3,
+      experience_relevance: null,
+      communication: null,
+      ownership: null,
+      interview_summary: null,
+      interview_notes: null,
+      recommendation: null
+    });
+    await waitFor(() => {
+      expect(screen.getByText("Draft scorecard saved.")).toBeInTheDocument();
+    });
   });
 
   it("does not autosave on field change and keeps values after PUT error", async () => {
@@ -403,7 +475,7 @@ describe("EmployerInterviewScorecardWorkspace", () => {
     });
     expect(apiMocks.putInterviewScorecard).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    fireEvent.click(screen.getByRole("button", { name: "Complete scorecard" }));
     await waitFor(() => {
       expect(screen.getByRole("alert")).toHaveTextContent("Validation failed");
     });
@@ -438,10 +510,12 @@ describe("EmployerInterviewScorecardWorkspace", () => {
       target: { value: "4" }
     });
     fireEvent.click(screen.getByLabelText("Yes"));
-    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    fireEvent.click(screen.getByRole("button", { name: "Complete scorecard" }));
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Saving..." })).toBeDisabled();
+      const savingButtons = screen.getAllByRole("button", { name: "Saving..." });
+      expect(savingButtons.length).toBeGreaterThan(0);
+      savingButtons.forEach((button) => expect(button).toBeDisabled());
     });
     expect(apiMocks.putInterviewScorecard).toHaveBeenCalledTimes(1);
 
@@ -450,7 +524,7 @@ describe("EmployerInterviewScorecardWorkspace", () => {
       recommendation: "yes"
     });
     await waitFor(() => {
-      expect(screen.getByText("Interview scorecard saved.")).toBeInTheDocument();
+      expect(screen.getByText("Interview scorecard completed.")).toBeInTheDocument();
     });
   });
 
@@ -529,15 +603,15 @@ describe("MatchReviewNavigation scorecard tab", () => {
       />
     );
 
-    expect(screen.getByRole("link", { name: "Interview Scorecard" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Scorecard" })).toHaveAttribute(
       "href",
       "/employer/matches/candidate-1/scorecard?vacancy_id=vacancy-1"
     );
-    expect(screen.getByRole("link", { name: "Interview Scorecard" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Scorecard" })).toHaveAttribute(
       "aria-current",
       "page"
     );
-    expect(screen.getByRole("link", { name: "Candidate Review" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Overview" })).toHaveAttribute(
       "href",
       "/employer/matches/candidate-1?vacancy_id=vacancy-1"
     );
@@ -545,7 +619,7 @@ describe("MatchReviewNavigation scorecard tab", () => {
       "href",
       "/employer/matches/candidate-1/ai-hiring?vacancy_id=vacancy-1"
     );
-    expect(screen.getByRole("link", { name: "Questions" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Interview" })).toHaveAttribute(
       "href",
       "/employer/matches/candidate-1/interview-questions?vacancy_id=vacancy-1"
     );
@@ -558,7 +632,7 @@ describe("MatchReviewNavigation scorecard tab", () => {
         hasApplied
       />
     );
-    expect(screen.getByRole("link", { name: "Candidate Review" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Overview" })).toHaveAttribute(
       "aria-current",
       "page"
     );
@@ -581,12 +655,12 @@ describe("MatchReviewNavigation scorecard tab", () => {
         hasApplied
       />
     );
-    expect(screen.getByRole("link", { name: "Questions" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("link", { name: "Interview" })).toHaveAttribute("aria-current", "page");
   });
 });
 
 describe("Shortlist interview scorecard CTA", () => {
-  it("shows CTA only for interview stage with correct href", () => {
+  it("shows an interview scorecard CTA for every shortlisted candidate regardless of stage", () => {
     const interviewEntry: EmployerShortlistEntry = {
       id: "entry-1",
       vacancy_id: "vacancy-1",
@@ -644,16 +718,18 @@ describe("Shortlist interview scorecard CTA", () => {
     );
 
     const scorecardLinks = screen.getAllByRole("link", { name: "Open interview scorecard" });
-    expect(scorecardLinks).toHaveLength(1);
-    expect(scorecardLinks[0]).toHaveAttribute(
-      "href",
-      "/employer/matches/candidate-1/scorecard?vacancy_id=vacancy-1"
-    );
+    expect(scorecardLinks).toHaveLength(2);
+
+    const alexCard = screen.getByText("Alex Morgan").closest("li");
+    expect(alexCard).not.toBeNull();
+    expect(
+      within(alexCard as HTMLElement).getByRole("link", { name: "Open interview scorecard" })
+    ).toHaveAttribute("href", "/employer/matches/candidate-1/scorecard?vacancy_id=vacancy-1");
 
     const beaCard = screen.getByText("Bea Chen").closest("li");
     expect(beaCard).not.toBeNull();
     expect(
-      within(beaCard as HTMLElement).queryByRole("link", { name: "Open interview scorecard" })
-    ).not.toBeInTheDocument();
+      within(beaCard as HTMLElement).getByRole("link", { name: "Open interview scorecard" })
+    ).toHaveAttribute("href", "/employer/matches/candidate-2/scorecard?vacancy_id=vacancy-1");
   });
 });

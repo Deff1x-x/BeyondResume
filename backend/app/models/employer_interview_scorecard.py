@@ -18,23 +18,27 @@ class EmployerInterviewScorecard(TimestampMixin, Base):
             name="uq_employer_interview_scorecards_vacancy_candidate",
         ),
         CheckConstraint(
-            "technical_competency BETWEEN 1 AND 5",
+            "status IN ('draft', 'completed')",
+            name="ck_employer_interview_scorecards_status",
+        ),
+        CheckConstraint(
+            "technical_competency IS NULL OR technical_competency BETWEEN 1 AND 5",
             name="ck_employer_interview_scorecards_technical_competency",
         ),
         CheckConstraint(
-            "experience_relevance BETWEEN 1 AND 5",
+            "experience_relevance IS NULL OR experience_relevance BETWEEN 1 AND 5",
             name="ck_employer_interview_scorecards_experience_relevance",
         ),
         CheckConstraint(
-            "communication BETWEEN 1 AND 5",
+            "communication IS NULL OR communication BETWEEN 1 AND 5",
             name="ck_employer_interview_scorecards_communication",
         ),
         CheckConstraint(
-            "ownership BETWEEN 1 AND 5",
+            "ownership IS NULL OR ownership BETWEEN 1 AND 5",
             name="ck_employer_interview_scorecards_ownership",
         ),
         CheckConstraint(
-            "recommendation IN ('strong_yes', 'yes', 'mixed', 'no')",
+            "recommendation IS NULL OR recommendation IN ('strong_yes', 'yes', 'mixed', 'no')",
             name="ck_employer_interview_scorecards_recommendation",
         ),
     )
@@ -49,10 +53,11 @@ class EmployerInterviewScorecard(TimestampMixin, Base):
     candidate_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("candidate_profiles.id"), nullable=False
     )
-    technical_competency: Mapped[int] = mapped_column(Integer, nullable=False)
-    experience_relevance: Mapped[int] = mapped_column(Integer, nullable=False)
-    communication: Mapped[int] = mapped_column(Integer, nullable=False)
-    ownership: Mapped[int] = mapped_column(Integer, nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="draft")
+    technical_competency: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    experience_relevance: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    communication: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    ownership: Mapped[int | None] = mapped_column(Integer, nullable=True)
     interview_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
     interview_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
-    recommendation: Mapped[str] = mapped_column(String(20), nullable=False)
+    recommendation: Mapped[str | None] = mapped_column(String(20), nullable=True)

@@ -125,6 +125,7 @@ export function AiHiringWorkspace({ candidateId, vacancyId, enabled }: AiHiringW
         vacancyId={vacancyId}
         active="ai"
         hasApplied={details.has_applied}
+        isShortlisted={details.is_shortlisted}
       />
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_20rem] xl:gap-8">
         <main>

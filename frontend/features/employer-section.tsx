@@ -15,6 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { SkeletonCard, SkeletonListRow } from "@/components/ui/skeleton";
 import { VacancyApplicantsView } from "@/features/employer/vacancy-applicants-view";
 import { VacancyMatchCard } from "@/features/employer/vacancy-match-card";
+import { ShortlistSaveButton } from "@/features/employer/shortlist-save-button";
 import { cn } from "@/lib/cn";
 import { ApiClientError } from "@/lib/api/error";
 import { listVacancyMatches, listVacancyRequirements } from "@/lib/api/employer";
@@ -37,6 +38,7 @@ import {
   useUpdateEmployerCompany,
   useVacancyMatchesQuery,
   useVacancyRequirementsQuery,
+  useVacancyShortlistQuery,
   vacancyMatchesQueryKey,
   vacancyRequirementsQueryKey
 } from "@/lib/employer/hooks";
@@ -388,14 +390,32 @@ function VacancyDetail({
 
 function MatchCard({
   match,
-  vacancyId
-}: Readonly<{ match: VacancyMatch; vacancyId: string }>) {
-  return <VacancyMatchCard match={match} vacancyId={vacancyId} saved={false} />;
+  vacancyId,
+  saved
+}: Readonly<{ match: VacancyMatch; vacancyId: string; saved: boolean }>) {
+  return (
+    <VacancyMatchCard
+      match={match}
+      vacancyId={vacancyId}
+      saved={saved}
+      pipelineActions={
+        <ShortlistSaveButton
+          vacancyId={vacancyId}
+          candidateId={match.candidate_id}
+          candidateName={match.candidate_name}
+        />
+      }
+    />
+  );
 }
 
 function VacancyMatches({ vacancyId }: Readonly<{ vacancyId: string }>) {
   const matchesQuery = useVacancyMatchesQuery(vacancyId, true);
+  const shortlistQuery = useVacancyShortlistQuery(vacancyId, true);
   const matches = matchesQuery.data?.matches ?? [];
+  const savedIds = new Set(
+    (shortlistQuery.data?.entries ?? []).map((entry) => entry.candidate_id)
+  );
 
   return (
     <section
@@ -406,7 +426,7 @@ function VacancyMatches({ vacancyId }: Readonly<{ vacancyId: string }>) {
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">
-            AI recommendations
+            Recommendations
           </p>
           <h3
             id={`vacancy-matches-title-${vacancyId}`}
@@ -415,7 +435,8 @@ function VacancyMatches({ vacancyId }: Readonly<{ vacancyId: string }>) {
             Recommended Candidates
           </h3>
           <p className="mt-2 text-sm leading-6 text-secondary">
-            Review AI-recommended candidates for this vacancy. Hiring actions are available under Applicants.
+            Review recommended candidates for this vacancy, shortlist strong fits, then continue to
+            interview preparation.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -450,7 +471,7 @@ function VacancyMatches({ vacancyId }: Readonly<{ vacancyId: string }>) {
       {matchesQuery.isSuccess && matches.length === 0 ? (
         <EmptyState
           title="No recommended candidates yet"
-          description="AI recommendations will appear when suitable candidate evidence is available."
+          description="Recommendations appear when suitable candidate evidence is available."
           className="bg-surface py-10"
         />
       ) : null}
@@ -462,6 +483,7 @@ function VacancyMatches({ vacancyId }: Readonly<{ vacancyId: string }>) {
               key={match.candidate_id}
               match={match}
               vacancyId={vacancyId}
+              saved={savedIds.has(match.candidate_id)}
             />
           ))}
         </ul>

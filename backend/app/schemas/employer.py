@@ -186,6 +186,8 @@ class EmployerShortlistEntryResponse(BaseModel):
     candidate_id: UUID
     stage: EmployerCandidateStage
     note: str | None
+    scorecard_status: Literal["none", "draft", "completed"] = "none"
+    scorecard_recommendation: Literal["strong_yes", "yes", "mixed", "no"] | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -247,6 +249,7 @@ class MatchDetailsResponse(BaseModel):
     evidence: list[MatchDetailsEvidenceResponse]
     roadmap: list[MatchDetailsRoadmapItemResponse]
     has_applied: bool = False
+    is_shortlisted: bool = False
 
 
 ApplicationStatus = Literal["applied", "withdrawn"]

@@ -5,19 +5,22 @@ type MatchReviewNavigationProps = Readonly<{
   vacancyId: string;
   active: "review" | "ai" | "questions" | "scorecard";
   hasApplied?: boolean;
+  isShortlisted?: boolean;
 }>;
 
 export function MatchReviewNavigation({
   candidateId,
   vacancyId,
   active,
-  hasApplied = false
+  hasApplied = false,
+  isShortlisted = false
 }: MatchReviewNavigationProps) {
   const query = `vacancy_id=${encodeURIComponent(vacancyId)}`;
   const reviewHref = `/employer/matches/${encodeURIComponent(candidateId)}?${query}`;
   const aiHref = `/employer/matches/${encodeURIComponent(candidateId)}/ai-hiring?${query}`;
   const questionsHref = `/employer/matches/${encodeURIComponent(candidateId)}/interview-questions?${query}`;
   const scorecardHref = `/employer/matches/${encodeURIComponent(candidateId)}/scorecard?${query}`;
+  const showInterviewWorkflow = hasApplied || isShortlisted;
 
   const tabClass = (isActive: boolean) =>
     `rounded-control px-3 py-2 text-sm font-medium transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 ${
@@ -36,7 +39,7 @@ export function MatchReviewNavigation({
         aria-current={active === "review" ? "page" : undefined}
         className={tabClass(active === "review")}
       >
-        Candidate Review
+        Overview
       </Link>
       <Link
         href={aiHref}
@@ -45,21 +48,21 @@ export function MatchReviewNavigation({
       >
         AI Hiring
       </Link>
-      {hasApplied ? (
+      {showInterviewWorkflow ? (
         <>
           <Link
             href={questionsHref}
             aria-current={active === "questions" ? "page" : undefined}
             className={tabClass(active === "questions")}
           >
-            Questions
+            Interview
           </Link>
           <Link
             href={scorecardHref}
             aria-current={active === "scorecard" ? "page" : undefined}
             className={tabClass(active === "scorecard")}
           >
-            Interview Scorecard
+            Scorecard
           </Link>
         </>
       ) : null}
