@@ -351,9 +351,57 @@ export function CandidateComparisonView({
                   className="border-l border-border px-5 py-4 text-sm text-ink"
                 >
                   {row.match ? (
-                    <span className="text-lg font-semibold tabular-nums tracking-tight">{row.match.score}%</span>
+                    <div className="space-y-2">
+                      <span className="text-lg font-semibold tabular-nums tracking-tight">
+                        {row.match.score}%
+                      </span>
+                      <p className="text-xs leading-5 text-secondary">
+                        {row.match.required.matched.length} of{" "}
+                        {row.match.required.matched.length + row.match.required.missing.length}{" "}
+                        required · {row.match.preferred.matched.length} of{" "}
+                        {row.match.preferred.matched.length + row.match.preferred.missing.length}{" "}
+                        preferred
+                      </p>
+                    </div>
                   ) : (
                     <span className="text-secondary">Unavailable</span>
+                  )}
+                </td>
+              ))}
+            </tr>
+
+            <tr className="border-b border-border align-top">
+              <th
+                scope="row"
+                className="sticky left-0 z-10 bg-surface px-5 py-4 text-sm font-medium text-secondary"
+              >
+                Why this score
+              </th>
+              {rows.map((row) => (
+                <td
+                  key={`${row.candidateId}-why`}
+                  className="border-l border-border px-5 py-4 text-sm text-secondary"
+                >
+                  {row.match ? (
+                    <ul className="space-y-1.5">
+                      {row.match.required.missing.length > 0 ? (
+                        <li>
+                          Missing required: {row.match.required.missing.slice(0, 3).join(", ")}
+                        </li>
+                      ) : (
+                        <li>All required skills matched</li>
+                      )}
+                      {row.match.preferred.matched.length > 0 ? (
+                        <li>
+                          Preferred strengths:{" "}
+                          {row.match.preferred.matched.slice(0, 3).join(", ")}
+                        </li>
+                      ) : (
+                        <li>No preferred skills matched</li>
+                      )}
+                    </ul>
+                  ) : (
+                    <span>Unavailable</span>
                   )}
                 </td>
               ))}

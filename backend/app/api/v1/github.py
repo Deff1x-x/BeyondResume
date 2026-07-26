@@ -28,6 +28,7 @@ from app.schemas.github import (
 )
 from app.schemas.resume import JobPollingResponse
 from app.services.candidate import get_candidate_profile
+from app.services.demo_users import reject_demo_fixture_mutation
 from app.services.github_repository import (
     GitHubRepositoryConflictError,
     connect_github_repository,
@@ -208,6 +209,7 @@ def connect_repository(
     current_user: Annotated[User, Depends(require_candidate)],
     session: Annotated[Session, Depends(get_db)],
 ) -> GitHubRepositoryResponse:
+    reject_demo_fixture_mutation(current_user, action="replace demo GitHub fixtures")
     profile = _require_profile(session, current_user)
     try:
         repository = connect_github_repository(session, profile.id, request.repository_url)
@@ -350,6 +352,7 @@ def delete_repository(
     current_user: Annotated[User, Depends(require_candidate)],
     session: Annotated[Session, Depends(get_db)],
 ) -> Response:
+    reject_demo_fixture_mutation(current_user, action="remove demo GitHub fixtures")
     profile = _require_profile(session, current_user)
     try:
         deleted = disconnect_github_repository(session, profile.id, repository_id)

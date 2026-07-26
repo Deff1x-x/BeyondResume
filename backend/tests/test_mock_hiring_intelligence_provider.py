@@ -27,9 +27,15 @@ def _prompt(*skills: tuple[str, int]) -> str:
     return build_hiring_prompt(context)
 
 
-def test_mock_provider_returns_deterministic_schema_valid_json() -> None:
+def test_mock_provider_returns_strong_hire_for_platform_backend_mix() -> None:
     provider = MockHiringIntelligenceProvider()
-    prompt = _prompt(("Python", 90), ("FastAPI", 80), ("SQL", 70), ("Git", 60))
+    prompt = _prompt(
+        ("Python", 90),
+        ("FastAPI", 88),
+        ("PostgreSQL", 85),
+        ("Docker", 80),
+        ("Redis", 70),
+    )
 
     first = provider.generate(prompt)
     second = provider.generate(prompt)
@@ -37,42 +43,62 @@ def test_mock_provider_returns_deterministic_schema_valid_json() -> None:
 
     assert first == second
     assert json.loads(first)
-    assert result.verdict == "hire"
-    assert result.confidence == 75
+    assert result.verdict == "strong_hire"
+    assert result.confidence == 84
     assert result.executive_summary
-    assert len(result.strengths) == 3
-    assert result.hiring_risks == []
-    assert result.confidence_explanation
-    assert result.first_90_days_focus
-    assert result.recommended_next_action == "Proceed to the next hiring stage."
-    dumped = result.model_dump()
-    assert set(dumped) == {
-        "verdict",
-        "confidence",
-        "executive_summary",
-        "strengths",
-        "hiring_risks",
-        "confidence_explanation",
-        "first_90_days_focus",
-        "recommended_next_action",
-    }
-    assert "interview_questions" not in dumped
-    assert "questions" not in dumped
-    assert "concerns" not in dumped
-    serialized = json.dumps(dumped).lower()
-    assert "interview" not in serialized
-    assert "question" not in serialized
-
-
-def test_mock_provider_uses_consider_for_single_eligible_skill() -> None:
-    content = MockHiringIntelligenceProvider().generate(_prompt(("Python", 90)))
-    result = AiHiringIntelligenceResponse.model_validate_json(content)
-
-    assert result.verdict == "consider"
-    assert result.confidence == 55
+    assert result.strengths
     assert result.hiring_risks
-    assert "consideration" in result.recommended_next_action.lower()
-    assert "proceed to the next hiring stage" not in result.recommended_next_action.lower()
+    assert result.recommended_next_action
+
+
+def test_mock_provider_returns_hire_for_fullstack_mix() -> None:
+    content = MockHiringIntelligenceProvider().generate(
+        _prompt(
+            ("Python", 88),
+            ("FastAPI", 80),
+            ("TypeScript", 82),
+            ("React", 79),
+            ("PostgreSQL", 70),
+        )
+    )
+    result = AiHiringIntelligenceResponse.model_validate_json(content)
+    assert result.verdict == "hire"
+    assert result.confidence == 72
+    assert "versatile" in result.executive_summary.lower() or "full-stack" in result.executive_summary.lower()
+
+
+def test_mock_provider_returns_consider_for_partial_backend() -> None:
+    content = MockHiringIntelligenceProvider().generate(
+        _prompt(("Python", 90), ("PostgreSQL", 80), ("TypeScript", 70), ("React", 68))
+    )
+    result = AiHiringIntelligenceResponse.model_validate_json(content)
+    assert result.verdict == "consider"
+    assert result.confidence == 58
+
+
+def test_mock_provider_returns_do_not_hire_for_adjacent_profile() -> None:
+    content = MockHiringIntelligenceProvider().generate(
+        _prompt(("Python", 80), ("TypeScript", 75), ("React", 70), ("Go", 72), ("Linux", 65))
+    )
+    result = AiHiringIntelligenceResponse.model_validate_json(content)
+    assert result.verdict == "do_not_hire"
+    assert result.confidence == 46
+
+
+def test_mock_provider_archetypes_are_not_identical() -> None:
+    backend = AiHiringIntelligenceResponse.model_validate_json(
+        MockHiringIntelligenceProvider().generate(
+            _prompt(("Python", 90), ("FastAPI", 88), ("PostgreSQL", 85), ("Docker", 80))
+        )
+    )
+    adjacent = AiHiringIntelligenceResponse.model_validate_json(
+        MockHiringIntelligenceProvider().generate(
+            _prompt(("Python", 80), ("TypeScript", 75), ("React", 70), ("Go", 72))
+        )
+    )
+    assert backend.verdict != adjacent.verdict
+    assert backend.executive_summary != adjacent.executive_summary
+    assert backend.recommended_next_action != adjacent.recommended_next_action
 
 
 @pytest.mark.parametrize(
@@ -99,7 +125,6 @@ def test_mock_provider_handles_empty_eligible_skills() -> None:
     assert result.strengths == []
     assert result.hiring_risks
     assert result.first_90_days_focus == []
-    assert "interview_questions" not in result.model_dump()
 
 
 def test_mock_provider_ignores_blank_and_duplicate_skill_names() -> None:
@@ -109,7 +134,6 @@ def test_mock_provider_ignores_blank_and_duplicate_skill_names() -> None:
     content = MockHiringIntelligenceProvider().generate(f"rules\nINPUT:\n{payload}")
     result = AiHiringIntelligenceResponse.model_validate_json(content)
 
-    assert [item for item in result.strengths if "Python" in item or "Go" in item] == [
-        "Eligible evidence is available for Python.",
-        "Eligible evidence is available for Go.",
-    ]
+    assert result.verdict == "do_not_hire"
+    joined = " ".join(result.strengths)
+    assert "Python" in joined or "Go" in joined

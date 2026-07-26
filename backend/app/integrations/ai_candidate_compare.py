@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Protocol
 
 from app.core.config import settings
+from app.core.llm_context import resolve_llm_provider
 
 
 class AiCandidateCompareProvider(Protocol):
@@ -19,22 +20,24 @@ class AiCandidateCompareProviderConfigurationError(Exception):
 
 def get_ai_candidate_compare_provider() -> AiCandidateCompareProvider:
     """Wire the configured transport while keeping implementations lazy."""
-    if settings.llm_provider == "mock":
+    _ = settings  # Public module compatibility for provider configuration tests.
+    provider = resolve_llm_provider()
+    if provider == "mock":
         from app.integrations.mock_ai_candidate_compare import MockAiCandidateCompareProvider
 
         return MockAiCandidateCompareProvider()
-    if settings.llm_provider == "openai":
+    if provider == "openai":
         from app.integrations.openai_ai_candidate_compare import OpenAIAiCandidateCompareProvider
 
         return OpenAIAiCandidateCompareProvider()
 
     raise AiCandidateCompareProviderConfigurationError(
-        f"Unsupported AI Candidate Compare provider: {settings.llm_provider!r}"
+        f"Unsupported AI Candidate Compare provider: {provider!r}"
     )
 
 
 def generation_mode_for_provider() -> str:
     """Backend-owned live/mock flag derived from settings, never from model output."""
-    if settings.llm_provider == "openai":
+    if resolve_llm_provider() == "openai":
         return "live"
     return "mock"

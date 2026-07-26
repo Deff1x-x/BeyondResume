@@ -168,9 +168,12 @@ def parse_explanation_json(content: str) -> AiMatchExplanationResponse:
 
 
 def get_llm_provider() -> LlmProvider:
-    if settings.llm_provider == "mock":
+    from app.core.llm_context import resolve_llm_provider
+
+    provider = resolve_llm_provider()
+    if provider == "mock":
         return _MockLlmProvider()
-    if settings.llm_provider == "openai":
+    if provider == "openai":
         return _OpenAiLlmProvider()
     raise MatchExplanationUnavailableError("LLM provider is not configured")
 

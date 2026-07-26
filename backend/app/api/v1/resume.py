@@ -14,6 +14,7 @@ from app.db.session import get_db
 from app.models.job import JobStatus
 from app.models.user import User
 from app.schemas.resume import JobPollingResponse, ResumeResponse, ResumeUploadAcceptedResponse
+from app.services.demo_users import reject_demo_fixture_mutation
 from app.services.resume import (
     CandidateProfileRequiredError,
     CHUNK_SIZE,
@@ -80,6 +81,7 @@ async def create_resume(
     current_user: Annotated[User, Depends(require_candidate)],
     session: Annotated[Session, Depends(get_db)],
 ) -> ResumeUploadAcceptedResponse:
+    reject_demo_fixture_mutation(current_user, action="upload permanent resume files")
     try:
         upload_result = await _upload_resume_from_request(session, current_user.id, file)
     except CandidateProfileRequiredError:

@@ -24,13 +24,16 @@ def verify_password(plain_password: str, password_hash: str) -> bool:
         return False
 
 
-def create_access_token(user_id: UUID) -> str:
+def create_access_token(user_id: UUID, *, demo: bool = False) -> str:
     if not settings.jwt_secret:
         raise RuntimeError("JWT_SECRET must be configured")
 
     expires_at = datetime.now(UTC) + timedelta(minutes=settings.jwt_access_ttl_minutes)
+    payload: dict[str, object] = {"sub": str(user_id), "exp": expires_at}
+    if demo:
+        payload["demo"] = True
     return jwt.encode(
-        {"sub": str(user_id), "exp": expires_at},
+        payload,
         settings.jwt_secret,
         algorithm=JWT_ALGORITHM,
     )
@@ -49,3 +52,14 @@ def decode_access_token(token: str) -> UUID:
         return UUID(subject)
     except ValueError as error:
         raise InvalidTokenError("Token subject is invalid") from error
+
+
+def access_token_is_demo(token: str) -> bool:
+    """Return True when the token carries an explicit Demo Mode claim."""
+    if not settings.jwt_secret:
+        return False
+    try:
+        payload = jwt.decode(token, settings.jwt_secret, algorithms=[JWT_ALGORITHM])
+    except InvalidTokenError:
+        return False
+    return payload.get("demo") is True

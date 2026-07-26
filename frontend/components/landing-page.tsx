@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { DemoEntryButton } from "@/components/demo-entry";
 import { EvidenceFlowVisual } from "@/components/evidence-flow-visual";
 import { EvidenceIntelligenceFlow } from "@/components/evidence-intelligence-flow";
 import { Reveal } from "@/components/reveal";
@@ -135,18 +136,13 @@ export function LandingPage({ sessionError }: Readonly<{ sessionError: boolean }
             </p>
           ) : null}
           <div className="mt-9 flex flex-wrap gap-3">
+            <DemoEntryButton />
             <Link
               href="/register"
-              className={cn(primaryActionClass, "px-6 shadow-accent/25")}
+              className={cn(secondaryActionClass, "px-6")}
             >
               Build your evidence profile
             </Link>
-            <a
-              href="#for-employers"
-              className={cn(secondaryActionClass, "px-6")}
-            >
-              Explore employer workflow
-            </a>
           </div>
         </Reveal>
 
